@@ -24,7 +24,7 @@ function getOpenRouterConfig() {
   return {
     apiKey: process.env.OPENROUTER_API_KEY || "",
     baseUrl: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-    paidModel: process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini",
+    paidModel: process.env.OPENROUTER_MODEL || "minimax/minimax-m2.5:free",
     freeModels,
   };
 }
@@ -220,7 +220,7 @@ class OpenRouterService {
   }
 
   // ===========================================================================
-  // Convenience: Chat with prompt caching (Anthropic models)
+  // Convenience: Chat with prompt caching
   // ===========================================================================
   public async chatWithCaching(
     messages: ChatMessage[],
