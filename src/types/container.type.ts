@@ -1,4 +1,4 @@
-import { config } from "../config";
+import { config } from "../core";
 import { prisma } from "../infrastructures/db.infrastructure";
 import { transporter } from "../infrastructures/mail.infrastructure";
 import { logger } from "../utils/logger.util";

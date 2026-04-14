@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import JadwalService from "../services/jadwal.service";
 import { APIError } from "../utils/api-error.util";
-import { JenisJadwal } from "@prisma/client";
+import { JenisJadwal, LogActorType } from "@prisma/client";
 
 export default class JadwalHandler {
   public static async getMe(c: Context) {
@@ -27,13 +27,35 @@ export default class JadwalHandler {
 
   public static async post(c: Context) {
     const data = await c.req.json();
-    return c.json(await JadwalService.post(data), 201);
+    const userPayload = c.get("user");
+    if (!userPayload || typeof userPayload !== "object") {
+      throw new APIError("Informasi otentikasi tidak ditemukan atau tidak valid.", 401);
+    }
+
+    const context = {
+      actor_id: userPayload.id || userPayload.email || "unknown",
+      actor_type: userPayload.role === "admin" ? LogActorType.KOORDINATOR : 
+                  userPayload.role === "dosen" ? LogActorType.DOSEN : LogActorType.MAHASISWA,
+    };
+
+    return c.json(await JadwalService.post(data, context), 201);
   }
 
   public static async put(c: Context) {
     const { id } = c.req.param();
     const body = await c.req.json();
-    return c.json(await JadwalService.put(id, body));
+    const userPayload = c.get("user");
+    if (!userPayload || typeof userPayload !== "object") {
+      throw new APIError("Informasi otentikasi tidak ditemukan atau tidak valid.", 401);
+    }
+
+    const context = {
+      actor_id: userPayload.id || userPayload.email || "unknown",
+      actor_type: userPayload.role === "admin" ? LogActorType.KOORDINATOR : 
+                  userPayload.role === "dosen" ? LogActorType.DOSEN : LogActorType.MAHASISWA,
+    };
+
+    return c.json(await JadwalService.put(id, body, context));
   }
 
   public static async delete(c: Context) {

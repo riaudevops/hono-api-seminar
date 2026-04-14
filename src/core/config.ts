@@ -79,6 +79,15 @@ const envSchema = z.object({
   // Email Configuration
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
+
+  // OpenRouter Configuration
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_BASE_URL: z.string().default("https://openrouter.ai/api/v1"),
+  OPENROUTER_MODEL: z.string().default("openai/gpt-4o-mini"),
+  OPENROUTER_FREE_MODELS: z
+    .string()
+    .default("google/gemma-3-27b-it:free,deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-4-maverick:free")
+    .transform((val) => val.split(",").map((s) => s.trim()).filter(Boolean)),
 });
 
 // =============================================================================
@@ -198,6 +207,16 @@ class Config {
     return {
       user: this.config.EMAIL_USER,
       pass: this.config.EMAIL_PASS,
+    };
+  }
+
+  // OpenRouter getters
+  public get openrouter() {
+    return {
+      apiKey: this.config.OPENROUTER_API_KEY,
+      baseUrl: this.config.OPENROUTER_BASE_URL,
+      model: this.config.OPENROUTER_MODEL,
+      freeModels: this.config.OPENROUTER_FREE_MODELS,
     };
   }
 

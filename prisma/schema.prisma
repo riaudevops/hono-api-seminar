@@ -38,6 +38,19 @@ enum LogActorType {
   MAHASISWA
 }
 
+enum StatusJadwalDraft {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum ConstraintType {
+  AVAILABLE_TIME    // Ketersediaan waktu (Misal: Hanya bisa Senin pagi)
+  UNAVAILABLE_TIME  // Waktu berhalangan (Misal: Cuti atau Mengajar)
+  PREFERENCE        // Preferensi (Misal: Ingin menguji maksimal 3 kali sehari)
+  LOCATION          // Batasan fisik (Misal: Hanya bisa di Kampus A / Online)
+}
+
 model dosen {
   nip    String @id @db.VarChar(18)
   nama   String @db.VarChar(255)
@@ -45,6 +58,7 @@ model dosen {
   no_hp  String? @unique @db.VarChar(14)
 
   penilaian penilaian[]
+  constraintDosens constraint_dosen[]
 }
 
 
@@ -85,7 +99,28 @@ model jadwal {
   @@index([tanggal])
 }
 
+model jadwal_draft {
+  id             String            @id @default(cuid())
+  nim            String
+  jenis          JenisJadwal
+  
+  // Slot yang diusulkan AI
+  tanggal        DateTime          @db.Timestamptz
+  waktu_mulai    DateTime          @db.Timestamptz
+  waktu_selesai  DateTime          @db.Timestamptz
+  kode_ruangan   String            @db.VarChar(10)
 
+  // Data Penilai dari Spreadsheet (Disimpan sementara)
+  // Format JSON: [{nip: "...", role: "TA_PEMBIMBING_1"}, {nip: "...", role: "TA_PENGUJI_1"}]
+  list_dosen   Json              
+
+  // Metadata AI
+  llm_reasoning  Json?
+  confidence     Float?
+  status         StatusJadwalDraft @default(DRAFT)
+
+  created_at     DateTime          @default(now()) @db.Timestamptz
+}
 model komponen_penilaian {
   id         String  @id @db.VarChar(7)
   nama       String  @db.VarChar(50)
@@ -158,4 +193,32 @@ model log_penilaian {
 
   @@index([id_jadwal])
   @@index([actor_id])
+}
+
+model constraint_dosen {
+  id          String         @id @default(cuid())
+  nip         String         @db.VarChar(18)
+  type        ConstraintType
+  
+  // Rentang waktu jika constraint berbasis waktu
+  hari        Int?           // 1 (Senin) - 7 (Minggu)
+  waktu_mulai  DateTime?      @db.Timestamptz
+  waktu_selesai DateTime?     @db.Timestamptz
+  
+  // Deskripsi tekstual untuk diproses LLM (NLP)
+  keterangan  String?        @db.Text
+  
+  // Metadata tambahan untuk LLM (misal: bobot prioritas 1-5)
+  priority    Int            @default(1) 
+  
+  is_active   Boolean        @default(true)
+  created_at  DateTime       @default(now()) @db.Timestamptz
+  updated_at  DateTime       @updatedAt @db.Timestamptz
+
+  dosen       dosen          @relation(fields: [nip], references: [nip])
+
+  raw_data   Json?
+
+  @@index([nip])
+  @@index([type])
 }

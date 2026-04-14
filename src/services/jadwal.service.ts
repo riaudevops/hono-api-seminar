@@ -3,13 +3,19 @@ import { APIError } from "../utils/api-error.util";
 import { CreateJadwalType, UpdateJadwalType } from "../types/jadwal.type";
 import JadwalHelper from "../helpers/jadwal.helper";
 import TahunAjaranHelper from "../helpers/tahun-ajaran.helper";
-import { JenisJadwal, PenilaiRole } from "@prisma/client";
+import { JenisJadwal, PenilaiRole, LogActionType, LogActorType } from "@prisma/client";
 import RuanganHelper from "../helpers/ruangan.helper";
 import DosenHelper from "../helpers/dosen.helper";
 import MahasiswaRepository from "../repositories/mahasiswa.repository";
 import DosenRepository from "../repositories/dosen.repository";
 import RuanganRepository from "../repositories/ruangan.repository";
 import PenilaianRepository from "../repositories/penilaian.repository";
+import prisma from "../infrastructures/db.infrastructure";
+
+export interface LogJadwalContext {
+  actor_id: string;
+  actor_type: LogActorType;
+}
 
 interface DosenAssignment {
   nip: string;
@@ -88,7 +94,7 @@ export default class JadwalService {
     };
   }
 
-  public static async post(data: CreateJadwalType & { penilai?: DosenAssignment[] }) {
+  public static async post(data: CreateJadwalType & { penilai?: DosenAssignment[] }, context: LogJadwalContext) {
     await this.validateMahasiswa(data.nim);
     await this.validateRuangan(data.kode_ruangan);
 
@@ -151,6 +157,17 @@ export default class JadwalService {
       waktu_selesai: completeJadwal?.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_selesai) : null,
     };
 
+    // Create log_jadwal for CREATE action
+    await prisma.log_jadwal.create({
+      data: {
+        action: LogActionType.CREATE,
+        actor_type: context.actor_type,
+        actor_id: context.actor_id,
+        jadwal_id: id,
+        new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
+      },
+    });
+
     return {
       response: true,
       message: "Jadwal berhasil ditambahkan",
@@ -158,7 +175,7 @@ export default class JadwalService {
     };
   }
 
-  public static async put(id: string, data: UpdateJadwalType & { penilai?: DosenAssignment[] }) {
+  public static async put(id: string, data: UpdateJadwalType & { penilai?: DosenAssignment[] }, context: LogJadwalContext) {
     const existingJadwal = await JadwalRepository.findById(id);
     if (!existingJadwal) {
       throw new APIError("Jadwal tidak ditemukan", 404);
@@ -224,6 +241,18 @@ export default class JadwalService {
       waktu_mulai: completeJadwal?.waktu_mulai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_mulai) : null,
       waktu_selesai: completeJadwal?.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_selesai) : null,
     };
+
+    // Create log_jadwal for UPDATE action
+    await prisma.log_jadwal.create({
+      data: {
+        action: LogActionType.UPDATE,
+        actor_type: context.actor_type,
+        actor_id: context.actor_id,
+        jadwal_id: id,
+        old_values: JSON.parse(JSON.stringify(existingJadwal)),
+        new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
+      },
+    });
 
     return {
       response: true,

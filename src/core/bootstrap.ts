@@ -1,7 +1,7 @@
 import { container, ServiceTokens } from "./container";
-import { createLogger } from "./utils/logger.util";
-import { database, getPrisma } from "./infrastructures/db.infrastructure";
-import { mailService, getTransporter } from "./infrastructures/mail.infrastructure";
+import { createLogger } from "../utils/logger.util";
+import { database, getPrisma } from "../infrastructures/db.infrastructure";
+import { mailService, getTransporter } from "../infrastructures/mail.infrastructure";
 
 // =============================================================================
 // Bootstrap: Register all services in the DI Container
@@ -20,7 +20,7 @@ export async function bootstrap(): Promise<void> {
   bootstrapLogger.debug("Config registered");
 
   // Register Logger (Singleton)
-  const { logger } = await import("./utils/logger.util");
+  const { logger } = await import("../utils/logger.util");
   container.registerInstance(ServiceTokens.LOGGER, logger);
   bootstrapLogger.debug("Logger registered");
 

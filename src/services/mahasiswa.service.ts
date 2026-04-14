@@ -27,17 +27,15 @@ export default class MahasiswaService {
     };
   }
   public static async getAll(page: number, limit: number, sortBy?: "asc" | "desc") {
-    const skip = (page - 1) * limit;
-    const totalMahasiswa = await MahasiswaRepository.countAll();
-    const allMahasiswa = await MahasiswaRepository.findAll(skip, limit, sortBy);
-    if (!allMahasiswa) {
+    const allMahasiswa = await MahasiswaRepository.findAllFromSheet();
+    if (!allMahasiswa || allMahasiswa.length === 0) {
       throw new APIError(`Tidak ada data mahasiswa`, 404);
     }
 
     const { tahunSekarang, semesterSekarang } = getCurrentAcademicInfo();
 
     const mahasiswaWithSemester = allMahasiswa.map((m) => {
-      const angkatan = parseInt(`20${m.nim.slice(1, 3)}`);
+      const angkatan = m.nim ? parseInt(`20${m.nim.slice(1, 3)}`) : 0;
       const semester = (tahunSekarang - angkatan) * 2 + semesterSekarang;
       return { ...m, semester, angkatan };
     });
@@ -46,20 +44,30 @@ export default class MahasiswaService {
       return m.semester >= 6;
     });
 
-    if (filteredMahasiswa.length === 0) {
-      throw new APIError(`Tidak ada mahasiswa di semester 6 atau lebih.`, 404);
+    // Sort by nama if requested
+    if (sortBy) {
+      filteredMahasiswa.sort((a, b) =>
+        sortBy === "asc" ? a.nama.localeCompare(b.nama) : b.nama.localeCompare(a.nama)
+      );
     }
+
+    const total = filteredMahasiswa.length;
+    const skip = (page - 1) * limit;
+    const paginatedData = filteredMahasiswa.slice(skip, skip + limit).map((m) => {
+      const { no, nim, nama, jenisSeminar, ...rest } = m;
+      return rest;
+    });
 
     return {
       response: true,
       message: "Data semua mahasiswa berhasil diambil.",
       data: {
-        mahasiswa: filteredMahasiswa,
+        mahasiswa: paginatedData,
         pagination: {
-          total: totalMahasiswa,
+          total,
           page,
           limit,
-          totalPages: Math.ceil(totalMahasiswa / limit),
+          totalPages: Math.ceil(total / limit),
         },
       },
     };
@@ -76,24 +84,29 @@ export default class MahasiswaService {
     };
   }
   public static async search(query?: string, filterAngkatan?: number, sortBy?: "asc" | "desc", page: number = 1, limit: number = 10) {
-    // Ambil semua data atau filter berdasarkan angkatan saja (tanpa query text)
-    const sqlResults = filterAngkatan ? await MahasiswaRepository.findByAngkatan(filterAngkatan, sortBy) : await MahasiswaRepository.findAll(undefined, undefined, sortBy);
+    // Ambil semua data dari spreadsheet
+    const sheetResults = await MahasiswaRepository.findAllFromSheet();
 
-    if (!sqlResults || (sqlResults as any[]).length === 0) {
+    if (!sheetResults || sheetResults.length === 0) {
       throw new APIError(`Mahasiswa tidak ditemukan`, 404);
     }
 
     const { tahunSekarang, semesterSekarang } = getCurrentAcademicInfo();
 
     // Tambahkan informasi semester dan angkatan
-    const mahasiswaWithDetails = (sqlResults as any[]).map((m: any) => {
-      const angkatan = parseInt(`20${m.nim.slice(1, 3)}`);
+    const mahasiswaWithDetails = sheetResults.map((m: any) => {
+      const angkatan = m.nim ? parseInt(`20${m.nim.slice(1, 3)}`) : 0;
       const semester = (tahunSekarang - angkatan) * 2 + semesterSekarang;
       return { ...m, semester, angkatan };
     });
 
     // Filter hanya mahasiswa semester 6 ke atas
-    const filteredMahasiswa = mahasiswaWithDetails.filter((m) => m.semester >= 6);
+    let filteredMahasiswa = mahasiswaWithDetails.filter((m) => m.semester >= 6);
+
+    // Filter berdasarkan angkatan jika ada
+    if (filterAngkatan) {
+      filteredMahasiswa = filteredMahasiswa.filter((m) => m.angkatan === filterAngkatan);
+    }
 
     if (filteredMahasiswa.length === 0) {
       throw new APIError(`Tidak ada mahasiswa di semester 6 atau lebih.`, 404);
@@ -211,7 +224,7 @@ export default class MahasiswaService {
   }
 
   public static async getAngkatanList() {
-    const angkatanList = await MahasiswaRepository.findDistinctAngkatan();
+    const angkatanList = await MahasiswaRepository.findAngkatanFromSheet();
     return {
       response: true,
       message: "Data angkatan berhasil diambil.",

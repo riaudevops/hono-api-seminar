@@ -2,9 +2,8 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { RegExpRouter } from "hono/router/reg-exp-router";
 import { swaggerUI } from "@hono/swagger-ui";
-import { apiReference } from "@scalar/hono-api-reference";
-import { config } from "./config";
-import { bootstrap, shutdown } from "./bootstrap";
+import { config } from "./core";
+import { bootstrap, shutdown } from "./core";
 import { createLogger } from "./utils/logger.util";
 import GlobalHandler from "./handlers/global.handler";
 import globalRoute from "./routes/global.route";
@@ -13,6 +12,8 @@ import jadwalRoute from "./routes/jadwal.route";
 import ruanganRoute from "./routes/ruangan.route";
 import dosenRoute from "./routes/dosen.route";
 import mahasiswaRoute from "./routes/mahasiswa.route";
+import komponenRoute from "./routes/komponen-penilaian.route";
+import penilaianRoute from "./routes/penilaian.route";
 
 const logger = createLogger("Server");
 
@@ -63,20 +64,13 @@ app.get(
   }),
 );
 
-// Scalar API Reference (alternative UI)
-app.get(
-  "/reference",
-  apiReference({
-    theme: "purple",
-    url: "/openapi.json",
-  }),
-);
-
 app.route("/", globalRoute);
 app.route("/", jadwalRoute);
 app.route("/", ruanganRoute);
 app.route("/", dosenRoute);
 app.route("/", mahasiswaRoute);
+app.route("/", komponenRoute);
+app.route("/", penilaianRoute);
 
 // Graceful shutdown handlers
 process.on("SIGINT", async () => {
