@@ -5,16 +5,16 @@
 // --- Chat Message Types ---
 
 export interface TextContent {
-  type: "text";
+  type: 'text';
   text: string;
 }
 
 export interface CacheControl {
-  type: "ephemeral";
+  type: 'ephemeral';
 }
 
 export interface CacheableTextContent {
-  type: "text";
+  type: 'text';
   text: string;
   cache_control?: CacheControl;
 }
@@ -22,13 +22,13 @@ export interface CacheableTextContent {
 export type MessageContent = string | (TextContent | CacheableTextContent)[];
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: MessageContent;
 }
 
 // --- Provider Routing ---
 
-export type ProviderSort = "price" | "throughput" | "latency";
+export type ProviderSort = 'price' | 'throughput' | 'latency';
 
 export interface ProviderPreferences {
   /** Sort providers by criteria */
@@ -52,7 +52,7 @@ export interface ProviderPreferences {
   /** Require parameter support */
   require_parameters?: boolean;
   /** Data collection policy */
-  data_collection?: "allow" | "deny";
+  data_collection?: 'allow' | 'deny';
 }
 
 // --- Fallback Model ---
@@ -67,13 +67,13 @@ export interface FallbackModel {
 // --- Prediction (Predicted Outputs) ---
 
 export interface Prediction {
-  type: "content";
+  type: 'content';
   content: string;
 }
 
 // --- Reasoning ---
 
-export type ReasoningEffort = "low" | "medium" | "high";
+export type ReasoningEffort = 'low' | 'medium' | 'high';
 
 // --- Chat Completion Options ---
 
@@ -93,7 +93,7 @@ export interface ChatCompletionOptions {
   /** Fallback models array — enables route: 'fallback' */
   models?: FallbackModel[];
   /** Routing strategy: 'fallback' for uptime, 'leaderboard' for quality */
-  route?: "fallback" | "leaderboard";
+  route?: 'fallback' | 'leaderboard';
   /** Allow fallbacks to other providers when primary fails */
   allow_fallbacks?: boolean;
 
@@ -133,23 +133,23 @@ export interface ChatCompletionResponse {
 
 /** Create a text message */
 export function textMessage(
-  role: ChatMessage["role"],
-  content: string,
+  role: ChatMessage['role'],
+  content: string
 ): ChatMessage {
   return { role, content };
 }
 
 /** Create a multipart message with cache breakpoints */
 export function cachedMessage(
-  role: ChatMessage["role"],
-  parts: { text: string; cache?: boolean }[],
+  role: ChatMessage['role'],
+  parts: { text: string; cache?: boolean }[]
 ): ChatMessage {
   return {
     role,
     content: parts.map((p) => ({
-      type: "text" as const,
+      type: 'text' as const,
       text: p.text,
-      ...(p.cache ? { cache_control: { type: "ephemeral" as const } } : {}),
+      ...(p.cache ? { cache_control: { type: 'ephemeral' as const } } : {}),
     })),
   };
 }

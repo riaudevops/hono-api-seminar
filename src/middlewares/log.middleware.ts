@@ -1,15 +1,17 @@
-import { Context, Next } from "hono";
-import { getConnInfo } from "hono/bun";
-import LogHelper from "../helpers/log.helper";
-import { createLogger } from "../utils/logger.util";
+import { Context, Next } from 'hono';
+import { getConnInfo } from 'hono/bun';
+import LogHelper from '../helpers/log.helper';
+import { createLogger } from '../utils/logger.util';
 
-const requestLogger = createLogger("HTTP");
+const requestLogger = createLogger('HTTP');
 
 export default class LogMiddleware {
   private static async extractRequest(c: Context) {
     const conn = getConnInfo(c);
-    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || conn.remote.address;
-    const user_agent = c.req.header("user-agent");
+    const ip =
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      conn.remote.address;
+    const user_agent = c.req.header('user-agent');
     const method = LogHelper.colorMethod(c.req.method);
     const path = c.req.path;
 
@@ -21,7 +23,7 @@ export default class LogMiddleware {
     const { ip, user_agent } = await LogMiddleware.extractRequest(c);
 
     // set network_log_data to context
-    c.set("network_log_data", { ip, user_agent });
+    c.set('network_log_data', { ip, user_agent });
     return next();
   }
 
@@ -47,10 +49,12 @@ export default class LogMiddleware {
   public static async structuredLogger(c: Context, next: Next) {
     const start = Date.now();
     const conn = getConnInfo(c);
-    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || conn.remote.address;
+    const ip =
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      conn.remote.address;
     const method = c.req.method;
     const path = c.req.path;
-    const userAgent = c.req.header("user-agent");
+    const userAgent = c.req.header('user-agent');
 
     // Log incoming request
     requestLogger.info(`Incoming ${method} request`, {
@@ -65,7 +69,7 @@ export default class LogMiddleware {
     const status = c.res.status;
 
     // Log response based on status code
-    const logMethod = status >= 500 ? "error" : status >= 400 ? "warn" : "info";
+    const logMethod = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
     requestLogger[logMethod](`${method} ${path} completed`, {
       status,
       duration: `${duration}ms`,

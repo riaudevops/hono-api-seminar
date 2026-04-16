@@ -1,5 +1,5 @@
-import MahasiswaRepository from "../repositories/mahasiswa.repository";
-import { APIError } from "../utils/api-error.util";
+import MahasiswaRepository from '../repositories/mahasiswa.repository';
+import { APIError } from '../utils/api-error.util';
 
 export default class MahasiswaHelper {
   public static async validate(nim: string) {

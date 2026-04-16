@@ -1,4 +1,4 @@
-import prisma from "../infrastructures/db.infrastructure";
+import prisma from '../infrastructures/db.infrastructure';
 
 export interface CreateDosenInput {
   nip: string;
@@ -17,7 +17,7 @@ export default class DosenRepository {
   public static async findAll() {
     return prisma.dosen.findMany({
       orderBy: {
-        nama: "asc",
+        nama: 'asc',
       },
     });
   }
@@ -61,7 +61,12 @@ export default class DosenRepository {
     });
   }
 
-  public static async checkDosenTimeConflict(nips: string[], waktu_mulai: Date, waktu_selesai: Date, excludeJadwalId?: string) {
+  public static async checkDosenTimeConflict(
+    nips: string[],
+    waktu_mulai: Date,
+    waktu_selesai: Date,
+    excludeJadwalId?: string
+  ) {
     return prisma.jadwal.findFirst({
       where: {
         ...(excludeJadwalId && { id: { not: excludeJadwalId } }),

@@ -1,5 +1,5 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { PenilaiRole } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { PenilaiRole } from '@prisma/client';
 
 export interface CreateKomponenPenilaianInput {
   id: string;
@@ -19,7 +19,7 @@ export interface UpdateKomponenPenilaianInput {
 export default class KomponenPenilaianRepository {
   public static async findAll() {
     return prisma.komponen_penilaian.findMany({
-      orderBy: [{ role: "asc" }, { id: "asc" }],
+      orderBy: [{ role: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -32,7 +32,7 @@ export default class KomponenPenilaianRepository {
   public static async findByRole(role: PenilaiRole) {
     return prisma.komponen_penilaian.findMany({
       where: { role },
-      orderBy: { id: "asc" },
+      orderBy: { id: 'asc' },
     });
   }
 
@@ -42,14 +42,14 @@ export default class KomponenPenilaianRepository {
         role,
         is_aktif: true,
       },
-      orderBy: { id: "asc" },
+      orderBy: { id: 'asc' },
     });
   }
 
   public static async findAktif() {
     return prisma.komponen_penilaian.findMany({
       where: { is_aktif: true },
-      orderBy: [{ role: "asc" }, { id: "asc" }],
+      orderBy: [{ role: 'asc' }, { id: 'asc' }],
     });
   }
 

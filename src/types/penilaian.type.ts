@@ -1,4 +1,4 @@
-import { PenilaiRole } from "@prisma/client";
+import { PenilaiRole } from '@prisma/client';
 
 export interface PenilaianType {
   id: string;

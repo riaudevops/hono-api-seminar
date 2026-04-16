@@ -1,14 +1,21 @@
-import { Context } from "hono";
-import ConstraintDosenService from "../services/constraint-dosen.service";
-import { APIError } from "../utils/api-error.util";
+import { Context } from 'hono';
+import ConstraintDosenService from '../services/constraint-dosen.service';
+import { APIError } from '../utils/api-error.util';
 
 function extractEmail(c: Context): string {
-  const userPayload = c.get("user");
-  if (!userPayload || typeof userPayload !== "object" || !("email" in userPayload)) {
-    throw new APIError("Informasi otentikasi tidak ditemukan atau tidak valid.", 401);
+  const userPayload = c.get('user');
+  if (
+    !userPayload ||
+    typeof userPayload !== 'object' ||
+    !('email' in userPayload)
+  ) {
+    throw new APIError(
+      'Informasi otentikasi tidak ditemukan atau tidak valid.',
+      401
+    );
   }
   const email = userPayload.email as string;
-  if (!email) throw new APIError("Email tidak ditemukan", 401);
+  if (!email) throw new APIError('Email tidak ditemukan', 401);
   return email;
 }
 

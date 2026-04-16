@@ -1,16 +1,21 @@
-import { Context } from "hono";
-import { BlankEnv, BlankInput, HTTPResponseError } from "hono/types";
-import GlobalService from "../services/global.service";
-import { GlobalServiceHealthResponse, GlobalServiceIntroduceResponse } from "../types/global.type";
+import { Context } from 'hono';
+import { BlankEnv, BlankInput, HTTPResponseError } from 'hono/types';
+import GlobalService from '../services/global.service';
+import {
+  GlobalServiceHealthResponse,
+  GlobalServiceIntroduceResponse,
+} from '../types/global.type';
 
 export default class GlobalHandler {
-  public static async introduce(c: Context<BlankEnv, "/", BlankInput>) {
-    const introduceMessage: GlobalServiceIntroduceResponse = await GlobalService.introduce();
+  public static async introduce(c: Context<BlankEnv, '/', BlankInput>) {
+    const introduceMessage: GlobalServiceIntroduceResponse =
+      await GlobalService.introduce();
     return c.json(introduceMessage, 200);
   }
 
-  public static async health(c: Context<BlankEnv, "/", BlankInput>) {
-    const healthMessage: GlobalServiceHealthResponse = await GlobalService.health();
+  public static async health(c: Context<BlankEnv, '/', BlankInput>) {
+    const healthMessage: GlobalServiceHealthResponse =
+      await GlobalService.health();
     return c.json(healthMessage, 200);
   }
 
@@ -18,22 +23,27 @@ export default class GlobalHandler {
     return c.json(
       {
         response: false,
-        message: "Resource tidak ditemukan.",
+        message: 'Resource tidak ditemukan.',
       },
-      404,
+      404
     );
   }
 
-  public static async error(err: Error | HTTPResponseError | any, c: Context<BlankEnv, any, {}>) {
+  public static async error(
+    err: Error | HTTPResponseError | any,
+    c: Context<BlankEnv, any, {}>
+  ) {
     if (!err.statusCode) {
-      console.error(`[ERROR] - [${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB] ${err.message}`);
+      console.error(
+        `[ERROR] - [${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB] ${err.message}`
+      );
       console.error(`[LOG] ${err.stack}`);
       return c.json(
         {
           response: false,
-          message: "Terjadi kesalahan pada server. Silakan coba lagi nanti.",
+          message: 'Terjadi kesalahan pada server. Silakan coba lagi nanti.',
         },
-        500,
+        500
       );
     }
     return c.json(
@@ -41,7 +51,7 @@ export default class GlobalHandler {
         response: false,
         message: err.message,
       },
-      err.statusCode || 500,
+      err.statusCode || 500
     );
   }
 }

@@ -1,6 +1,6 @@
-import Fuse from "fuse.js";
-import DosenRepository from "../repositories/dosen.repository";
-import { APIError } from "../utils/api-error.util";
+import Fuse from 'fuse.js';
+import DosenRepository from '../repositories/dosen.repository';
+import { APIError } from '../utils/api-error.util';
 
 export default class DosenService {
   public static async search(query: string) {
@@ -12,8 +12,8 @@ export default class DosenService {
 
     const fuseOptions = {
       keys: [
-        { name: "nama", weight: 0.7 },
-        { name: "nip", weight: 0.3 },
+        { name: 'nama', weight: 0.7 },
+        { name: 'nip', weight: 0.3 },
       ],
       threshold: 0.4,
       distance: 100,
@@ -39,8 +39,11 @@ export default class DosenService {
 
       matches.forEach((match) => {
         if (match.key && match.indices) {
-          const fieldValue = match.value || "";
-          const highlightedText = this.highlightMatches(fieldValue, match.indices);
+          const fieldValue = match.value || '';
+          const highlightedText = this.highlightMatches(
+            fieldValue,
+            match.indices
+          );
           highlights[match.key] = highlightedText;
         }
       });
@@ -60,8 +63,11 @@ export default class DosenService {
     };
   }
 
-  private static highlightMatches(text: string, indices: readonly [number, number][]): string {
-    let highlightedText = "";
+  private static highlightMatches(
+    text: string,
+    indices: readonly [number, number][]
+  ): string {
+    let highlightedText = '';
     let lastIndex = 0;
     indices.forEach(([start, end]) => {
       highlightedText += text.substring(lastIndex, start);
@@ -74,11 +80,11 @@ export default class DosenService {
   public static async getAll() {
     const dosen = await DosenRepository.findAll();
     if (!dosen || dosen.length === 0) {
-      throw new APIError("Data Dosen tidak ditemukan", 404);
+      throw new APIError('Data Dosen tidak ditemukan', 404);
     }
     return {
       response: true,
-      message: "Data semua dosen berhasil diambil",
+      message: 'Data semua dosen berhasil diambil',
       data: dosen,
     };
   }

@@ -1,39 +1,42 @@
-import { container, ServiceTokens } from "./container";
-import { createLogger } from "../utils/logger.util";
-import { database, getPrisma } from "../infrastructures/db.infrastructure";
-import { mailService, getTransporter } from "../infrastructures/mail.infrastructure";
+import { container, ServiceTokens } from './container';
+import { createLogger } from '../utils/logger.util';
+import { database, getPrisma } from '../infrastructures/db.infrastructure';
+import {
+  mailService,
+  getTransporter,
+} from '../infrastructures/mail.infrastructure';
 
 // =============================================================================
 // Bootstrap: Register all services in the DI Container
 // =============================================================================
 
-const bootstrapLogger = createLogger("Bootstrap");
+const bootstrapLogger = createLogger('Bootstrap');
 
 export async function bootstrap(): Promise<void> {
-  bootstrapLogger.info("Starting application bootstrap...");
+  bootstrapLogger.info('Starting application bootstrap...');
 
   // Import config lazily
-  const { config } = await import("./config");
+  const { config } = await import('./config');
 
   // Register Configuration (Singleton)
   container.registerInstance(ServiceTokens.CONFIG, config);
-  bootstrapLogger.debug("Config registered");
+  bootstrapLogger.debug('Config registered');
 
   // Register Logger (Singleton)
-  const { logger } = await import("../utils/logger.util");
+  const { logger } = await import('../utils/logger.util');
   container.registerInstance(ServiceTokens.LOGGER, logger);
-  bootstrapLogger.debug("Logger registered");
+  bootstrapLogger.debug('Logger registered');
 
   // Register Database (Singleton - lazy getter)
   container.registerSingleton(ServiceTokens.DATABASE, () => getPrisma());
-  bootstrapLogger.debug("Database registered");
+  bootstrapLogger.debug('Database registered');
 
   // Register Mailer (Singleton - lazy getter)
   container.registerSingleton(ServiceTokens.MAILER, () => getTransporter());
-  bootstrapLogger.debug("Mailer registered");
+  bootstrapLogger.debug('Mailer registered');
 
   // Log registered services
-  bootstrapLogger.info("Bootstrap completed", {
+  bootstrapLogger.info('Bootstrap completed', {
     services: container.getRegisteredServices(),
     environment: config.app.env,
     debug: config.app.debug,
@@ -41,7 +44,7 @@ export async function bootstrap(): Promise<void> {
 }
 
 export async function shutdown(): Promise<void> {
-  bootstrapLogger.info("Starting graceful shutdown...");
+  bootstrapLogger.info('Starting graceful shutdown...');
 
   try {
     // Disconnect database
@@ -50,9 +53,9 @@ export async function shutdown(): Promise<void> {
     // Close mail transporter
     await mailService.close();
 
-    bootstrapLogger.info("Graceful shutdown completed");
+    bootstrapLogger.info('Graceful shutdown completed');
   } catch (error) {
-    bootstrapLogger.error("Error during shutdown", {
+    bootstrapLogger.error('Error during shutdown', {
       error: error instanceof Error ? error.message : String(error),
     });
   }

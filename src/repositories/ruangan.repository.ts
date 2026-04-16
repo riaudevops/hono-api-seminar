@@ -1,4 +1,4 @@
-import prisma from "../infrastructures/db.infrastructure";
+import prisma from '../infrastructures/db.infrastructure';
 
 export interface CreateRuanganInput {
   kode: string;
@@ -15,7 +15,7 @@ export default class RuanganRepository {
   public static async findAll() {
     return prisma.ruangan.findMany({
       orderBy: {
-        kode: "asc",
+        kode: 'asc',
       },
     });
   }
@@ -30,7 +30,7 @@ export default class RuanganRepository {
     return prisma.ruangan.findMany({
       where: { status: true },
       orderBy: {
-        kode: "asc",
+        kode: 'asc',
       },
     });
   }
@@ -58,7 +58,12 @@ export default class RuanganRepository {
     });
   }
 
-  public static async checkTimeConflict(kode_ruangan: string, waktu_mulai: Date, waktu_selesai: Date, excludeJadwalId?: string) {
+  public static async checkTimeConflict(
+    kode_ruangan: string,
+    waktu_mulai: Date,
+    waktu_selesai: Date,
+    excludeJadwalId?: string
+  ) {
     return prisma.jadwal.findFirst({
       where: {
         kode_ruangan,
@@ -90,7 +95,7 @@ export default class RuanganRepository {
             },
           },
           orderBy: {
-            tanggal: "desc",
+            tanggal: 'desc',
           },
         },
       },

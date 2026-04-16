@@ -1,6 +1,6 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { APIError } from "../utils/api-error.util";
-import { PenilaiRole } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { APIError } from '../utils/api-error.util';
+import { PenilaiRole } from '@prisma/client';
 
 export interface CreateKomponenInput {
   id: string;
@@ -24,16 +24,12 @@ export default class KomponenPenilaianService {
   public static async getAll(role?: PenilaiRole) {
     const komponen = await prisma.komponen_penilaian.findMany({
       where: role ? { role } : undefined,
-      orderBy: [
-        { role: "asc" },
-        { is_aktif: "desc" },
-        { id: "asc" },
-      ]
+      orderBy: [{ role: 'asc' }, { is_aktif: 'desc' }, { id: 'asc' }],
     });
 
     return {
       response: true,
-      message: "Data komponen penilaian berhasil diambil",
+      message: 'Data komponen penilaian berhasil diambil',
       data: komponen,
     };
   }
@@ -44,7 +40,7 @@ export default class KomponenPenilaianService {
   public static async getActiveByRole(role: PenilaiRole) {
     const komponen = await prisma.komponen_penilaian.findMany({
       where: { role, is_aktif: true },
-      orderBy: { id: "asc" },
+      orderBy: { id: 'asc' },
     });
 
     return {
@@ -58,7 +54,11 @@ export default class KomponenPenilaianService {
    * Validasi persentase komponen penilaian untuk suatu role.
    * Total persentase dari komponen yang 'is_aktif = true' tidak boleh melebih 100%.
    */
-  private static async validatePercentageLimit(role: PenilaiRole, newPersentase: number, excludeId?: string) {
+  private static async validatePercentageLimit(
+    role: PenilaiRole,
+    newPersentase: number,
+    excludeId?: string
+  ) {
     const activeComponents = await prisma.komponen_penilaian.findMany({
       where: {
         role,
@@ -67,11 +67,17 @@ export default class KomponenPenilaianService {
       },
     });
 
-    const currentTotal = activeComponents.reduce((sum, comp) => sum + comp.persentase, 0);
+    const currentTotal = activeComponents.reduce(
+      (sum, comp) => sum + comp.persentase,
+      0
+    );
     const newTotal = currentTotal + newPersentase;
 
     if (newTotal > 100) {
-      throw new APIError(`Total persentase komponen aktif untuk role ${role} melebihi 100%. Saat ini sudah ${currentTotal}%, Anda mencoba menambah/mengubah menjadi ${newPersentase}%. (Total: ${newTotal}%)`, 400);
+      throw new APIError(
+        `Total persentase komponen aktif untuk role ${role} melebihi 100%. Saat ini sudah ${currentTotal}%, Anda mencoba menambah/mengubah menjadi ${newPersentase}%. (Total: ${newTotal}%)`,
+        400
+      );
     }
 
     return newTotal;
@@ -106,7 +112,7 @@ export default class KomponenPenilaianService {
 
     return {
       response: true,
-      message: "Komponen penilaian berhasil dibuat",
+      message: 'Komponen penilaian berhasil dibuat',
       data: newComponent,
     };
   }
@@ -144,7 +150,7 @@ export default class KomponenPenilaianService {
 
     return {
       response: true,
-      message: "Komponen penilaian berhasil diperbarui",
+      message: 'Komponen penilaian berhasil diperbarui',
       data: updatedComponent,
     };
   }
@@ -167,7 +173,10 @@ export default class KomponenPenilaianService {
     });
 
     if (usage) {
-      throw new APIError(`Komponen dengan ID ${id} tidak dapat dihapus karena sudah ada data penilaian yang menggunakannya. Nonaktifkan saja komponen ini.`, 400);
+      throw new APIError(
+        `Komponen dengan ID ${id} tidak dapat dihapus karena sudah ada data penilaian yang menggunakannya. Nonaktifkan saja komponen ini.`,
+        400
+      );
     }
 
     await prisma.komponen_penilaian.delete({
@@ -176,7 +185,7 @@ export default class KomponenPenilaianService {
 
     return {
       response: true,
-      message: "Komponen penilaian berhasil dihapus",
+      message: 'Komponen penilaian berhasil dihapus',
     };
   }
 
@@ -194,7 +203,11 @@ export default class KomponenPenilaianService {
 
     // Jika diaktifkan, pastikan totalnya tidak lebih dari 100%
     if (is_aktif) {
-      await this.validatePercentageLimit(existing.role, existing.persentase, id);
+      await this.validatePercentageLimit(
+        existing.role,
+        existing.persentase,
+        id
+      );
     }
 
     const updatedComponent = await prisma.komponen_penilaian.update({
@@ -202,23 +215,26 @@ export default class KomponenPenilaianService {
       data: { is_aktif },
     });
 
-    // Validasi apakah setelah toggle, totalnya menjadi kurang dari 100% 
+    // Validasi apakah setelah toggle, totalnya menjadi kurang dari 100%
     // (Peringatan saja, karena secara fungsional boleh dinonaktifkan sementara)
     let warningMsg = null;
     const activeComponents = await prisma.komponen_penilaian.findMany({
       where: { role: existing.role, is_aktif: true },
     });
-    const currentTotal = activeComponents.reduce((sum, comp) => sum + comp.persentase, 0);
-    
+    const currentTotal = activeComponents.reduce(
+      (sum, comp) => sum + comp.persentase,
+      0
+    );
+
     if (currentTotal < 100) {
-       warningMsg = `Total persentase komponen aktif untuk role ${existing.role} sekarang adalah ${currentTotal}%. Anda perlu menambah atau mengaktifkan komponen lain agar mencapai 100%.`;
+      warningMsg = `Total persentase komponen aktif untuk role ${existing.role} sekarang adalah ${currentTotal}%. Anda perlu menambah atau mengaktifkan komponen lain agar mencapai 100%.`;
     }
 
     return {
       response: true,
-      message: "Status komponen penilaian berhasil diubah",
+      message: 'Status komponen penilaian berhasil diubah',
       data: updatedComponent,
-      warning: warningMsg
+      warning: warningMsg,
     };
   }
 }

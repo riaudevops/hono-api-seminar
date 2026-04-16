@@ -1,6 +1,6 @@
-import Fuse from "fuse.js";
-import MahasiswaRepository from "../repositories/mahasiswa.repository";
-import { APIError } from "../utils/api-error.util";
+import Fuse from 'fuse.js';
+import MahasiswaRepository from '../repositories/mahasiswa.repository';
+import { APIError } from '../utils/api-error.util';
 
 function getCurrentAcademicInfo() {
   const now = new Date();
@@ -22,11 +22,15 @@ export default class MahasiswaService {
     }
     return {
       response: true,
-      message: "Data mahasiswa berhasil diambil.",
+      message: 'Data mahasiswa berhasil diambil.',
       data: mahasiswa,
     };
   }
-  public static async getAll(page: number, limit: number, sortBy?: "asc" | "desc") {
+  public static async getAll(
+    page: number,
+    limit: number,
+    sortBy?: 'asc' | 'desc'
+  ) {
     const allMahasiswa = await MahasiswaRepository.findAllFromSheet();
     if (!allMahasiswa || allMahasiswa.length === 0) {
       throw new APIError(`Tidak ada data mahasiswa`, 404);
@@ -47,20 +51,24 @@ export default class MahasiswaService {
     // Sort by nama if requested
     if (sortBy) {
       filteredMahasiswa.sort((a, b) =>
-        sortBy === "asc" ? a.nama.localeCompare(b.nama) : b.nama.localeCompare(a.nama)
+        sortBy === 'asc'
+          ? a.nama.localeCompare(b.nama)
+          : b.nama.localeCompare(a.nama)
       );
     }
 
     const total = filteredMahasiswa.length;
     const skip = (page - 1) * limit;
-    const paginatedData = filteredMahasiswa.slice(skip, skip + limit).map((m) => {
-      const { no, nim, nama, jenisSeminar, ...rest } = m;
-      return rest;
-    });
+    const paginatedData = filteredMahasiswa
+      .slice(skip, skip + limit)
+      .map((m) => {
+        const { no, nim, nama, jenisSeminar, ...rest } = m;
+        return rest;
+      });
 
     return {
       response: true,
-      message: "Data semua mahasiswa berhasil diambil.",
+      message: 'Data semua mahasiswa berhasil diambil.',
       data: {
         mahasiswa: paginatedData,
         pagination: {
@@ -79,11 +87,17 @@ export default class MahasiswaService {
     }
     return {
       response: true,
-      message: "Data mahasiswa berhasil diambil.",
+      message: 'Data mahasiswa berhasil diambil.',
       data: mahasiswa,
     };
   }
-  public static async search(query?: string, filterAngkatan?: number, sortBy?: "asc" | "desc", page: number = 1, limit: number = 10) {
+  public static async search(
+    query?: string,
+    filterAngkatan?: number,
+    sortBy?: 'asc' | 'desc',
+    page: number = 1,
+    limit: number = 10
+  ) {
     // Ambil semua data dari spreadsheet
     const sheetResults = await MahasiswaRepository.findAllFromSheet();
 
@@ -105,7 +119,9 @@ export default class MahasiswaService {
 
     // Filter berdasarkan angkatan jika ada
     if (filterAngkatan) {
-      filteredMahasiswa = filteredMahasiswa.filter((m) => m.angkatan === filterAngkatan);
+      filteredMahasiswa = filteredMahasiswa.filter(
+        (m) => m.angkatan === filterAngkatan
+      );
     }
 
     if (filteredMahasiswa.length === 0) {
@@ -113,7 +129,7 @@ export default class MahasiswaService {
     }
 
     // Jika tidak ada query, langsung return dengan pagination
-    if (!query || query.trim() === "") {
+    if (!query || query.trim() === '') {
       const total = filteredMahasiswa.length;
       const skip = (page - 1) * limit;
       const paginatedData = filteredMahasiswa.slice(skip, skip + limit);
@@ -122,10 +138,10 @@ export default class MahasiswaService {
         response: true,
         message: `Ditemukan ${total} mahasiswa.`,
         data: paginatedData,
-        query: query || "",
+        query: query || '',
         filters: {
-          angkatan: filterAngkatan || "semua",
-          sortBy: sortBy || "default",
+          angkatan: filterAngkatan || 'semua',
+          sortBy: sortBy || 'default',
         },
         pagination: {
           total,
@@ -139,8 +155,8 @@ export default class MahasiswaService {
     // Fuzzy search menggunakan Fuse.js untuk toleransi typo
     const fuseOptions = {
       keys: [
-        { name: "nama", weight: 0.7 },
-        { name: "nim", weight: 0.3 },
+        { name: 'nama', weight: 0.7 },
+        { name: 'nim', weight: 0.3 },
       ],
       threshold: 0.4, // Lebih toleran terhadap typo (0.0 = perfect match, 1.0 = match anything)
       distance: 100, // Jarak maksimal untuk match
@@ -157,7 +173,10 @@ export default class MahasiswaService {
 
     // Jika fuzzy search tidak menemukan hasil, return empty dengan message yang lebih jelas
     if (results.length === 0) {
-      throw new APIError(`Tidak ditemukan mahasiswa dengan nama atau NIM yang mirip dengan "${query}"`, 404);
+      throw new APIError(
+        `Tidak ditemukan mahasiswa dengan nama atau NIM yang mirip dengan "${query}"`,
+        404
+      );
     }
 
     const total = results.length;
@@ -172,8 +191,11 @@ export default class MahasiswaService {
 
       matches.forEach((match) => {
         if (match.key && match.indices) {
-          const fieldValue = match.value || "";
-          const highlightedText = this.highlightMatches(fieldValue, match.indices);
+          const fieldValue = match.value || '';
+          const highlightedText = this.highlightMatches(
+            fieldValue,
+            match.indices
+          );
           highlights[match.key] = highlightedText;
         }
       });
@@ -194,8 +216,8 @@ export default class MahasiswaService {
       data: formattedResults,
       query: query,
       filters: {
-        angkatan: filterAngkatan || "semua",
-        sortBy: sortBy || "relevance",
+        angkatan: filterAngkatan || 'semua',
+        sortBy: sortBy || 'relevance',
       },
       pagination: {
         total,
@@ -206,8 +228,11 @@ export default class MahasiswaService {
     };
   }
 
-  private static highlightMatches(text: string, indices: readonly [number, number][]): string {
-    let result = "";
+  private static highlightMatches(
+    text: string,
+    indices: readonly [number, number][]
+  ): string {
+    let result = '';
     let lastIndex = 0;
 
     const sortedIndices = [...indices].sort((a, b) => a[0] - b[0]);
@@ -227,7 +252,7 @@ export default class MahasiswaService {
     const angkatanList = await MahasiswaRepository.findAngkatanFromSheet();
     return {
       response: true,
-      message: "Data angkatan berhasil diambil.",
+      message: 'Data angkatan berhasil diambil.',
       data: angkatanList,
     };
   }

@@ -1,16 +1,21 @@
-import JadwalRepository from "../repositories/jadwal.repository";
-import { APIError } from "../utils/api-error.util";
-import { CreateJadwalType, UpdateJadwalType } from "../types/jadwal.type";
-import JadwalHelper from "../helpers/jadwal.helper";
-import TahunAjaranHelper from "../helpers/tahun-ajaran.helper";
-import { JenisJadwal, PenilaiRole, LogActionType, LogActorType } from "@prisma/client";
-import RuanganHelper from "../helpers/ruangan.helper";
-import DosenHelper from "../helpers/dosen.helper";
-import MahasiswaRepository from "../repositories/mahasiswa.repository";
-import DosenRepository from "../repositories/dosen.repository";
-import RuanganRepository from "../repositories/ruangan.repository";
-import PenilaianRepository from "../repositories/penilaian.repository";
-import prisma from "../infrastructures/db.infrastructure";
+import JadwalRepository from '../repositories/jadwal.repository';
+import { APIError } from '../utils/api-error.util';
+import { CreateJadwalType, UpdateJadwalType } from '../types/jadwal.type';
+import JadwalHelper from '../helpers/jadwal.helper';
+import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
+import {
+  JenisJadwal,
+  PenilaiRole,
+  LogActionType,
+  LogActorType,
+} from '@prisma/client';
+import RuanganHelper from '../helpers/ruangan.helper';
+import DosenHelper from '../helpers/dosen.helper';
+import MahasiswaRepository from '../repositories/mahasiswa.repository';
+import DosenRepository from '../repositories/dosen.repository';
+import RuanganRepository from '../repositories/ruangan.repository';
+import PenilaianRepository from '../repositories/penilaian.repository';
+import prisma from '../infrastructures/db.infrastructure';
 
 export interface LogJadwalContext {
   actor_id: string;
@@ -26,19 +31,23 @@ export default class JadwalService {
   public static async getMe(email: string) {
     const jadwal = await JadwalRepository.findByMahasiswaEmail(email);
     if (!jadwal || jadwal.length === 0) {
-      throw new APIError("Jadwal tidak ditemukan", 404);
+      throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
     // Konversi waktu ke timezone Asia/Jakarta
     const jadwalWithTimezone = jadwal.map((j) => ({
       ...j,
-      waktu_mulai: j.waktu_mulai ? JadwalHelper.convertToJakartaTimezone(j.waktu_mulai) : null,
-      waktu_selesai: j.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(j.waktu_selesai) : null,
+      waktu_mulai: j.waktu_mulai
+        ? JadwalHelper.convertToJakartaTimezone(j.waktu_mulai)
+        : null,
+      waktu_selesai: j.waktu_selesai
+        ? JadwalHelper.convertToJakartaTimezone(j.waktu_selesai)
+        : null,
     }));
 
     return {
       response: true,
-      message: "Data jadwal berhasil diambil",
+      message: 'Data jadwal berhasil diambil',
       data: jadwalWithTimezone,
     };
   }
@@ -48,29 +57,36 @@ export default class JadwalService {
     if (!jadwal || jadwal.length === 0) {
       return {
         response: true,
-        message: "Data jadwal masih kosong",
+        message: 'Data jadwal masih kosong',
         data: [],
       };
     }
 
     const dataWithTimezone = jadwal.map((j: any) => {
-      const nim = j.mahasiswa?.nim || "";
-      const angkatan = nim ? parseInt(`20${nim.slice(1, 3)}`) : new Date().getFullYear();
+      const nim = j.mahasiswa?.nim || '';
+      const angkatan = nim
+        ? parseInt(`20${nim.slice(1, 3)}`)
+        : new Date().getFullYear();
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth();
-      const semester = (currentYear - angkatan) * 2 + (currentMonth >= 8 ? 1 : 2);
+      const semester =
+        (currentYear - angkatan) * 2 + (currentMonth >= 8 ? 1 : 2);
 
       return {
         ...j,
         semester,
-        waktu_mulai: j.waktu_mulai ? JadwalHelper.convertToJakartaTimezone(j.waktu_mulai) : null,
-        waktu_selesai: j.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(j.waktu_selesai) : null,
+        waktu_mulai: j.waktu_mulai
+          ? JadwalHelper.convertToJakartaTimezone(j.waktu_mulai)
+          : null,
+        waktu_selesai: j.waktu_selesai
+          ? JadwalHelper.convertToJakartaTimezone(j.waktu_selesai)
+          : null,
       };
     });
 
     return {
       response: true,
-      message: "Data semua jadwal berhasil diambil",
+      message: 'Data semua jadwal berhasil diambil',
       data: dataWithTimezone,
     };
   }
@@ -78,23 +94,30 @@ export default class JadwalService {
   public static async get(id: string) {
     const jadwal = await JadwalRepository.findById(id);
     if (!jadwal) {
-      throw new APIError("Jadwal tidak ditemukan", 404);
+      throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
     const jadwalWithTimezone = {
       ...jadwal,
-      waktu_mulai: jadwal.waktu_mulai ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai) : null,
-      waktu_selesai: jadwal.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_selesai) : null,
+      waktu_mulai: jadwal.waktu_mulai
+        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
+        : null,
+      waktu_selesai: jadwal.waktu_selesai
+        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_selesai)
+        : null,
     };
 
     return {
       response: true,
-      message: "Data jadwal berhasil diambil",
+      message: 'Data jadwal berhasil diambil',
       data: jadwalWithTimezone,
     };
   }
 
-  public static async post(data: CreateJadwalType & { penilai?: DosenAssignment[] }, context: LogJadwalContext) {
+  public static async post(
+    data: CreateJadwalType & { penilai?: DosenAssignment[] },
+    context: LogJadwalContext
+  ) {
     await this.validateMahasiswa(data.nim);
     await this.validateRuangan(data.kode_ruangan);
 
@@ -106,10 +129,18 @@ export default class JadwalService {
     }
 
     // Konversi waktu input ke timezone server sebelum validasi
-    const waktuMulaiServer = JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_mulai));
-    const waktuSelesaiServer = JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_selesai));
+    const waktuMulaiServer = JadwalHelper.convertFromJakartaTimezone(
+      new Date(data.waktu_mulai)
+    );
+    const waktuSelesaiServer = JadwalHelper.convertFromJakartaTimezone(
+      new Date(data.waktu_selesai)
+    );
 
-    await RuanganHelper.cekKonflik(data.kode_ruangan, waktuMulaiServer, waktuSelesaiServer);
+    await RuanganHelper.cekKonflik(
+      data.kode_ruangan,
+      waktuMulaiServer,
+      waktuSelesaiServer
+    );
 
     // Check dosen time conflicts
     if (data.penilai && data.penilai.length > 0) {
@@ -118,9 +149,15 @@ export default class JadwalService {
     }
 
     // Check if mahasiswa already has jadwal for this jenis
-    const existing = await JadwalRepository.existsByMahasiswaAndJenis(data.nim, data.jenis);
+    const existing = await JadwalRepository.existsByMahasiswaAndJenis(
+      data.nim,
+      data.jenis
+    );
     if (existing) {
-      throw new APIError(`Mahasiswa ${data.nim} sudah memiliki jadwal untuk jenis ${data.jenis}`, 400);
+      throw new APIError(
+        `Mahasiswa ${data.nim} sudah memiliki jadwal untuk jenis ${data.jenis}`,
+        400
+      );
     }
 
     const id = await JadwalHelper.generateId(data.jenis);
@@ -153,8 +190,12 @@ export default class JadwalService {
 
     const jadwalWithTimezone = {
       ...completeJadwal,
-      waktu_mulai: completeJadwal?.waktu_mulai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_mulai) : null,
-      waktu_selesai: completeJadwal?.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_selesai) : null,
+      waktu_mulai: completeJadwal?.waktu_mulai
+        ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_mulai)
+        : null,
+      waktu_selesai: completeJadwal?.waktu_selesai
+        ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_selesai)
+        : null,
     };
 
     // Create log_jadwal for CREATE action
@@ -170,15 +211,19 @@ export default class JadwalService {
 
     return {
       response: true,
-      message: "Jadwal berhasil ditambahkan",
+      message: 'Jadwal berhasil ditambahkan',
       data: jadwalWithTimezone,
     };
   }
 
-  public static async put(id: string, data: UpdateJadwalType & { penilai?: DosenAssignment[] }, context: LogJadwalContext) {
+  public static async put(
+    id: string,
+    data: UpdateJadwalType & { penilai?: DosenAssignment[] },
+    context: LogJadwalContext
+  ) {
     const existingJadwal = await JadwalRepository.findById(id);
     if (!existingJadwal) {
-      throw new APIError("Jadwal tidak ditemukan", 404);
+      throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
     if (data.nim) {
@@ -196,16 +241,30 @@ export default class JadwalService {
     }
 
     // Konversi waktu input ke timezone server sebelum validasi
-    const waktuMulaiServer = data.waktu_mulai ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_mulai)) : existingJadwal.waktu_mulai;
-    const waktuSelesaiServer = data.waktu_selesai ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_selesai)) : existingJadwal.waktu_selesai;
+    const waktuMulaiServer = data.waktu_mulai
+      ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_mulai))
+      : existingJadwal.waktu_mulai;
+    const waktuSelesaiServer = data.waktu_selesai
+      ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_selesai))
+      : existingJadwal.waktu_selesai;
 
     const kodeRuangan = data.kode_ruangan || existingJadwal.kode_ruangan;
-    await RuanganHelper.cekKonflik(kodeRuangan, waktuMulaiServer, waktuSelesaiServer, id);
+    await RuanganHelper.cekKonflik(
+      kodeRuangan,
+      waktuMulaiServer,
+      waktuSelesaiServer,
+      id
+    );
 
     // Check dosen time conflicts
     if (data.penilai && data.penilai.length > 0) {
       const nips = data.penilai.map((p) => p.nip);
-      await DosenHelper.cekKonflik(nips, waktuMulaiServer, waktuSelesaiServer, id);
+      await DosenHelper.cekKonflik(
+        nips,
+        waktuMulaiServer,
+        waktuSelesaiServer,
+        id
+      );
     }
 
     const updateData: any = {};
@@ -238,8 +297,12 @@ export default class JadwalService {
 
     const jadwalWithTimezone = {
       ...completeJadwal,
-      waktu_mulai: completeJadwal?.waktu_mulai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_mulai) : null,
-      waktu_selesai: completeJadwal?.waktu_selesai ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_selesai) : null,
+      waktu_mulai: completeJadwal?.waktu_mulai
+        ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_mulai)
+        : null,
+      waktu_selesai: completeJadwal?.waktu_selesai
+        ? JadwalHelper.convertToJakartaTimezone(completeJadwal.waktu_selesai)
+        : null,
     };
 
     // Create log_jadwal for UPDATE action
@@ -256,7 +319,7 @@ export default class JadwalService {
 
     return {
       response: true,
-      message: "Jadwal berhasil diperbarui",
+      message: 'Jadwal berhasil diperbarui',
       data: jadwalWithTimezone,
     };
   }
@@ -275,7 +338,10 @@ export default class JadwalService {
   public static async validateDosen(nip: string, role: PenilaiRole) {
     const dosen = await DosenRepository.findByNip(nip);
     if (!dosen) {
-      throw new APIError(`Dosen ${role} dengan NIP ${nip} tidak ditemukan`, 404);
+      throw new APIError(
+        `Dosen ${role} dengan NIP ${nip} tidak ditemukan`,
+        404
+      );
     }
 
     if (!dosen.email) {
@@ -288,7 +354,10 @@ export default class JadwalService {
   public static async validateRuangan(kode_ruangan: string) {
     const ruangan = await RuanganRepository.findByKode(kode_ruangan);
     if (!ruangan) {
-      throw new APIError(`Ruangan dengan kode ${kode_ruangan} tidak ditemukan`, 404);
+      throw new APIError(
+        `Ruangan dengan kode ${kode_ruangan} tidak ditemukan`,
+        404
+      );
     }
     if (!ruangan.status) {
       throw new APIError(`Ruangan ${ruangan.nama} sedang tidak tersedia`, 400);
@@ -299,14 +368,14 @@ export default class JadwalService {
   public static async delete(id: string) {
     const jadwal = await JadwalRepository.findById(id);
     if (!jadwal) {
-      throw new APIError("Jadwal tidak ditemukan", 404);
+      throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
     await JadwalRepository.destroy(id);
 
     return {
       response: true,
-      message: "Jadwal berhasil dihapus",
+      message: 'Jadwal berhasil dihapus',
     };
   }
 }

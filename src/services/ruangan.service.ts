@@ -1,13 +1,13 @@
-import RuanganRepository from "../repositories/ruangan.repository";
-import { APIError } from "../utils/api-error.util";
-import { CreateRuanganType, UpdateRuanganType } from "../types/ruangan.type";
+import RuanganRepository from '../repositories/ruangan.repository';
+import { APIError } from '../utils/api-error.util';
+import { CreateRuanganType, UpdateRuanganType } from '../types/ruangan.type';
 
 export default class RuanganService {
   public static async getAll() {
     const ruangan = await RuanganRepository.findAll();
     return {
       response: true,
-      message: "Data semua ruangan berhasil diambil",
+      message: 'Data semua ruangan berhasil diambil',
       data: ruangan,
     };
   }
@@ -19,7 +19,7 @@ export default class RuanganService {
     }
     return {
       response: true,
-      message: "Data ruangan berhasil diambil",
+      message: 'Data ruangan berhasil diambil',
       data: ruangan,
     };
   }
@@ -33,7 +33,7 @@ export default class RuanganService {
     const ruangan = await RuanganRepository.create(data);
     return {
       response: true,
-      message: "Ruangan berhasil ditambahkan",
+      message: 'Ruangan berhasil ditambahkan',
       data: ruangan,
     };
   }
@@ -43,7 +43,7 @@ export default class RuanganService {
     const ruangan = await RuanganRepository.update(kode, data);
     return {
       response: true,
-      message: "Ruangan berhasil diperbarui",
+      message: 'Ruangan berhasil diperbarui',
       data: ruangan,
     };
   }
@@ -53,7 +53,7 @@ export default class RuanganService {
     await RuanganRepository.destroy(kode);
     return {
       response: true,
-      message: "Ruangan berhasil dihapus",
+      message: 'Ruangan berhasil dihapus',
     };
   }
 }

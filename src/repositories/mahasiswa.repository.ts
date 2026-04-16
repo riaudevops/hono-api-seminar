@@ -1,5 +1,8 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { spssInfrastructure, type MahasiswaSheet } from "../infrastructures/spss.infrastructure";
+import prisma from '../infrastructures/db.infrastructure';
+import {
+  spssInfrastructure,
+  type MahasiswaSheet,
+} from '../infrastructures/spss.infrastructure';
 
 export interface CreateMahasiswaInput {
   nim: string;
@@ -15,11 +18,15 @@ export interface UpdateMahasiswaInput {
 }
 
 export default class MahasiswaRepository {
-  public static async findAll(skip?: number, take?: number, sortBy?: "asc" | "desc") {
+  public static async findAll(
+    skip?: number,
+    take?: number,
+    sortBy?: 'asc' | 'desc'
+  ) {
     return prisma.mahasiswa.findMany({
       ...(skip !== undefined && { skip }),
       ...(take !== undefined && { take }),
-      orderBy: sortBy ? { nama: sortBy } : { nama: "asc" },
+      orderBy: sortBy ? { nama: sortBy } : { nama: 'asc' },
     });
   }
 
@@ -58,25 +65,34 @@ export default class MahasiswaRepository {
     });
   }
 
-  public static async search(query?: string, sortBy?: "asc" | "desc") {
+  public static async search(query?: string, sortBy?: 'asc' | 'desc') {
     if (query) {
       return prisma.mahasiswa.findMany({
         where: {
-          OR: [{ nim: { contains: query, mode: "insensitive" } }, { nama: { contains: query, mode: "insensitive" } }, { email: { contains: query, mode: "insensitive" } }],
+          OR: [
+            { nim: { contains: query, mode: 'insensitive' } },
+            { nama: { contains: query, mode: 'insensitive' } },
+            { email: { contains: query, mode: 'insensitive' } },
+          ],
         },
-        orderBy: sortBy ? { nama: sortBy } : { nama: "asc" },
+        orderBy: sortBy ? { nama: sortBy } : { nama: 'asc' },
       });
     }
 
     return prisma.mahasiswa.findMany({
-      orderBy: sortBy ? { nama: sortBy } : { nama: "asc" },
+      orderBy: sortBy ? { nama: sortBy } : { nama: 'asc' },
     });
   }
 
-  public static async findByAngkatan(angkatan: number, sortBy?: "asc" | "desc") {
+  public static async findByAngkatan(
+    angkatan: number,
+    sortBy?: 'asc' | 'desc'
+  ) {
     const angkatanDigits = angkatan.toString().slice(-2);
 
-    const orderClause = sortBy ? `ORDER BY nama ${sortBy.toUpperCase()}` : "ORDER BY nama ASC";
+    const orderClause = sortBy
+      ? `ORDER BY nama ${sortBy.toUpperCase()}`
+      : 'ORDER BY nama ASC';
 
     const sqlQuery = `
       SELECT * FROM mahasiswa 
@@ -101,7 +117,7 @@ export default class MahasiswaRepository {
   public static async findAktif() {
     return prisma.mahasiswa.findMany({
       where: { aktif: true },
-      orderBy: { nama: "asc" },
+      orderBy: { nama: 'asc' },
     });
   }
 

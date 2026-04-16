@@ -1,11 +1,11 @@
-import { JenisJadwal } from "@prisma/client";
-import JadwalRepository from "../repositories/jadwal.repository";
+import { JenisJadwal } from '@prisma/client';
+import JadwalRepository from '../repositories/jadwal.repository';
 
 export default class JadwalHelper {
   // Server timezone: Europe/Stockholm (Sweden)
-  private static readonly SERVER_TIMEZONE = "Europe/Stockholm";
+  private static readonly SERVER_TIMEZONE = 'Europe/Stockholm';
   // Client timezone: Asia/Jakarta
-  private static readonly CLIENT_TIMEZONE = "Asia/Jakarta";
+  private static readonly CLIENT_TIMEZONE = 'Asia/Jakarta';
 
   private static getTahunAkademik(): string {
     const now = new Date();
@@ -29,38 +29,38 @@ export default class JadwalHelper {
 
     let nextNumber = 1;
     if (lastId) {
-      const lastNumberStr = lastId.replace(prefix, "");
+      const lastNumberStr = lastId.replace(prefix, '');
       const lastNumber = parseInt(lastNumberStr, 10);
       if (!isNaN(lastNumber)) {
         nextNumber = lastNumber + 1;
       }
     }
-    const uniqueId = nextNumber.toString().padStart(3, "0");
+    const uniqueId = nextNumber.toString().padStart(3, '0');
     return `${prefix}${uniqueId}`;
   }
 
   public static singkatanJenis(jenis: JenisJadwal): string {
     const pemetaan = {
-      [JenisJadwal.SEMKP]: "KP",
-      [JenisJadwal.SEMPRO]: "TAPRO",
-      [JenisJadwal.SEMHAS_LAPORAN]: "TAHLP",
-      [JenisJadwal.SEMHAS_PAPERBASED]: "TAHPB",
-      [JenisJadwal.SIDANG_TA_LAPORAN]: "TASLP",
-      [JenisJadwal.SIDANG_TA_PAPERBASED]: "TASPB",
+      [JenisJadwal.SEMKP]: 'KP',
+      [JenisJadwal.SEMPRO]: 'TAPRO',
+      [JenisJadwal.SEMHAS_LAPORAN]: 'TAHLP',
+      [JenisJadwal.SEMHAS_PAPERBASED]: 'TAHPB',
+      [JenisJadwal.SIDANG_TA_LAPORAN]: 'TASLP',
+      [JenisJadwal.SIDANG_TA_PAPERBASED]: 'TASPB',
     };
-    return pemetaan[jenis] || "JNS";
+    return pemetaan[jenis] || 'JNS';
   }
 
   public static convertToJakartaTimezone(date: Date): Date {
     // Convert from server timezone (Sweden) to client timezone (Jakarta)
-    const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
+    const dateFormatter = new Intl.DateTimeFormat('sv-SE', {
       timeZone: this.CLIENT_TIMEZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       hour12: false,
     });
 
@@ -73,21 +73,21 @@ export default class JadwalHelper {
     // and convert to UTC for storage (which JavaScript Date stores internally)
 
     // Format the input date in Jakarta timezone to get Jakarta time components
-    const jakartaFormatter = new Intl.DateTimeFormat("sv-SE", {
+    const jakartaFormatter = new Intl.DateTimeFormat('sv-SE', {
       timeZone: this.CLIENT_TIMEZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       hour12: false,
     });
 
     const jakartaFormatted = jakartaFormatter.format(date);
 
     // Create a date from Jakarta string (treat as UTC temporarily)
-    const jakartaDate = new Date(jakartaFormatted + "Z");
+    const jakartaDate = new Date(jakartaFormatted + 'Z');
 
     // Calculate Jakarta offset: Jakarta is UTC+7 (420 minutes)
     // We need to adjust the date to represent the correct UTC time
@@ -101,14 +101,14 @@ export default class JadwalHelper {
   public static getCurrentJakartaTime(): Date {
     // Get current time in Sweden, then convert to Jakarta for display
     const today = new Date();
-    const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
+    const dateFormatter = new Intl.DateTimeFormat('sv-SE', {
       timeZone: this.CLIENT_TIMEZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       hour12: false,
     });
 

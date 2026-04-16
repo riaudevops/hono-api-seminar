@@ -1,8 +1,8 @@
-import { createTransport, Transporter } from "nodemailer";
-import SMTPTransport from "nodemailer/lib/smtp-transport";
-import { createLogger } from "../utils/logger.util";
+import { createTransport, Transporter } from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { createLogger } from '../utils/logger.util';
 
-const logger = createLogger("Mailer");
+const logger = createLogger('Mailer');
 
 // =============================================================================
 // Get email config from environment directly (lazy loading)
@@ -35,8 +35,8 @@ class MailService {
     const emailConfig = getEmailConfig();
 
     const transporter = createTransport({
-      name: "live",
-      host: "smtp.gmail.com",
+      name: 'live',
+      host: 'smtp.gmail.com',
       port: 465,
       secure: true,
       auth: {
@@ -53,14 +53,19 @@ class MailService {
       this.transporter = this.createTransporter();
       this.isInitialized = true;
       const emailConfig = getEmailConfig();
-      logger.info("Mail transporter initialized", {
-        user: emailConfig.user ? "configured" : "not configured",
+      logger.info('Mail transporter initialized', {
+        user: emailConfig.user ? 'configured' : 'not configured',
       });
     }
     return this.transporter;
   }
 
-  public async sendMail(options: { to: string | string[]; subject: string; text?: string; html?: string }): Promise<SMTPTransport.SentMessageInfo> {
+  public async sendMail(options: {
+    to: string | string[];
+    subject: string;
+    text?: string;
+    html?: string;
+  }): Promise<SMTPTransport.SentMessageInfo> {
     const transporter = this.getTransporter();
     const emailConfig = getEmailConfig();
 
@@ -70,17 +75,17 @@ class MailService {
         ...options,
       });
 
-      logger.info("Email sent successfully", {
-        to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+      logger.info('Email sent successfully', {
+        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
         subject: options.subject,
         messageId: result.messageId,
       });
 
       return result;
     } catch (error) {
-      logger.error("Failed to send email", {
+      logger.error('Failed to send email', {
         error: error instanceof Error ? error.message : String(error),
-        to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+        to: Array.isArray(options.to) ? options.to.join(', ') : options.to,
       });
       throw error;
     }
@@ -91,10 +96,10 @@ class MailService {
 
     try {
       await transporter.verify();
-      logger.info("Mail connection verified successfully");
+      logger.info('Mail connection verified successfully');
       return true;
     } catch (error) {
-      logger.error("Mail connection verification failed", {
+      logger.error('Mail connection verification failed', {
         error: error instanceof Error ? error.message : String(error),
       });
       return false;
@@ -110,7 +115,7 @@ class MailService {
       this.transporter.close();
       this.transporter = null;
       this.isInitialized = false;
-      logger.info("Mail transporter closed");
+      logger.info('Mail transporter closed');
     }
   }
 
@@ -134,10 +139,13 @@ export function getTransporter(): Transporter<SMTPTransport.SentMessageInfo> {
 }
 
 // Proxy for backward compatibility
-export const transporter = new Proxy({} as Transporter<SMTPTransport.SentMessageInfo>, {
-  get(_, prop) {
-    return (mailService.getTransporter() as any)[prop];
-  },
-});
+export const transporter = new Proxy(
+  {} as Transporter<SMTPTransport.SentMessageInfo>,
+  {
+    get(_, prop) {
+      return (mailService.getTransporter() as any)[prop];
+    },
+  }
+);
 
 export default transporter;

@@ -1,18 +1,18 @@
-import { PrismaClient } from "@prisma/client";
-import { withAccelerate } from "@prisma/extension-accelerate";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { createLogger } from "../utils/logger.util";
+import { PrismaClient } from '@prisma/client';
+import { withAccelerate } from '@prisma/extension-accelerate';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { createLogger } from '../utils/logger.util';
 
-const logger = createLogger("Database");
+const logger = createLogger('Database');
 
 // =============================================================================
 // Get database config from environment directly (lazy loading)
 // =============================================================================
 function getDatabaseConfig() {
   return {
-    url: process.env.DATABASE_URL || "postgresql://localhost:5432/test",
-    poolSize: parseInt(process.env.DATABASE_POOL_SIZE || "5", 10),
-    echo: process.env.DATABASE_ECHO === "true",
+    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/test',
+    poolSize: parseInt(process.env.DATABASE_POOL_SIZE || '5', 10),
+    echo: process.env.DATABASE_ECHO === 'true',
   };
 }
 
@@ -31,7 +31,7 @@ function createPrismaClient() {
 
   return new PrismaClient({
     adapter,
-    log: dbConfig.echo ? ["query", "info", "warn", "error"] : ["error"],
+    log: dbConfig.echo ? ['query', 'info', 'warn', 'error'] : ['error'],
   }).$extends(withAccelerate());
 }
 
@@ -54,7 +54,7 @@ class Database {
       this.client = createPrismaClient();
       this.isConnected = true;
       const dbConfig = getDatabaseConfig();
-      logger.info("Database client initialized", {
+      logger.info('Database client initialized', {
         poolSize: dbConfig.poolSize,
         echo: dbConfig.echo,
       });
@@ -64,7 +64,7 @@ class Database {
 
   public async connect(): Promise<void> {
     if (this.isConnected) {
-      logger.debug("Database already connected");
+      logger.debug('Database already connected');
       return;
     }
 
@@ -72,9 +72,9 @@ class Database {
       const client = this.getClient();
       await (client as any).$connect();
       this.isConnected = true;
-      logger.info("Database connected successfully");
+      logger.info('Database connected successfully');
     } catch (error) {
-      logger.error("Failed to connect to database", {
+      logger.error('Failed to connect to database', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -83,7 +83,7 @@ class Database {
 
   public async disconnect(): Promise<void> {
     if (!this.isConnected || !this.client) {
-      logger.debug("Database already disconnected");
+      logger.debug('Database already disconnected');
       return;
     }
 
@@ -91,9 +91,9 @@ class Database {
       await (this.client as any).$disconnect();
       this.isConnected = false;
       this.client = null;
-      logger.info("Database disconnected successfully");
+      logger.info('Database disconnected successfully');
     } catch (error) {
-      logger.error("Failed to disconnect from database", {
+      logger.error('Failed to disconnect from database', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

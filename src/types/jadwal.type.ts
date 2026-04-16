@@ -1,4 +1,4 @@
-import { JenisJadwal, PenilaiRole } from "@prisma/client";
+import { JenisJadwal, PenilaiRole } from '@prisma/client';
 
 export interface CreateJadwalType {
   id: string;

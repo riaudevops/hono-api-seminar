@@ -1,5 +1,5 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { JenisJadwal } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { JenisJadwal } from '@prisma/client';
 
 export interface CreateJadwalInput {
   id: string;
@@ -40,7 +40,7 @@ export default class JadwalRepository {
         },
       },
       orderBy: {
-        tanggal: "desc",
+        tanggal: 'desc',
       },
     });
   }
@@ -113,7 +113,11 @@ export default class JadwalRepository {
     });
   }
 
-  public static async existsByMahasiswaAndJenis(nim: string, jenis: JenisJadwal, excludeId?: string) {
+  public static async existsByMahasiswaAndJenis(
+    nim: string,
+    jenis: JenisJadwal,
+    excludeId?: string
+  ) {
     return await prisma.jadwal.findFirst({
       where: {
         nim,
@@ -155,7 +159,10 @@ export default class JadwalRepository {
     });
   }
 
-  public static async findLastIdByJenis(jenis: JenisJadwal, prefix: string): Promise<string | null> {
+  public static async findLastIdByJenis(
+    jenis: JenisJadwal,
+    prefix: string
+  ): Promise<string | null> {
     const lastJadwal = await prisma.jadwal.findFirst({
       where: {
         jenis,
@@ -164,7 +171,7 @@ export default class JadwalRepository {
         },
       },
       orderBy: {
-        id: "desc",
+        id: 'desc',
       },
       select: {
         id: true,
@@ -205,7 +212,12 @@ export default class JadwalRepository {
     });
   }
 
-  public static async checkTimeConflict(kode_ruangan: string, waktu_mulai: Date, waktu_selesai: Date, excludeId?: string) {
+  public static async checkTimeConflict(
+    kode_ruangan: string,
+    waktu_mulai: Date,
+    waktu_selesai: Date,
+    excludeId?: string
+  ) {
     return await prisma.jadwal.findFirst({
       where: {
         kode_ruangan,

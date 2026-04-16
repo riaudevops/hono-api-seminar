@@ -1,4 +1,4 @@
-import { LogActionType, LogActorType, Prisma } from "@prisma/client";
+import { LogActionType, LogActorType, Prisma } from '@prisma/client';
 
 export interface LogJadwalType {
   id: string;

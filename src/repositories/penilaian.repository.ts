@@ -1,5 +1,5 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { PenilaiRole } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { PenilaiRole } from '@prisma/client';
 
 export interface CreatePenilaianInput {
   id_jadwal: string;
@@ -113,7 +113,10 @@ export default class PenilaianRepository {
     });
   }
 
-  public static async findByJadwalAndRole(id_jadwal: string, role: PenilaiRole) {
+  public static async findByJadwalAndRole(
+    id_jadwal: string,
+    role: PenilaiRole
+  ) {
     return prisma.penilaian.findMany({
       where: {
         id_jadwal,
@@ -183,7 +186,9 @@ export default class PenilaianRepository {
     });
   }
 
-  public static async createManyDetailPenilaian(data: CreateDetailPenilaianInput[]) {
+  public static async createManyDetailPenilaian(
+    data: CreateDetailPenilaianInput[]
+  ) {
     return prisma.detail_penilaian.createMany({
       data: data.map((item) => ({
         id_penilaian: item.id_penilaian,
@@ -217,7 +222,10 @@ export default class PenilaianRepository {
     });
   }
 
-  public static async findDetailByPenilaianAndKomponen(id_penilaian: string, id_komponen: string) {
+  public static async findDetailByPenilaianAndKomponen(
+    id_penilaian: string,
+    id_komponen: string
+  ) {
     return prisma.detail_penilaian.findUnique({
       where: {
         id_penilaian_id_komponen: {
@@ -231,7 +239,10 @@ export default class PenilaianRepository {
     });
   }
 
-  public static async updateDetailPenilaian(id: string, data: UpdateDetailPenilaianInput) {
+  public static async updateDetailPenilaian(
+    id: string,
+    data: UpdateDetailPenilaianInput
+  ) {
     return prisma.detail_penilaian.update({
       where: { id },
       data: {
@@ -243,7 +254,11 @@ export default class PenilaianRepository {
     });
   }
 
-  public static async upsertDetailPenilaian(id_penilaian: string, id_komponen: string, nilai: number) {
+  public static async upsertDetailPenilaian(
+    id_penilaian: string,
+    id_komponen: string,
+    nilai: number
+  ) {
     return prisma.detail_penilaian.upsert({
       where: {
         id_penilaian_id_komponen: {
@@ -306,7 +321,8 @@ export default class PenilaianRepository {
     return {
       totalNilai,
       totalPersentase,
-      nilaiAkhir: totalPersentase > 0 ? (totalNilai / totalPersentase) * 100 : 0,
+      nilaiAkhir:
+        totalPersentase > 0 ? (totalNilai / totalPersentase) * 100 : 0,
     };
   }
 
@@ -328,7 +344,7 @@ export default class PenilaianRepository {
         },
       },
       orderBy: {
-        tanggal: "desc",
+        tanggal: 'desc',
       },
     });
   }

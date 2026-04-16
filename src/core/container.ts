@@ -59,7 +59,11 @@ class Container {
   /**
    * Register a class as a singleton
    */
-  public registerClass<T>(token: string, ctor: Constructor<T>, singleton: boolean = true): void {
+  public registerClass<T>(
+    token: string,
+    ctor: Constructor<T>,
+    singleton: boolean = true
+  ): void {
     this.services.set(token, {
       factory: () => new ctor(),
       singleton,
@@ -147,34 +151,34 @@ class Container {
 // =============================================================================
 export const ServiceTokens = {
   // Infrastructure
-  DATABASE: "Database",
-  MAILER: "Mailer",
-  CONFIG: "Config",
-  LOGGER: "Logger",
+  DATABASE: 'Database',
+  MAILER: 'Mailer',
+  CONFIG: 'Config',
+  LOGGER: 'Logger',
 
   // Repositories
-  JADWAL_REPOSITORY: "JadwalRepository",
-  MAHASISWA_REPOSITORY: "MahasiswaRepository",
-  DOSEN_REPOSITORY: "DosenRepository",
-  RUANGAN_REPOSITORY: "RuanganRepository",
-  TAHUN_AJARAN_REPOSITORY: "TahunAjaranRepository",
-  KOMPONEN_PENILAIAN_REPOSITORY: "KomponenPenilaianRepository",
-  NILAI_REPOSITORY: "NilaiRepository",
-  LOG_JADWAL_REPOSITORY: "LogJadwalRepository",
-  LOG_NILAI_REPOSITORY: "LogNilaiRepository",
+  JADWAL_REPOSITORY: 'JadwalRepository',
+  MAHASISWA_REPOSITORY: 'MahasiswaRepository',
+  DOSEN_REPOSITORY: 'DosenRepository',
+  RUANGAN_REPOSITORY: 'RuanganRepository',
+  TAHUN_AJARAN_REPOSITORY: 'TahunAjaranRepository',
+  KOMPONEN_PENILAIAN_REPOSITORY: 'KomponenPenilaianRepository',
+  NILAI_REPOSITORY: 'NilaiRepository',
+  LOG_JADWAL_REPOSITORY: 'LogJadwalRepository',
+  LOG_NILAI_REPOSITORY: 'LogNilaiRepository',
 
   // Services
-  JADWAL_SERVICE: "JadwalService",
-  MAHASISWA_SERVICE: "MahasiswaService",
-  DOSEN_SERVICE: "DosenService",
-  RUANGAN_SERVICE: "RuanganService",
-  TAHUN_AJARAN_SERVICE: "TahunAjaranService",
-  GLOBAL_SERVICE: "GlobalService",
-  KOMPONEN_PENILAIAN_SERVICE: "KomponenPenilaianService",
+  JADWAL_SERVICE: 'JadwalService',
+  MAHASISWA_SERVICE: 'MahasiswaService',
+  DOSEN_SERVICE: 'DosenService',
+  RUANGAN_SERVICE: 'RuanganService',
+  TAHUN_AJARAN_SERVICE: 'TahunAjaranService',
+  GLOBAL_SERVICE: 'GlobalService',
+  KOMPONEN_PENILAIAN_SERVICE: 'KomponenPenilaianService',
 
   // Helpers
-  CRYPTO_HELPER: "CryptoHelper",
-  AUTH_HELPER: "AuthHelper",
+  CRYPTO_HELPER: 'CryptoHelper',
+  AUTH_HELPER: 'AuthHelper',
 } as const;
 
 export type ServiceToken = (typeof ServiceTokens)[keyof typeof ServiceTokens];

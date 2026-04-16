@@ -21,19 +21,19 @@ const LOG_LEVEL_MAP: Record<string, LogLevel> = {
 // Colors for console output
 // =============================================================================
 const colors = {
-  reset: "\x1b[0m",
-  bright: "\x1b[1m",
-  dim: "\x1b[2m",
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
 
   // Foreground colors
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  magenta: "\x1b[35m",
-  cyan: "\x1b[36m",
-  white: "\x1b[37m",
-  gray: "\x1b[90m",
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  white: '\x1b[37m',
+  gray: '\x1b[90m',
 };
 
 const levelColors: Record<LogLevel, string> = {
@@ -45,18 +45,18 @@ const levelColors: Record<LogLevel, string> = {
 };
 
 const levelLabels: Record<LogLevel, string> = {
-  [LogLevel.DEBUG]: "DEBUG",
-  [LogLevel.INFO]: "INFO",
-  [LogLevel.WARNING]: "WARN",
-  [LogLevel.ERROR]: "ERROR",
-  [LogLevel.CRITICAL]: "CRITICAL",
+  [LogLevel.DEBUG]: 'DEBUG',
+  [LogLevel.INFO]: 'INFO',
+  [LogLevel.WARNING]: 'WARN',
+  [LogLevel.ERROR]: 'ERROR',
+  [LogLevel.CRITICAL]: 'CRITICAL',
 };
 
 // =============================================================================
 // Get log level from environment (without config dependency)
 // =============================================================================
 function getLogLevelFromEnv(): LogLevel {
-  const envLevel = process.env.LOG_LEVEL?.toUpperCase() || "INFO";
+  const envLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
   return LOG_LEVEL_MAP[envLevel] ?? LogLevel.INFO;
 }
 
@@ -68,7 +68,7 @@ class Logger {
   private minLevel: LogLevel;
   private context: string;
 
-  private constructor(context: string = "App") {
+  private constructor(context: string = 'App') {
     this.context = context;
     this.minLevel = getLogLevelFromEnv();
   }
@@ -94,7 +94,11 @@ class Logger {
     return new Date().toISOString();
   }
 
-  private formatMessage(level: LogLevel, message: string, meta?: Record<string, any>): string {
+  private formatMessage(
+    level: LogLevel,
+    message: string,
+    meta?: Record<string, any>
+  ): string {
     const timestamp = this.formatTimestamp();
     const levelLabel = levelLabels[level];
     const color = levelColors[level];
@@ -108,7 +112,11 @@ class Logger {
     return formattedMessage;
   }
 
-  private log(level: LogLevel, message: string, meta?: Record<string, any>): void {
+  private log(
+    level: LogLevel,
+    message: string,
+    meta?: Record<string, any>
+  ): void {
     if (!this.shouldLog(level)) return;
 
     const formattedMessage = this.formatMessage(level, message, meta);

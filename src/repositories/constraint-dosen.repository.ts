@@ -1,5 +1,5 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { ConstraintType, Prisma } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { ConstraintType, Prisma } from '@prisma/client';
 
 export interface CreateConstraintDosenInput {
   nip: string;
@@ -12,13 +12,14 @@ export interface CreateConstraintDosenInput {
   raw_data?: Prisma.InputJsonValue;
 }
 
-export type UpdateConstraintDosenInput = Prisma.constraint_dosenUncheckedUpdateInput;
+export type UpdateConstraintDosenInput =
+  Prisma.constraint_dosenUncheckedUpdateInput;
 
 export default class ConstraintDosenRepository {
   public static async findByNip(nip: string) {
     return prisma.constraint_dosen.findMany({
       where: { nip, is_active: true },
-      orderBy: { created_at: "desc" },
+      orderBy: { created_at: 'desc' },
     });
   }
 

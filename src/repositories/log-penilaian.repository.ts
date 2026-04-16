@@ -1,5 +1,5 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { LogActionType, LogActorType } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { LogActionType, LogActorType } from '@prisma/client';
 
 export interface CreateLogPenilaianInput {
   action: LogActionType;
@@ -17,7 +17,7 @@ export default class LogPenilaianRepository {
       ...(limit && { take: limit }),
       ...(offset && { skip: offset }),
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -32,7 +32,7 @@ export default class LogPenilaianRepository {
     return prisma.log_penilaian.findMany({
       where: { id_jadwal },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -41,7 +41,7 @@ export default class LogPenilaianRepository {
     return prisma.log_penilaian.findMany({
       where: { id_komponen_penilaian },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -50,7 +50,7 @@ export default class LogPenilaianRepository {
     return prisma.log_penilaian.findMany({
       where: { actor_id },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -59,7 +59,7 @@ export default class LogPenilaianRepository {
     return prisma.log_penilaian.findMany({
       where: { actor_type },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -68,7 +68,7 @@ export default class LogPenilaianRepository {
     return prisma.log_penilaian.findMany({
       where: { action },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -82,7 +82,7 @@ export default class LogPenilaianRepository {
         },
       },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -127,14 +127,17 @@ export default class LogPenilaianRepository {
     });
   }
 
-  public static async getLogsByJadwalAndKomponen(id_jadwal: string, id_komponen_penilaian: string) {
+  public static async getLogsByJadwalAndKomponen(
+    id_jadwal: string,
+    id_komponen_penilaian: string
+  ) {
     return prisma.log_penilaian.findMany({
       where: {
         id_jadwal,
         id_komponen_penilaian,
       },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }

@@ -1,4 +1,4 @@
-import prisma from "../infrastructures/db.infrastructure";
+import prisma from '../infrastructures/db.infrastructure';
 
 export default class TahunAjaranRepository {
   /**
@@ -39,7 +39,7 @@ export default class TahunAjaranRepository {
     const endDate = new Date(year, 11, 31, 23, 59, 59);
 
     const stats = await prisma.jadwal.groupBy({
-      by: ["jenis"],
+      by: ['jenis'],
       where: {
         tanggal: {
           gte: startDate,

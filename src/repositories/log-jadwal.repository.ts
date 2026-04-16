@@ -1,5 +1,5 @@
-import prisma from "../infrastructures/db.infrastructure";
-import { LogActionType, LogActorType, Prisma } from "@prisma/client";
+import prisma from '../infrastructures/db.infrastructure';
+import { LogActionType, LogActorType, Prisma } from '@prisma/client';
 
 export interface CreateLogJadwalInput {
   action: LogActionType;
@@ -16,7 +16,7 @@ export default class LogJadwalRepository {
       ...(limit && { take: limit }),
       ...(offset && { skip: offset }),
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -31,7 +31,7 @@ export default class LogJadwalRepository {
     return prisma.log_jadwal.findMany({
       where: { jadwal_id },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -40,7 +40,7 @@ export default class LogJadwalRepository {
     return prisma.log_jadwal.findMany({
       where: { actor_id },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -49,7 +49,7 @@ export default class LogJadwalRepository {
     return prisma.log_jadwal.findMany({
       where: { actor_type },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -58,7 +58,7 @@ export default class LogJadwalRepository {
     return prisma.log_jadwal.findMany({
       where: { action },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }
@@ -72,7 +72,7 @@ export default class LogJadwalRepository {
         },
       },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
   }

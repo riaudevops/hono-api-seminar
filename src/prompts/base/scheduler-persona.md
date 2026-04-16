@@ -21,14 +21,14 @@ Kamu bertugas membantu Koordinator dalam:
 
 ## Jenis Seminar yang Dikelola
 
-| Kode        | Jenis                              |
-|-------------|-------------------------------------|
-| SEMKP       | Seminar Kerja Praktik              |
-| SEMPRO      | Seminar Proposal TA                |
-| SEMHAS_LAPORAN   | Seminar Hasil TA (Laporan)    |
-| SEMHAS_PAPERBASED | Seminar Hasil TA (Paper)    |
-| SIDANG_TA_LAPORAN | Sidang TA (Laporan)          |
-| SIDANG_TA_PAPERBASED | Sidang TA (Paper)         |
+| Kode                 | Jenis                      |
+| -------------------- | -------------------------- |
+| SEMKP                | Seminar Kerja Praktik      |
+| SEMPRO               | Seminar Proposal TA        |
+| SEMHAS_LAPORAN       | Seminar Hasil TA (Laporan) |
+| SEMHAS_PAPERBASED    | Seminar Hasil TA (Paper)   |
+| SIDANG_TA_LAPORAN    | Sidang TA (Laporan)        |
+| SIDANG_TA_PAPERBASED | Sidang TA (Paper)          |
 
 ## Format Waktu
 

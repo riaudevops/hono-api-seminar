@@ -1,13 +1,20 @@
-import { Context } from "hono";
-import PenilaianService from "../services/penilaian.service";
-import { APIError } from "../utils/api-error.util";
-import { LogActorType } from "@prisma/client";
+import { Context } from 'hono';
+import PenilaianService from '../services/penilaian.service';
+import { APIError } from '../utils/api-error.util';
+import { LogActorType } from '@prisma/client';
 
 export default class PenilaianHandler {
   public static async getJadwalToAssess(c: Context) {
-    const userPayload = c.get("user");
-    if (!userPayload || typeof userPayload !== "object" || !("nip" in userPayload)) {
-      throw new APIError("Informasi NIP dosen tidak ditemukan. Anda bukan Dosen.", 403);
+    const userPayload = c.get('user');
+    if (
+      !userPayload ||
+      typeof userPayload !== 'object' ||
+      !('nip' in userPayload)
+    ) {
+      throw new APIError(
+        'Informasi NIP dosen tidak ditemukan. Anda bukan Dosen.',
+        403
+      );
     }
     const nip = userPayload.nip as string;
     return c.json(await PenilaianService.getJadwalToAssess(nip));
@@ -21,10 +28,14 @@ export default class PenilaianHandler {
   public static async submitPenilaian(c: Context) {
     const { id } = c.req.param(); // id_penilaian
     const data = await c.req.json();
-    
-    const userPayload = c.get("user");
-    if (!userPayload || typeof userPayload !== "object" || !("nip" in userPayload)) {
-      throw new APIError("Informasi otentikasi Dosen tidak valid.", 403);
+
+    const userPayload = c.get('user');
+    if (
+      !userPayload ||
+      typeof userPayload !== 'object' ||
+      !('nip' in userPayload)
+    ) {
+      throw new APIError('Informasi otentikasi Dosen tidak valid.', 403);
     }
     const nip = userPayload.nip as string;
 
@@ -33,6 +44,8 @@ export default class PenilaianHandler {
       actor_type: LogActorType.DOSEN,
     };
 
-    return c.json(await PenilaianService.submitPenilaian(id, nip, data.details, context));
+    return c.json(
+      await PenilaianService.submitPenilaian(id, nip, data.details, context)
+    );
   }
 }

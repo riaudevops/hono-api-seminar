@@ -1,10 +1,12 @@
-import SimpleCrypto from "simple-crypto-js";
+import SimpleCrypto from 'simple-crypto-js';
 
 // =============================================================================
 // Get crypto key from environment directly (lazy loading)
 // =============================================================================
 function getCryptoKey(): string {
-  return process.env.HANZ_CRYPTO_KEY || "default-crypto-key-change-in-production";
+  return (
+    process.env.HANZ_CRYPTO_KEY || 'default-crypto-key-change-in-production'
+  );
 }
 
 // =============================================================================
@@ -38,8 +40,8 @@ class CryptoHelper {
     // URL-Safe Encoding
     // Ganti karakter yang tidak aman untuk URL
     return encryptedData
-      .replace(/\//g, "_hanz_") // Ganti '/' dengan '_hanz_'
-      .replace(/\+/g, "-hanz-")
+      .replace(/\//g, '_hanz_') // Ganti '/' dengan '_hanz_'
+      .replace(/\+/g, '-hanz-')
       .toString() as string; // Ganti '+' dengan '-hanz-'
   }
 
@@ -53,8 +55,8 @@ class CryptoHelper {
     // URL-Safe Decoding
     // Kembalikan dulu karakter ke format Base64 standar SEBELUM dekripsi
     const originalEncryptedData = id
-      .replace(/_hanz_/g, "/") // Kembalikan '$hanz$' menjadi '/'
-      .replace(/-hanz-/g, "+"); // Kembalikan '&hanz&' menjadi '+'
+      .replace(/_hanz_/g, '/') // Kembalikan '$hanz$' menjadi '/'
+      .replace(/-hanz-/g, '+'); // Kembalikan '&hanz&' menjadi '+'
 
     return this.crypto.decrypt(originalEncryptedData);
   }

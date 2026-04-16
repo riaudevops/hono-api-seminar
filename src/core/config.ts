@@ -1,33 +1,35 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // =============================================================================
 // Environment Schema Validation
 // =============================================================================
 const envSchema = z.object({
   // Application Configuration
-  APP_NAME: z.string().default("ZRAES AI API"),
-  APP_VERSION: z.string().default("1.0.0"),
-  APP_ENV: z.enum(["development", "staging", "production", "testing"]).default("development"),
+  APP_NAME: z.string().default('ZRAES AI API'),
+  APP_VERSION: z.string().default('1.0.0'),
+  APP_ENV: z
+    .enum(['development', 'staging', 'production', 'testing'])
+    .default('development'),
   DEBUG: z
     .string()
-    .transform((val) => val === "true")
-    .default("false"),
+    .transform((val) => val === 'true')
+    .default('false'),
 
   // Server Configuration
-  HOST: z.string().default("0.0.0.0"),
-  PORT: z.string().transform(Number).default("8000"),
+  HOST: z.string().default('0.0.0.0'),
+  PORT: z.string().transform(Number).default('8000'),
   APP_PORT: z.string().transform(Number).optional(),
-  WORKERS: z.string().transform(Number).default("1"),
+  WORKERS: z.string().transform(Number).default('1'),
 
   // Database Configuration
-  DATABASE_URL: z.string().default("postgresql://localhost:5432/test"),
-  DATABASE_POOL_SIZE: z.string().transform(Number).default("5"),
-  DATABASE_MAX_OVERFLOW: z.string().transform(Number).default("10"),
-  DATABASE_POOL_TIMEOUT: z.string().transform(Number).default("30"),
+  DATABASE_URL: z.string().default('postgresql://localhost:5432/test'),
+  DATABASE_POOL_SIZE: z.string().transform(Number).default('5'),
+  DATABASE_MAX_OVERFLOW: z.string().transform(Number).default('10'),
+  DATABASE_POOL_TIMEOUT: z.string().transform(Number).default('30'),
   DATABASE_ECHO: z
     .string()
-    .transform((val) => val === "true")
-    .default("false"),
+    .transform((val) => val === 'true')
+    .default('false'),
 
   // CORS Configuration
   CORS_ORIGINS: z
@@ -36,21 +38,21 @@ const envSchema = z.object({
       try {
         return JSON.parse(val) as string[];
       } catch {
-        return ["*"];
+        return ['*'];
       }
     })
     .default('["*"]'),
   CORS_ALLOW_CREDENTIALS: z
     .string()
-    .transform((val) => val === "true")
-    .default("true"),
+    .transform((val) => val === 'true')
+    .default('true'),
   CORS_ALLOW_METHODS: z
     .string()
     .transform((val) => {
       try {
         return JSON.parse(val) as string[];
       } catch {
-        return ["*"];
+        return ['*'];
       }
     })
     .default('["*"]'),
@@ -60,21 +62,27 @@ const envSchema = z.object({
       try {
         return JSON.parse(val) as string[];
       } catch {
-        return ["*"];
+        return ['*'];
       }
     })
     .default('["*"]'),
 
   // Logging Configuration
-  LOG_LEVEL: z.enum(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]).default("INFO"),
-  LOG_FORMAT: z.string().default("%(asctime)s - %(name)s - %(levelname)s - %(message)s"),
+  LOG_LEVEL: z
+    .enum(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'])
+    .default('INFO'),
+  LOG_FORMAT: z
+    .string()
+    .default('%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
   LOG_FILE: z.string().optional(),
 
   // API Configuration
-  API_PREFIX: z.string().default("/api/v1"),
+  API_PREFIX: z.string().default('/api/v1'),
 
   // Crypto Configuration
-  HANZ_CRYPTO_KEY: z.string().default("default-crypto-key-change-in-production"),
+  HANZ_CRYPTO_KEY: z
+    .string()
+    .default('default-crypto-key-change-in-production'),
 
   // Email Configuration
   EMAIL_USER: z.string().optional(),
@@ -82,12 +90,19 @@ const envSchema = z.object({
 
   // OpenRouter Configuration
   OPENROUTER_API_KEY: z.string().optional(),
-  OPENROUTER_BASE_URL: z.string().default("https://openrouter.ai/api/v1"),
-  OPENROUTER_MODEL: z.string().default("openai/gpt-4o-mini"),
+  OPENROUTER_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_MODEL: z.string().default('openai/gpt-4o-mini'),
   OPENROUTER_FREE_MODELS: z
     .string()
-    .default("google/gemma-3-27b-it:free,deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-4-maverick:free")
-    .transform((val) => val.split(",").map((s) => s.trim()).filter(Boolean)),
+    .default(
+      'google/gemma-3-27b-it:free,deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-4-maverick:free'
+    )
+    .transform((val) =>
+      val
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
 });
 
 // =============================================================================
@@ -112,9 +127,9 @@ class Config {
     const result = envSchema.safeParse(process.env);
 
     if (!result.success) {
-      console.error("[CONFIG] Environment validation failed:");
+      console.error('[CONFIG] Environment validation failed:');
       console.error(result.error.format());
-      throw new Error("Invalid environment configuration");
+      throw new Error('Invalid environment configuration');
     }
 
     return result.data;
@@ -142,10 +157,10 @@ class Config {
       version: this.config.APP_VERSION,
       env: this.config.APP_ENV,
       debug: this.config.DEBUG,
-      isDevelopment: this.config.APP_ENV === "development",
-      isProduction: this.config.APP_ENV === "production",
-      isStaging: this.config.APP_ENV === "staging",
-      isTesting: this.config.APP_ENV === "testing",
+      isDevelopment: this.config.APP_ENV === 'development',
+      isProduction: this.config.APP_ENV === 'production',
+      isStaging: this.config.APP_ENV === 'staging',
+      isTesting: this.config.APP_ENV === 'testing',
     };
   }
 

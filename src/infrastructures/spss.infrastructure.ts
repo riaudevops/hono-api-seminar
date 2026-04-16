@@ -1,6 +1,6 @@
-import { createLogger } from "../utils/logger.util";
+import { createLogger } from '../utils/logger.util';
 
-const logger = createLogger("SPSS");
+const logger = createLogger('SPSS');
 
 // =============================================================================
 // Types
@@ -31,11 +31,11 @@ class SpssInfrastructure {
   private cacheTTL: number = 5 * 60 * 1000; // 5 minutes
 
   private constructor() {
-    this.spreadsheetUrl = process.env.SPREADSHEET_KEY || "";
-    this.gidMahasiswa = process.env.SPREADSHEET_GID_MAHASISWA || "0";
+    this.spreadsheetUrl = process.env.SPREADSHEET_KEY || '';
+    this.gidMahasiswa = process.env.SPREADSHEET_GID_MAHASISWA || '0';
 
     if (!this.spreadsheetUrl) {
-      logger.warn("SPREADSHEET_LINK is not defined in environment variables");
+      logger.warn('SPREADSHEET_LINK is not defined in environment variables');
     }
   }
 
@@ -58,22 +58,26 @@ class SpssInfrastructure {
     const cacheKey = `mahasiswa_${this.gidMahasiswa}`;
     const cached = this.getFromCache<MahasiswaSheet[]>(cacheKey);
     if (cached) {
-      logger.debug("Data_Mahasiswa served from cache");
+      logger.debug('Data_Mahasiswa served from cache');
       return cached;
     }
 
     if (!this.spreadsheetUrl) {
-      throw new Error("Spreadsheet URL is not configured in .env (SPREADSHEET_LINK)");
+      throw new Error(
+        'Spreadsheet URL is not configured in .env (SPREADSHEET_LINK)'
+      );
     }
 
     const csvUrl = this.buildCsvUrl(this.gidMahasiswa);
 
     try {
-      logger.info("Fetching Data_Mahasiswa dari Google Spreadsheet...");
+      logger.info('Fetching Data_Mahasiswa dari Google Spreadsheet...');
       const response = await fetch(csvUrl);
 
       if (!response.ok) {
-        throw new Error(`Gagal mengambil spreadsheet: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Gagal mengambil spreadsheet: ${response.status} ${response.statusText}`
+        );
       }
 
       const csvText = await response.text();
@@ -82,19 +86,21 @@ class SpssInfrastructure {
       // Map CSV headers ke property names yang konsisten
       const data: MahasiswaSheet[] = rows
         .map((row) => ({
-          no: row["NO"] || "",
-          nim: row["NIM"] || "",
-          nama: row["NAMA"] || "",
-          jenisSeminar: row["JENIS SEMINAR"] || row["JENIS SEM"] || "",
+          no: row['NO'] || '',
+          nim: row['NIM'] || '',
+          nama: row['NAMA'] || '',
+          jenisSeminar: row['JENIS SEMINAR'] || row['JENIS SEM'] || '',
           ...row,
         }))
-        .filter((m) => m.nim && m.nim.trim() !== "" && m.nama && m.nama.trim() !== "");
+        .filter(
+          (m) => m.nim && m.nim.trim() !== '' && m.nama && m.nama.trim() !== ''
+        );
 
       this.setCache(cacheKey, data);
       logger.info(`Data_Mahasiswa fetched: ${data.length} rows`);
       return data;
     } catch (error) {
-      logger.error("Error fetching Data_Mahasiswa", {
+      logger.error('Error fetching Data_Mahasiswa', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -106,7 +112,7 @@ class SpssInfrastructure {
    */
   public clearCache(): void {
     this.cache.clear();
-    logger.info("SPSS cache cleared");
+    logger.info('SPSS cache cleared');
   }
 
   // ===========================================================================
@@ -118,7 +124,7 @@ class SpssInfrastructure {
    * Contoh: .../pubhtml → .../pub?output=csv&gid=0
    */
   private buildCsvUrl(gid: string): string {
-    const baseUrl = this.spreadsheetUrl.replace(/\/pubhtml\/?$/, "");
+    const baseUrl = this.spreadsheetUrl.replace(/\/pubhtml\/?$/, '');
     return `${baseUrl}/pub?output=csv&gid=${gid}`;
   }
 
@@ -126,7 +132,7 @@ class SpssInfrastructure {
    * Parse CSV text ke array of objects (key = header)
    */
   private parseCsv(csv: string): Record<string, string>[] {
-    const lines = csv.split(/\r?\n/).filter((line) => line.trim() !== "");
+    const lines = csv.split(/\r?\n/).filter((line) => line.trim() !== '');
     if (lines.length <= 1) return [];
 
     const headers = this.parseCsvLine(lines[0]);
@@ -138,7 +144,7 @@ class SpssInfrastructure {
 
       headers.forEach((header, index) => {
         if (header) {
-          obj[header] = values[index] !== undefined ? values[index] : "";
+          obj[header] = values[index] !== undefined ? values[index] : '';
         }
       });
 
@@ -153,7 +159,7 @@ class SpssInfrastructure {
    */
   private parseCsvLine(line: string): string[] {
     const result: string[] = [];
-    let current = "";
+    let current = '';
     let inQuotes = false;
 
     for (let i = 0; i < line.length; i++) {
@@ -166,9 +172,9 @@ class SpssInfrastructure {
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char === "," && !inQuotes) {
+      } else if (char === ',' && !inQuotes) {
         result.push(current.trim());
-        current = "";
+        current = '';
       } else {
         current += char;
       }

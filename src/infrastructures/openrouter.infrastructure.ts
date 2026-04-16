@@ -1,4 +1,4 @@
-import { createLogger } from "../utils/logger.util";
+import { createLogger } from '../utils/logger.util';
 import {
   ChatCompletionOptions,
   ChatCompletionResponse,
@@ -7,24 +7,24 @@ import {
   Prediction,
   ProviderPreferences,
   ReasoningEffort,
-} from "../utils/openrouter.util";
+} from '../utils/openrouter.util';
 
-const logger = createLogger("OpenRouter");
+const logger = createLogger('OpenRouter');
 
 // =============================================================================
 // Get OpenRouter config from environment directly (lazy loading)
 // =============================================================================
 function getOpenRouterConfig() {
-  const freeModelsRaw = process.env.OPENROUTER_FREE_MODELS || "";
+  const freeModelsRaw = process.env.OPENROUTER_FREE_MODELS || '';
   const freeModels = freeModelsRaw
-    .split(",")
+    .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
   return {
-    apiKey: process.env.OPENROUTER_API_KEY || "",
-    baseUrl: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-    paidModel: process.env.OPENROUTER_MODEL || "minimax/minimax-m2.5:free",
+    apiKey: process.env.OPENROUTER_API_KEY || '',
+    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    paidModel: process.env.OPENROUTER_MODEL || 'minimax/minimax-m2.5:free',
     freeModels,
   };
 }
@@ -66,7 +66,7 @@ class OpenRouterService {
   private validateConfig(): void {
     const config = getOpenRouterConfig();
     if (!config.apiKey) {
-      throw new Error("OPENROUTER_API_KEY is not configured");
+      throw new Error('OPENROUTER_API_KEY is not configured');
     }
   }
 
@@ -74,7 +74,9 @@ class OpenRouterService {
   // Core chat completion
   // By default: tries free models first, falls back to paid model.
   // ===========================================================================
-  public async chatCompletion(options: ChatCompletionOptions): Promise<ChatCompletionResponse> {
+  public async chatCompletion(
+    options: ChatCompletionOptions
+  ): Promise<ChatCompletionResponse> {
     this.validateConfig();
     const config = getOpenRouterConfig();
 
@@ -99,7 +101,7 @@ class OpenRouterService {
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 1024,
       models: fallbackChain,
-      route: options.route || "fallback",
+      route: options.route || 'fallback',
       allow_fallbacks: options.allow_fallbacks ?? true,
     };
 
@@ -118,9 +120,9 @@ class OpenRouterService {
 
     try {
       const response = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify(body),
@@ -128,14 +130,16 @@ class OpenRouterService {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        throw new Error(`OpenRouter API error (${response.status}): ${errorBody}`);
+        throw new Error(
+          `OpenRouter API error (${response.status}): ${errorBody}`
+        );
       }
 
       const result = (await response.json()) as ChatCompletionResponse;
 
       if (!this.isInitialized) {
         this.isInitialized = true;
-        logger.info("OpenRouter client initialized", {
+        logger.info('OpenRouter client initialized', {
           freeModels: config.freeModels,
           paidModel: config.paidModel,
         });
@@ -143,19 +147,22 @@ class OpenRouterService {
 
       // Log which model actually responded (could be free or paid fallback)
       const usedModel = result.model || primaryModel;
-      const isFreeModel = config.freeModels.some((m) => usedModel.startsWith(m.split(":")[0]));
+      const isFreeModel = config.freeModels.some((m) =>
+        usedModel.startsWith(m.split(':')[0])
+      );
 
-      logger.debug("Chat completion successful", {
+      logger.debug('Chat completion successful', {
         model: usedModel,
-        tier: isFreeModel ? "free" : "paid",
+        tier: isFreeModel ? 'free' : 'paid',
         tokens: result.usage?.total_tokens,
         cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
-        reasoningTokens: result.usage?.completion_tokens_details?.reasoning_tokens,
+        reasoningTokens:
+          result.usage?.completion_tokens_details?.reasoning_tokens,
       });
 
       return result;
     } catch (error) {
-      logger.error("Chat completion failed", {
+      logger.error('Chat completion failed', {
         error: error instanceof Error ? error.message : String(error),
         model: primaryModel,
       });
@@ -175,7 +182,7 @@ class OpenRouterService {
       maxTokens?: number;
       provider?: ProviderPreferences;
       allow_fallbacks?: boolean;
-    },
+    }
   ): Promise<ChatCompletionResponse> {
     return this.chatCompletion({
       messages,
@@ -184,7 +191,7 @@ class OpenRouterService {
       maxTokens: options?.maxTokens,
       provider: options?.provider,
       models: fallbacks,
-      route: "fallback",
+      route: 'fallback',
       allow_fallbacks: options?.allow_fallbacks ?? true,
     });
   }
@@ -201,7 +208,7 @@ class OpenRouterService {
       maxLatencySeconds?: number;
       preferredMinThroughput?: number;
       prediction?: Prediction;
-    },
+    }
   ): Promise<ChatCompletionResponse> {
     return this.chatCompletion({
       messages,
@@ -210,8 +217,10 @@ class OpenRouterService {
       maxTokens: options?.maxTokens,
       prediction: options?.prediction,
       provider: {
-        sort: "latency",
-        ...(options?.maxLatencySeconds ? { preferred_max_latency: options.maxLatencySeconds } : {}),
+        sort: 'latency',
+        ...(options?.maxLatencySeconds
+          ? { preferred_max_latency: options.maxLatencySeconds }
+          : {}),
         ...(options?.preferredMinThroughput
           ? { preferred_min_throughput: options.preferredMinThroughput }
           : {}),
@@ -229,7 +238,7 @@ class OpenRouterService {
       temperature?: number;
       maxTokens?: number;
       provider?: ProviderPreferences;
-    },
+    }
   ): Promise<ChatCompletionResponse> {
     return this.chatCompletion({
       messages,
@@ -251,7 +260,7 @@ class OpenRouterService {
       temperature?: number;
       maxTokens?: number;
       provider?: ProviderPreferences;
-    },
+    }
   ): Promise<ChatCompletionResponse> {
     return this.chatCompletion({
       messages,
