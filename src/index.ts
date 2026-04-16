@@ -14,6 +14,7 @@ import dosenRoute from "./routes/dosen.route";
 import mahasiswaRoute from "./routes/mahasiswa.route";
 import komponenRoute from "./routes/komponen-penilaian.route";
 import penilaianRoute from "./routes/penilaian.route";
+import constraintDosenRoute from "./routes/constraint-dosen.route";
 
 const logger = createLogger("Server");
 
@@ -71,6 +72,7 @@ app.route("/", dosenRoute);
 app.route("/", mahasiswaRoute);
 app.route("/", komponenRoute);
 app.route("/", penilaianRoute);
+app.route("/", constraintDosenRoute);
 
 // Graceful shutdown handlers
 process.on("SIGINT", async () => {
