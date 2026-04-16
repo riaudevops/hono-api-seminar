@@ -2,6 +2,12 @@ import DosenRepository from '../repositories/dosen.repository';
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import { APIError } from '../utils/api-error.util';
 import { ConstraintType, Prisma } from '@prisma/client';
+import openRouterService from '../infrastructures/openrouter.infrastructure';
+import { textMessage } from '../utils/openrouter.util';
+import { ParseConstraintOutputSchema, ParsedConstraint } from '../prompts/output/constraint-schema';
+import { createLogger } from '../utils/logger.util';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 export interface CreateConstraintType {
   type: ConstraintType;
@@ -23,6 +29,13 @@ export interface UpdateConstraintType {
   is_active?: boolean;
   raw_data?: Record<string, unknown> | null;
 }
+
+const logger = createLogger('ConstraintDosenService');
+
+const PARSE_CONSTRAINT_PROMPT = readFileSync(
+  join(process.cwd(), 'src/prompts/tasks/parse-constraint.md'),
+  'utf-8'
+);
 
 export default class ConstraintDosenService {
   private static async getNipFromEmail(email: string): Promise<string> {
@@ -152,6 +165,72 @@ export default class ConstraintDosenService {
     return {
       response: true,
       message: 'Constraint berhasil dihapus',
+    };
+  }
+
+  public static async chat(email: string, message: string) {
+    const nip = await this.getNipFromEmail(email);
+
+    logger.info('Parsing constraint from chat', { nip, message });
+
+    const response = await openRouterService.chatCompletion({
+      messages: [
+        textMessage('system', PARSE_CONSTRAINT_PROMPT),
+        textMessage('user', message),
+      ],
+      temperature: 0.3,
+      maxTokens: 2048,
+    });
+
+    const rawContent = response.choices?.[0]?.message?.content;
+    if (!rawContent || typeof rawContent !== 'string') {
+      throw new APIError('AI tidak dapat memproses pesan Anda. Silakan coba lagi.', 502);
+    }
+
+    // Extract JSON from AI response (handle markdown code blocks)
+    const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawContent];
+    const jsonStr = jsonMatch[1].trim();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      logger.error('Failed to parse AI JSON output', { rawContent });
+      throw new APIError('AI mengembalikan format yang tidak valid. Silakan coba lagi.', 502);
+    }
+
+    // Validate with Zod — support both { constraints: [...] } and direct [...]
+    const wrapped = Array.isArray(parsed) ? { constraints: parsed } : parsed;
+    const result = ParseConstraintOutputSchema.safeParse(wrapped);
+
+    if (!result.success) {
+      logger.error('AI output validation failed', { errors: result.error.issues });
+      throw new APIError('AI mengembalikan data yang tidak valid. Silakan coba lagi.', 502);
+    }
+
+    // Create all parsed constraints in the database
+    const created = await Promise.all(
+      result.data.constraints.map((c: ParsedConstraint) =>
+        ConstraintDosenRepository.create({
+          type: c.type as ConstraintType,
+          hari: c.hari ?? undefined,
+          waktu_mulai: c.waktu_mulai ? new Date(c.waktu_mulai) : undefined,
+          waktu_selesai: c.waktu_selesai ? new Date(c.waktu_selesai) : undefined,
+          keterangan: c.keterangan ?? undefined,
+          priority: c.priority ?? 1,
+          raw_data: { original_message: message } as unknown as Prisma.InputJsonValue,
+          dosen: { connect: { nip } },
+        })
+      )
+    );
+
+    return {
+      response: true,
+      message: `${created.length} constraint berhasil ditambahkan`,
+      data: {
+        pesan: message,
+        constraints: created,
+      },
     };
   }
 }

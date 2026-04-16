@@ -7,6 +7,7 @@ import AuthMiddleware from '../middlewares/auth.middleware';
 import {
   postConstraintSchema,
   putConstraintSchema,
+  chatConstraintSchema,
 } from '../validators/constraint-dosen.validator';
 
 const constraintDosenRoute = new Hono({ router: new RegExpRouter() });
@@ -37,6 +38,12 @@ constraintDosenRoute.delete(
   '/constraint-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   ConstraintDosenHandler.delete
+);
+constraintDosenRoute.post(
+  '/constraint-saya/chat',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('json', chatConstraintSchema, zodError),
+  ConstraintDosenHandler.chat
 );
 
 export default constraintDosenRoute;

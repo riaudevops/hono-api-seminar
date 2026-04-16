@@ -49,4 +49,10 @@ export default class ConstraintDosenHandler {
     const { id } = c.req.param();
     return c.json(await ConstraintDosenService.delete(email, id));
   }
+
+  public static async chat(c: Context) {
+    const email = extractEmail(c);
+    const { message } = await c.req.json();
+    return c.json(await ConstraintDosenService.chat(email, message), 201);
+  }
 }

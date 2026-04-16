@@ -103,3 +103,10 @@ export const putConstraintSchema = z
       path: ['waktu_selesai'],
     }
   );
+
+export const chatConstraintSchema = z.object({
+  message: z
+    .string()
+    .min(3, 'Pesan minimal 3 karakter')
+    .max(1000, 'Pesan maksimal 1000 karakter'),
+});
