@@ -3,6 +3,7 @@ import { JenisJadwal, PenilaiRole } from '@prisma/client';
 export interface CreateJadwalType {
   id: string;
   tanggal: Date;
+  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   jenis: JenisJadwal;
@@ -12,6 +13,7 @@ export interface CreateJadwalType {
 
 export interface UpdateJadwalType {
   tanggal?: Date;
+  judul?: string;
   waktu_mulai?: Date;
   waktu_selesai?: Date;
   jenis?: JenisJadwal;

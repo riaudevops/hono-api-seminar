@@ -27,6 +27,10 @@ export const postPutJadwalSchema = z
     jenis: z.nativeEnum(JenisJadwal, {
       errorMap: () => ({ message: 'Jenis jadwal tidak valid' }),
     }),
+    judul: z
+      .string()
+      .min(1, 'Judul tidak boleh kosong')
+      .max(255, 'Judul maksimal 255 karakter'),
     nim: z
       .string()
       .min(1, 'NIM tidak boleh kosong')

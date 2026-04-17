@@ -166,6 +166,7 @@ export default class JadwalService {
     const jadwal = await JadwalRepository.create({
       id,
       tanggal: new Date(data.tanggal),
+      judul: data.judul,
       waktu_mulai: waktuMulaiServer,
       waktu_selesai: waktuSelesaiServer,
       jenis: data.jenis,
@@ -269,6 +270,7 @@ export default class JadwalService {
 
     const updateData: any = {};
     if (data.tanggal) updateData.tanggal = new Date(data.tanggal);
+    if (data.judul) updateData.judul = data.judul;
     if (data.waktu_mulai) updateData.waktu_mulai = waktuMulaiServer;
     if (data.waktu_selesai) updateData.waktu_selesai = waktuSelesaiServer;
     if (data.jenis) updateData.jenis = data.jenis;

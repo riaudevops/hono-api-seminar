@@ -4,6 +4,7 @@ import { JenisJadwal } from '@prisma/client';
 export interface CreateJadwalInput {
   id: string;
   tanggal: Date;
+  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   jenis: JenisJadwal;
@@ -133,6 +134,7 @@ export default class JadwalRepository {
       data: {
         id: data.id,
         tanggal: data.tanggal,
+        judul: data.judul,
         waktu_mulai: data.waktu_mulai,
         waktu_selesai: data.waktu_selesai,
         jenis: data.jenis,
@@ -209,6 +211,27 @@ export default class JadwalRepository {
           },
         },
       },
+    });
+  }
+
+  public static async findByDateRange(startDate: Date, endDate: Date) {
+    return prisma.jadwal.findMany({
+      where: {
+        tanggal: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        mahasiswa: true,
+        ruangan: true,
+        penilaian: {
+          include: {
+            dosen: true,
+          },
+        },
+      },
+      orderBy: { tanggal: 'asc' },
     });
   }
 

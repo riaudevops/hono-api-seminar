@@ -82,6 +82,7 @@ model ruangan {
 model jadwal {
   id            String   @id @db.VarChar(14)
   tanggal       DateTime @db.Timestamptz
+  judul         String   @db.VarChar(255)
   waktu_mulai   DateTime @db.Timestamptz
   waktu_selesai DateTime @db.Timestamptz
   jenis         JenisJadwal
@@ -101,9 +102,11 @@ model jadwal {
 
 model jadwal_draft {
   id             String            @id @default(cuid())
+  batch_id       String            @db.VarChar(20) // Untuk mengelompokkan jadwal draft dalam satu batch proses AI
   nim            String
   jenis          JenisJadwal
-  
+  judul          String            @db.VarChar(255)
+
   // Slot yang diusulkan AI
   tanggal        DateTime          @db.Timestamptz
   waktu_mulai    DateTime          @db.Timestamptz

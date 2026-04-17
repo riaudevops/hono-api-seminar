@@ -141,6 +141,21 @@ function convertZodDef(
   }
 }
 
+// --- Generate Batch Schedule Output ---
+
+const BatchScheduleSuggestionSchema = TimeSlotSchema.extend({
+  nim: z.string().describe('NIM mahasiswa'),
+  jenis: z.string().describe('Jenis seminar (misal: SEMPRO, SIDANG_TA_LAPORAN)'),
+  confidence: z.number().min(0).max(1).describe('Skor keyakinan AI (0.0-1.0)'),
+  reasoning: z.string().describe('Alasan pemilihan slot ini'),
+});
+
+export const GenerateBatchOutputSchema = z.object({
+  suggestions: z
+    .array(BatchScheduleSuggestionSchema)
+    .describe('Daftar jadwal yang diusulkan, satu per mahasiswa'),
+});
+
 // =============================================================================
 // Type exports
 // =============================================================================
@@ -149,3 +164,4 @@ export type ResolveConflictOutput = z.infer<typeof ResolveConflictOutputSchema>;
 export type SuggestAlternativesOutput = z.infer<
   typeof SuggestAlternativesOutputSchema
 >;
+export type GenerateBatchOutput = z.infer<typeof GenerateBatchOutputSchema>;
