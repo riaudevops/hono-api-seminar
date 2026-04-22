@@ -15,7 +15,7 @@ import MahasiswaRepository from '../repositories/mahasiswa.repository';
 import DosenRepository from '../repositories/dosen.repository';
 import RuanganRepository from '../repositories/ruangan.repository';
 import PenilaianRepository from '../repositories/penilaian.repository';
-import prisma from '../infrastructures/db.infrastructure';
+import LogJadwalService from './log-jadwal.service';
 
 export interface LogJadwalContext {
   actor_id: string;
@@ -199,15 +199,12 @@ export default class JadwalService {
         : null,
     };
 
-    // Create log_jadwal for CREATE action
-    await prisma.log_jadwal.create({
-      data: {
-        action: LogActionType.CREATE,
-        actor_type: context.actor_type,
-        actor_id: context.actor_id,
-        jadwal_id: id,
-        new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
-      },
+    await LogJadwalService.create({
+      action: LogActionType.CREATE,
+      actor_type: context.actor_type,
+      actor_id: context.actor_id,
+      jadwal_id: id,
+      new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
     });
 
     return {
@@ -307,16 +304,13 @@ export default class JadwalService {
         : null,
     };
 
-    // Create log_jadwal for UPDATE action
-    await prisma.log_jadwal.create({
-      data: {
-        action: LogActionType.UPDATE,
-        actor_type: context.actor_type,
-        actor_id: context.actor_id,
-        jadwal_id: id,
-        old_values: JSON.parse(JSON.stringify(existingJadwal)),
-        new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
-      },
+    await LogJadwalService.create({
+      action: LogActionType.UPDATE,
+      actor_type: context.actor_type,
+      actor_id: context.actor_id,
+      jadwal_id: id,
+      old_values: JSON.parse(JSON.stringify(existingJadwal)),
+      new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
     });
 
     return {
@@ -367,13 +361,21 @@ export default class JadwalService {
     return ruangan;
   }
 
-  public static async delete(id: string) {
+  public static async delete(id: string, context: LogJadwalContext) {
     const jadwal = await JadwalRepository.findById(id);
     if (!jadwal) {
       throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
     await JadwalRepository.destroy(id);
+
+    await LogJadwalService.create({
+      action: LogActionType.DELETE,
+      actor_type: context.actor_type,
+      actor_id: context.actor_id,
+      jadwal_id: id,
+      old_values: JSON.parse(JSON.stringify(jadwal)),
+    });
 
     return {
       response: true,

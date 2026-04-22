@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import PenilaianService from '../services/penilaian.service';
 import { APIError } from '../utils/api-error.util';
 import { LogActorType } from '@prisma/client';
+import LogPenilaianService from '../services/log-penilaian.service';
 
 export default class PenilaianHandler {
   public static async getJadwalToAssess(c: Context) {
@@ -23,6 +24,11 @@ export default class PenilaianHandler {
   public static async getNilaiByJadwal(c: Context) {
     const { id_jadwal } = c.req.param();
     return c.json(await PenilaianService.getNilaiByJadwal(id_jadwal));
+  }
+
+  public static async getLogsByJadwal(c: Context) {
+    const { id_jadwal } = c.req.param();
+    return c.json(await LogPenilaianService.getAll({ id_jadwal }));
   }
 
   public static async submitPenilaian(c: Context) {

@@ -1,9 +1,8 @@
 import prisma from '../infrastructures/db.infrastructure';
 import { APIError } from '../utils/api-error.util';
-import { PenilaiRole } from '@prisma/client';
+import { PenilaiRole, Prisma } from '@prisma/client';
 
 export interface CreateKomponenInput {
-  id: string;
   nama: string;
   persentase: number;
   is_aktif?: boolean;
@@ -18,6 +17,51 @@ export interface UpdateKomponenInput {
 }
 
 export default class KomponenPenilaianService {
+  private static getIdPrefixByRole(role: PenilaiRole): string {
+    const prefixMap: Record<PenilaiRole, string> = {
+      KP_PEMBIMBING: 'KP-A',
+      KP_PENGUJI: 'KP-B',
+      KP_INSTANSI: 'KP-C',
+      TA_PEMBIMBING_1: 'TA-A',
+      TA_PEMBIMBING_2: 'TA-B',
+      TA_PENGUJI_1: 'TA-C',
+      TA_PENGUJI_2: 'TA-D',
+      TA_KETUA_SIDANG: 'TA-E',
+    };
+
+    return prefixMap[role];
+  }
+
+  private static async generateKomponenId(role: PenilaiRole): Promise<string> {
+    const prefix = this.getIdPrefixByRole(role);
+    const idPrefix = `${prefix}-`;
+
+    const existingIds = await prisma.komponen_penilaian.findMany({
+      where: {
+        id: {
+          startsWith: idPrefix,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const maxSequence = existingIds.reduce((max, item) => {
+      const sequenceRaw = item.id.split('-').at(-1);
+      const sequence = Number(sequenceRaw);
+
+      if (Number.isNaN(sequence)) {
+        return max;
+      }
+
+      return Math.max(max, sequence);
+    }, 0);
+
+    const nextSequence = String(maxSequence + 1).padStart(2, '0');
+    return `${prefix}-${nextSequence}`;
+  }
+
   /**
    * Mengambil semua komponen penilaian, opsional difilter berdasarkan role
    */
@@ -87,28 +131,45 @@ export default class KomponenPenilaianService {
    * Membuat komponen penilaian baru
    */
   public static async create(data: CreateKomponenInput) {
-    // Pastikan ID unik
-    const existing = await prisma.komponen_penilaian.findUnique({
-      where: { id: data.id },
-    });
-    if (existing) {
-      throw new APIError(`Komponen dengan ID ${data.id} sudah ada.`, 400);
-    }
-
     // Jika komponen akan langsung diaktifkan, validasi total persentasenya
     if (data.is_aktif !== false) {
       await this.validatePercentageLimit(data.role, data.persentase);
     }
 
-    const newComponent = await prisma.komponen_penilaian.create({
-      data: {
-        id: data.id,
-        nama: data.nama,
-        persentase: data.persentase,
-        is_aktif: data.is_aktif ?? true,
-        role: data.role,
-      },
-    });
+    let newComponent: Awaited<
+      ReturnType<typeof prisma.komponen_penilaian.create>
+    > | null = null;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const generatedId = await this.generateKomponenId(data.role);
+
+      try {
+        newComponent = await prisma.komponen_penilaian.create({
+          data: {
+            id: generatedId,
+            nama: data.nama,
+            persentase: data.persentase,
+            is_aktif: data.is_aktif ?? true,
+            role: data.role,
+          },
+        });
+        break;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          attempt < 2
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    if (!newComponent) {
+      throw new APIError('Gagal membuat ID komponen penilaian unik', 500);
+    }
 
     return {
       response: true,

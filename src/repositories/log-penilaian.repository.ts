@@ -7,8 +7,26 @@ export interface CreateLogPenilaianInput {
   actor_id: string;
   id_jadwal: string;
   id_komponen_penilaian: string;
-  old_nilai?: number;
-  new_nilai?: number;
+  old_nilai?: number | null;
+  new_nilai?: number | null;
+}
+
+export interface UpdateLogPenilaianInput {
+  action?: LogActionType;
+  actor_type?: LogActorType;
+  actor_id?: string;
+  id_jadwal?: string;
+  id_komponen_penilaian?: string;
+  old_nilai?: number | null;
+  new_nilai?: number | null;
+}
+
+export interface LogPenilaianFilter {
+  id_jadwal?: string;
+  id_komponen_penilaian?: string;
+  actor_id?: string;
+  actor_type?: LogActorType;
+  action?: LogActionType;
 }
 
 export default class LogPenilaianRepository {
@@ -25,6 +43,23 @@ export default class LogPenilaianRepository {
   public static async findById(id: string) {
     return prisma.log_penilaian.findUnique({
       where: { id },
+    });
+  }
+
+  public static async findByFilters(filters: LogPenilaianFilter) {
+    return prisma.log_penilaian.findMany({
+      where: {
+        ...(filters.id_jadwal ? { id_jadwal: filters.id_jadwal } : {}),
+        ...(filters.id_komponen_penilaian
+          ? { id_komponen_penilaian: filters.id_komponen_penilaian }
+          : {}),
+        ...(filters.actor_id ? { actor_id: filters.actor_id } : {}),
+        ...(filters.actor_type ? { actor_type: filters.actor_type } : {}),
+        ...(filters.action ? { action: filters.action } : {}),
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
     });
   }
 
@@ -98,6 +133,19 @@ export default class LogPenilaianRepository {
         old_nilai: data.old_nilai,
         new_nilai: data.new_nilai,
       },
+    });
+  }
+
+  public static async update(id: string, data: UpdateLogPenilaianInput) {
+    return prisma.log_penilaian.update({
+      where: { id },
+      data,
+    });
+  }
+
+  public static async destroy(id: string) {
+    return prisma.log_penilaian.delete({
+      where: { id },
     });
   }
 

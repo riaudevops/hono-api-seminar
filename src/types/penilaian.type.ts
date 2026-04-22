@@ -39,7 +39,6 @@ export interface KomponenPenilaianType {
 }
 
 export interface CreateKomponenPenilaianType {
-  id: string;
   nama: string;
   persentase: number;
   is_aktif?: boolean;

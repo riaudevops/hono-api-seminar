@@ -23,6 +23,11 @@ jadwalRoute.get(
   AuthMiddleware.JWTBearerTokenExtraction,
   JadwalHandler.get
 );
+jadwalRoute.get(
+  '/jadwal/:id/logs',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.getLogs
+);
 jadwalRoute.post(
   '/jadwal',
   AuthMiddleware.JWTBearerTokenExtraction,

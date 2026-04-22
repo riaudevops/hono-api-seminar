@@ -4,6 +4,7 @@ import { APIError } from '../utils/api-error.util';
 import prisma from '../infrastructures/db.infrastructure';
 import { LogActionType, LogActorType } from '@prisma/client';
 import { LogJadwalContext } from './jadwal.service';
+import LogPenilaianService from './log-penilaian.service';
 
 export interface SubmitPenilaianItem {
   id_komponen: string;
@@ -158,19 +159,14 @@ export default class PenilaianService {
           },
         });
 
-        // Log the change
-        await tx.log_penilaian.create({
-          data: {
-            action: existingDetail
-              ? LogActionType.UPDATE
-              : LogActionType.CREATE,
-            actor_type: context.actor_type,
-            actor_id: context.actor_id,
-            id_jadwal: penilaian.id_jadwal,
-            id_komponen_penilaian: item.id_komponen,
-            old_nilai: existingDetail ? existingDetail.nilai : null,
-            new_nilai: item.nilai,
-          },
+        await LogPenilaianService.createWithTransaction(tx, {
+          action: existingDetail ? LogActionType.UPDATE : LogActionType.CREATE,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          id_jadwal: penilaian.id_jadwal,
+          id_komponen_penilaian: item.id_komponen,
+          old_nilai: existingDetail ? existingDetail.nilai : null,
+          new_nilai: item.nilai,
         });
 
         results.push(upserted);

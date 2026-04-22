@@ -10,6 +10,15 @@ export interface CreateLogJadwalInput {
   new_values?: Prisma.InputJsonValue;
 }
 
+export type UpdateLogJadwalInput = Prisma.log_jadwalUncheckedUpdateInput;
+
+export interface LogJadwalFilter {
+  jadwal_id?: string;
+  actor_id?: string;
+  actor_type?: LogActorType;
+  action?: LogActionType;
+}
+
 export default class LogJadwalRepository {
   public static async findAll(limit?: number, offset?: number) {
     return prisma.log_jadwal.findMany({
@@ -24,6 +33,20 @@ export default class LogJadwalRepository {
   public static async findById(id: string) {
     return prisma.log_jadwal.findUnique({
       where: { id },
+    });
+  }
+
+  public static async findByFilters(filters: LogJadwalFilter) {
+    return prisma.log_jadwal.findMany({
+      where: {
+        ...(filters.jadwal_id ? { jadwal_id: filters.jadwal_id } : {}),
+        ...(filters.actor_id ? { actor_id: filters.actor_id } : {}),
+        ...(filters.actor_type ? { actor_type: filters.actor_type } : {}),
+        ...(filters.action ? { action: filters.action } : {}),
+      },
+      orderBy: {
+        timestamp: 'desc',
+      },
     });
   }
 
@@ -87,6 +110,19 @@ export default class LogJadwalRepository {
         old_values: data.old_values,
         new_values: data.new_values,
       },
+    });
+  }
+
+  public static async update(id: string, data: UpdateLogJadwalInput) {
+    return prisma.log_jadwal.update({
+      where: { id },
+      data,
+    });
+  }
+
+  public static async destroy(id: string) {
+    return prisma.log_jadwal.delete({
+      where: { id },
     });
   }
 

@@ -27,5 +27,10 @@ penilaianRoute.get(
   AuthMiddleware.JWTBearerTokenExtraction,
   PenilaianHandler.getNilaiByJadwal
 );
+penilaianRoute.get(
+  '/penilaian/jadwal/:id_jadwal/logs',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  PenilaianHandler.getLogsByJadwal
+);
 
 export default penilaianRoute;

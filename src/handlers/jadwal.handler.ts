@@ -2,6 +2,7 @@ import { Context } from 'hono';
 import JadwalService from '../services/jadwal.service';
 import { APIError } from '../utils/api-error.util';
 import { JenisJadwal, LogActorType } from '@prisma/client';
+import LogJadwalService from '../services/log-jadwal.service';
 
 export default class JadwalHandler {
   public static async getMe(c: Context) {
@@ -30,6 +31,11 @@ export default class JadwalHandler {
   public static async get(c: Context) {
     const { id } = c.req.param();
     return c.json(await JadwalService.get(id));
+  }
+
+  public static async getLogs(c: Context) {
+    const { id } = c.req.param();
+    return c.json(await LogJadwalService.getAll({ jadwal_id: id }));
   }
 
   public static async post(c: Context) {
@@ -81,6 +87,24 @@ export default class JadwalHandler {
 
   public static async delete(c: Context) {
     const { id } = c.req.param();
-    return c.json(await JadwalService.delete(id));
+    const userPayload = c.get('user');
+    if (!userPayload || typeof userPayload !== 'object') {
+      throw new APIError(
+        'Informasi otentikasi tidak ditemukan atau tidak valid.',
+        401
+      );
+    }
+
+    const context = {
+      actor_id: userPayload.id || userPayload.email || 'unknown',
+      actor_type:
+        userPayload.role === 'admin'
+          ? LogActorType.KOORDINATOR
+          : userPayload.role === 'dosen'
+            ? LogActorType.DOSEN
+            : LogActorType.MAHASISWA,
+    };
+
+    return c.json(await JadwalService.delete(id, context));
   }
 }

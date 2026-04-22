@@ -2,10 +2,6 @@ import { z } from 'zod';
 import { PenilaiRole } from '@prisma/client';
 
 export const createKomponenPenilaianSchema = z.object({
-  id: z
-    .string()
-    .min(1, 'ID Komponen wajib diisi')
-    .max(7, 'ID Komponen maksimal 7 karakter'),
   nama: z
     .string()
     .min(1, 'Nama komponen wajib diisi')
