@@ -30,6 +30,8 @@ enum LogActionType {
   CREATE
   UPDATE
   DELETE
+  GANTI_JADWAL
+  GANTI_DOSEN
 }
 
 enum LogActorType {
