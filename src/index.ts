@@ -1,23 +1,25 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import { cors } from "hono/cors";
-import { RegExpRouter } from "hono/router/reg-exp-router";
-import { swaggerUI } from "@hono/swagger-ui";
-import { config } from "./core";
-import { bootstrap, shutdown } from "./core";
-import { createLogger } from "./utils/logger.util";
-import GlobalHandler from "./handlers/global.handler";
-import globalRoute from "./routes/global.route";
-import LogMiddleware from "./middlewares/log.middleware";
-import jadwalRoute from "./routes/jadwal.route";
-import ruanganRoute from "./routes/ruangan.route";
-import dosenRoute from "./routes/dosen.route";
-import mahasiswaRoute from "./routes/mahasiswa.route";
-import komponenRoute from "./routes/komponen-penilaian.route";
-import penilaianRoute from "./routes/penilaian.route";
-import constraintDosenRoute from "./routes/constraint-dosen.route";
-import jadwalDraftRoute from "./routes/jadwal-draft.route";
+import { OpenAPIHono } from '@hono/zod-openapi';
+import { cors } from 'hono/cors';
+import { RegExpRouter } from 'hono/router/reg-exp-router';
+import { swaggerUI } from '@hono/swagger-ui';
+import { config } from './core';
+import { bootstrap, shutdown } from './core';
+import { createLogger } from './utils/logger.util';
+import GlobalHandler from './handlers/global.handler';
+import globalRoute from './routes/global.route';
+import LogMiddleware from './middlewares/log.middleware';
+import jadwalRoute from './routes/jadwal.route';
+import ruanganRoute from './routes/ruangan.route';
+import dosenRoute from './routes/dosen.route';
+import mahasiswaRoute from './routes/mahasiswa.route';
+import komponenRoute from './routes/komponen-penilaian.route';
+import penilaianRoute from './routes/penilaian.route';
+import constraintDosenRoute from './routes/constraint-dosen.route';
+import jadwalDraftRoute from './routes/jadwal-draft.route';
+import bidangKeahlianRoute from './routes/bidang-keahlian.route';
+import keahlianDosenRoute from './routes/keahlian-dosen.route';
 
-const logger = createLogger("Server");
+const logger = createLogger('Server');
 
 // Initialize DI Container
 await bootstrap();
@@ -28,63 +30,66 @@ const app = new OpenAPIHono({
 
 // CORS Configuration from config
 app.use(
-  "*",
+  '*',
   cors({
-    origin: config.cors.origins.includes("*") ? "*" : config.cors.origins,
+    origin: config.cors.origins.includes('*') ? '*' : config.cors.origins,
     credentials: config.cors.allowCredentials,
     allowMethods: config.cors.allowMethods as any,
     allowHeaders: config.cors.allowHeaders,
-  }),
+  })
 );
 
-app.use("*", LogMiddleware.structuredLogger);
+app.use('*', LogMiddleware.structuredLogger);
 
 app.notFound(GlobalHandler.notFound);
 app.onError(GlobalHandler.error);
 
 // OpenAPI Documentation
-app.doc("/openapi.json", {
-  openapi: "3.1.0",
+app.doc('/openapi.json', {
+  openapi: '3.1.0',
   info: {
-    title: "Hono API Seminar - TIF UIN Suska",
+    title: 'Hono API Seminar - TIF UIN Suska',
     version: config.app.version,
-    description: "API untuk sistem manajemen seminar kerja praktik dan tugas akhir",
+    description:
+      'API untuk sistem manajemen seminar kerja praktik dan tugas akhir',
   },
   servers: [
     {
       url: `http://${config.server.host}:${config.server.port}`,
-      description: "Development Server",
+      description: 'Development Server',
     },
   ],
 });
 
 // Swagger UI
 app.get(
-  "/docs",
+  '/docs',
   swaggerUI({
-    url: "/openapi.json",
-  }),
+    url: '/openapi.json',
+  })
 );
 
-app.route("/", globalRoute);
-app.route("/", jadwalRoute);
-app.route("/", ruanganRoute);
-app.route("/", dosenRoute);
-app.route("/", mahasiswaRoute);
-app.route("/", komponenRoute);
-app.route("/", penilaianRoute);
-app.route("/", constraintDosenRoute);
-app.route("/", jadwalDraftRoute);
+app.route('/api', globalRoute);
+app.route('/api', jadwalRoute);
+app.route('/api', ruanganRoute);
+app.route('/api', dosenRoute);
+app.route('/api', mahasiswaRoute);
+app.route('/api', komponenRoute);
+app.route('/api', penilaianRoute);
+app.route('/api', constraintDosenRoute);
+app.route('/api', jadwalDraftRoute);
+app.route('/api', bidangKeahlianRoute);
+app.route('/api', keahlianDosenRoute);
 
 // Graceful shutdown handlers
-process.on("SIGINT", async () => {
-  logger.info("Received SIGINT, shutting down gracefully...");
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT, shutting down gracefully...');
   await shutdown();
   process.exit(0);
 });
 
-process.on("SIGTERM", async () => {
-  logger.info("Received SIGTERM, shutting down gracefully...");
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM, shutting down gracefully...');
   await shutdown();
   process.exit(0);
 });

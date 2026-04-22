@@ -1,36 +1,21 @@
 import prisma from '../src/infrastructures/db.infrastructure';
+import fs from 'fs';
+import path from 'path';
 
 console.log('[INFO] Seeding database...');
 
 async function main() {
   console.log('[DEBUG] Running createMany...');
 
+  // 1. Seeder Ruangan
   const resultRuangan = await prisma.ruangan.createMany({
     data: [
-      {
-        kode: 'FST-301',
-        nama: 'FST-301',
-      },
-      {
-        kode: 'FST-302',
-        nama: 'FST-302',
-      },
-      {
-        kode: 'FST-303',
-        nama: 'FST-303',
-      },
-      {
-        kode: 'FST-304',
-        nama: 'FST-304',
-      },
-      {
-        kode: 'FST-305',
-        nama: 'FST-305',
-      },
-      {
-        kode: 'FST-306',
-        nama: 'FST-306',
-      },
+      { kode: 'FST-301', nama: 'FST-301' },
+      { kode: 'FST-302', nama: 'FST-302' },
+      { kode: 'FST-303', nama: 'FST-303' },
+      { kode: 'FST-304', nama: 'FST-304' },
+      { kode: 'FST-305', nama: 'FST-305' },
+      { kode: 'FST-306', nama: 'FST-306' },
     ],
     skipDuplicates: true,
   });
@@ -42,6 +27,7 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
+  // 2. Seeder Komponen Penilaian
   const resultKomponenPenilaian = await prisma.komponen_penilaian.createMany({
     data: [
       {
@@ -138,6 +124,60 @@ async function main() {
       ? resultKomponenPenilaian
       : 'Data was inserted previously, no new data inserted.'
   );
+
+  // 3. Seeder Bidang Keahlian
+  const resultBidangKeahlian = await prisma.bidang_keahlian.createMany({
+    data: [
+      { nama: 'Software Engineering' },
+      { nama: 'Artificial Intelligence' },
+      { nama: 'Data Science' },
+      { nama: 'Cyber Security' },
+      { nama: 'Computer Networks' },
+      { nama: 'Internet of Things (IoT)' },
+      { nama: 'UI/UX Design' },
+      { nama: 'Information Systems' },
+      { nama: 'Cloud Computing' },
+      { nama: 'Machine Learning' },
+      { nama: 'Game Development' },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(
+    '[DEBUG] Result of inserted bidang_keahlian createMany:',
+    resultBidangKeahlian.count > 0
+      ? resultBidangKeahlian
+      : 'Data was inserted previously, no new data inserted.'
+  );
+
+  // 4. Eksekusi Raw SQL untuk Dosen dan Mahasiswa
+
+  // Menggunakan process.cwd() untuk mendapatkan path absolut dari root project
+  const sqlDirPath = path.join(process.cwd(), 'src', 'data');
+
+  // 4a. Seeder Dosen
+  console.log('[DEBUG] Executing dosen.sql...');
+  try {
+    const dosenSqlPath = path.join(sqlDirPath, 'dosen.sql');
+    const dosenSql = fs.readFileSync(dosenSqlPath, 'utf8');
+
+    await prisma.$executeRawUnsafe(dosenSql);
+    console.log('[DEBUG] Successfully executed dosen.sql');
+  } catch (error: any) {
+    console.error(`[ERROR] Failed to execute dosen.sql: ${error.message}`);
+  }
+
+  // 4b. Seeder Mahasiswa
+  console.log('[DEBUG] Executing mahasiswa.sql...');
+  try {
+    const mahasiswaSqlPath = path.join(sqlDirPath, 'mahasiswa.sql');
+    const mahasiswaSql = fs.readFileSync(mahasiswaSqlPath, 'utf8');
+
+    await prisma.$executeRawUnsafe(mahasiswaSql);
+    console.log('[DEBUG] Successfully executed mahasiswa.sql');
+  } catch (error: any) {
+    console.error(`[ERROR] Failed to execute mahasiswa.sql: ${error.message}`);
+  }
 }
 
 main()

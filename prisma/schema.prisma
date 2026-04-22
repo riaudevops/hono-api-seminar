@@ -59,6 +59,29 @@ model dosen {
 
   penilaian penilaian[]
   constraintDosens constraint_dosen[]
+  keahlian_dosen   keahlian_dosen[]
+}
+
+// Tabel Master untuk menyimpan daftar bidang keahlian yang ada
+model bidang_keahlian {
+  id   String @id @default(cuid())
+  nama String @unique @db.VarChar(100)
+
+  keahlian_dosen keahlian_dosen[]
+}
+
+// Tabel Pivot (Relasi) yang menghubungkan Dosen dengan Bidang Keahliannya
+model keahlian_dosen {
+  id                 String @id @default(cuid())
+  nip                String @db.VarChar(18)
+  id_bidang_keahlian String
+
+  dosen           dosen           @relation(fields: [nip], references: [nip], onDelete: Cascade)
+  bidang_keahlian bidang_keahlian @relation(fields: [id_bidang_keahlian], references: [id], onDelete: Cascade)
+
+  @@unique([nip, id_bidang_keahlian]) // Mencegah data ganda (1 dosen tidak bisa ditambahkan keahlian yang sama 2x)
+  @@index([nip])
+  @@index([id_bidang_keahlian])
 }
 
 
@@ -82,7 +105,7 @@ model ruangan {
 model jadwal {
   id            String   @id @db.VarChar(14)
   tanggal       DateTime @db.Timestamptz
-  judul         String   @db.VarChar(255)
+  judul         String?  @db.VarChar(255)
   waktu_mulai   DateTime @db.Timestamptz
   waktu_selesai DateTime @db.Timestamptz
   jenis         JenisJadwal

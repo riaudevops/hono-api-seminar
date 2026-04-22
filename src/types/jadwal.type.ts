@@ -36,6 +36,7 @@ export interface CreateDetailPenilaianType {
 export interface JadwalWithRelations {
   id: string;
   tanggal: Date;
+  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   jenis: JenisJadwal;

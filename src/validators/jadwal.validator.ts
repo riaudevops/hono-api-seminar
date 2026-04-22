@@ -57,17 +57,6 @@ export const postPutJadwalSchema = z
   })
   .refine(
     (data) => {
-      const now = new Date();
-      const jadwalDate = new Date(data.tanggal);
-      return jadwalDate >= now;
-    },
-    {
-      message: 'Jadwal tidak boleh di masa lalu',
-      path: ['tanggal'],
-    }
-  )
-  .refine(
-    (data) => {
       const startTime = new Date(data.waktu_mulai);
       const endTime = new Date(data.waktu_selesai);
       const duration = endTime.getTime() - startTime.getTime();
@@ -120,21 +109,19 @@ export const postPutJadwalSchema = z
     (data) => {
       if (data.nip_ketua_sidang) {
         const ketuaSidang = data.nip_ketua_sidang;
-        const pembimbingPenguji = [
-          data.nip_pembimbing_1,
-          data.nip_pembimbing_2,
+        const penguji = [
           data.nip_penguji_1,
           data.nip_penguji_2,
         ].filter(Boolean);
 
-        if (pembimbingPenguji.includes(ketuaSidang)) {
+        if (penguji.includes(ketuaSidang)) {
           return false;
         }
       }
       return true;
     },
     {
-      message: 'Ketua sidang tidak boleh menjadi pembimbing atau penguji',
+      message: 'Ketua sidang tidak boleh menjadi penguji',
       path: ['nip_ketua_sidang'],
     }
   )

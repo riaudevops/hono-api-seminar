@@ -15,6 +15,21 @@ function getCurrentAcademicInfo() {
 }
 
 export default class MahasiswaService {
+  private static sanitizeMahasiswaData(mahasiswa: Record<string, any>) {
+    const {
+      semester,
+      idPengajuan,
+      noWaTelegram,
+      pembimbing1,
+      pembimbing2,
+      penguji1,
+      penguji2,
+      ...rest
+    } = mahasiswa;
+
+    return rest;
+  }
+
   public static async getMe(email: string) {
     const mahasiswa = await MahasiswaRepository.findByEmail(email);
     if (!mahasiswa) {
@@ -23,7 +38,7 @@ export default class MahasiswaService {
     return {
       response: true,
       message: 'Data mahasiswa berhasil diambil.',
-      data: mahasiswa,
+      data: this.sanitizeMahasiswaData(mahasiswa),
     };
   }
   public static async getAll(
@@ -62,7 +77,8 @@ export default class MahasiswaService {
     const paginatedData = filteredMahasiswa
       .slice(skip, skip + limit)
       .map((m) => {
-        const { no, nim, nama, jenisSeminar, ...rest } = m;
+        const sanitizedMahasiswa = this.sanitizeMahasiswaData(m);
+        const { no, nim, nama, jenisSeminar, ...rest } = sanitizedMahasiswa;
         return rest;
       });
 
@@ -88,7 +104,7 @@ export default class MahasiswaService {
     return {
       response: true,
       message: 'Data mahasiswa berhasil diambil.',
-      data: mahasiswa,
+      data: this.sanitizeMahasiswaData(mahasiswa),
     };
   }
   public static async search(
@@ -132,7 +148,9 @@ export default class MahasiswaService {
     if (!query || query.trim() === '') {
       const total = filteredMahasiswa.length;
       const skip = (page - 1) * limit;
-      const paginatedData = filteredMahasiswa.slice(skip, skip + limit);
+      const paginatedData = filteredMahasiswa
+        .slice(skip, skip + limit)
+        .map((m) => this.sanitizeMahasiswaData(m));
 
       return {
         response: true,
@@ -201,7 +219,7 @@ export default class MahasiswaService {
       });
 
       return {
-        ...mahasiswa,
+        ...this.sanitizeMahasiswaData(mahasiswa),
         _highlights: highlights,
         _score: result.score,
       };

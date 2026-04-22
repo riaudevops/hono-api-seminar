@@ -15,6 +15,7 @@ export interface CreateJadwalInput {
 
 export interface UpdateJadwalInput {
   tanggal?: Date;
+  judul?: string;
   waktu_mulai?: Date;
   waktu_selesai?: Date;
   jenis?: JenisJadwal;

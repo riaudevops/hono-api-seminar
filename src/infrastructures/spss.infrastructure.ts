@@ -9,7 +9,14 @@ export interface MahasiswaSheet {
   no: string;
   nim: string;
   nama: string;
+  semester: string;
+  idPengajuan: string;
+  noWaTelegram: string;
   jenisSeminar: string;
+  pembimbing1: string;
+  pembimbing2: string;
+  penguji1: string;
+  penguji2: string;
   [key: string]: string;
 }
 
@@ -88,8 +95,15 @@ class SpssInfrastructure {
         .map((row) => ({
           no: row['NO'] || '',
           nim: row['NIM'] || '',
-          nama: row['NAMA'] || '',
-          jenisSeminar: row['JENIS SEMINAR'] || row['JENIS SEM'] || '',
+          nama: row['Nama'] || row['NAMA'] || '',
+          semester: row['Semester'] || '',
+          idPengajuan: row['ID Pengajuan Seminar FST'] || '',
+          noWaTelegram: row['No. WA/Telegram'] || '',
+          jenisSeminar: row['Jenis Seminar'] || row['JENIS SEMINAR'] || '',
+          pembimbing1: row['Pembimbing 1'] || '',
+          pembimbing2: row['Pembimbing 2'] || '',
+          penguji1: row['Penguji 1'] || '',
+          penguji2: row['Penguji 2'] || '',
           ...row,
         }))
         .filter(
