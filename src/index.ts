@@ -20,6 +20,8 @@ import bidangKeahlianRoute from './routes/bidang-keahlian.route';
 import keahlianDosenRoute from './routes/keahlian-dosen.route';
 import logJadwalRoute from './routes/log-jadwal.route';
 import logPenilaianRoute from './routes/log-penilaian.route';
+import dosenSeminarRoute from './routes/dosen-seminar.route';
+import koordinatorRoute from './routes/koordinator.route';
 
 const logger = createLogger('Server');
 
@@ -84,6 +86,8 @@ app.route('/api', bidangKeahlianRoute);
 app.route('/api', keahlianDosenRoute);
 app.route('/api', logJadwalRoute);
 app.route('/api', logPenilaianRoute);
+app.route('/api', dosenSeminarRoute);
+app.route('/api', koordinatorRoute);
 
 // Graceful shutdown handlers
 process.on('SIGINT', async () => {

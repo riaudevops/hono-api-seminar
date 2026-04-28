@@ -1,0 +1,519 @@
+import PenilaianRepository from '../repositories/penilaian.repository';
+import KomponenPenilaianRepository from '../repositories/komponen-penilaian.repository';
+import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
+import DosenRepository from '../repositories/dosen.repository';
+import JadwalRepository from '../repositories/jadwal.repository';
+import LogPenilaianService from './log-penilaian.service';
+import JadwalHelper from '../helpers/jadwal.helper';
+import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
+import { APIError } from '../utils/api-error.util';
+import prisma from '../infrastructures/db.infrastructure';
+import {
+  JenisJadwal,
+  PenilaiRole,
+  LogActionType,
+  LogActorType,
+  ConstraintType,
+  Prisma,
+} from '@prisma/client';
+
+// ─── Mapping helpers ───────────────────────────────────────────────
+
+const JENIS_TO_FRONTEND: Record<JenisJadwal, string> = {
+  [JenisJadwal.SEMKP]: 'KP',
+  [JenisJadwal.SEMPRO]: 'PROPOSAL',
+  [JenisJadwal.SEMHAS_LAPORAN]: 'HASIL',
+  [JenisJadwal.SEMHAS_PAPERBASED]: 'HASIL',
+  [JenisJadwal.SIDANG_TA_LAPORAN]: 'SIDANG_AKHIR',
+  [JenisJadwal.SIDANG_TA_PAPERBASED]: 'SIDANG_AKHIR',
+};
+
+const ROLE_TO_FRONTEND: Record<PenilaiRole, string> = {
+  [PenilaiRole.KP_PEMBIMBING]: 'PEMBIMBING_1',
+  [PenilaiRole.KP_PENGUJI]: 'PENGUJI_1',
+  [PenilaiRole.TA_PEMBIMBING_1]: 'PEMBIMBING_1',
+  [PenilaiRole.TA_PEMBIMBING_2]: 'PEMBIMBING_2',
+  [PenilaiRole.TA_PENGUJI_1]: 'PENGUJI_1',
+  [PenilaiRole.TA_PENGUJI_2]: 'PENGUJI_2',
+  [PenilaiRole.TA_KETUA_SIDANG]: 'KETUA_SIDANG',
+  [PenilaiRole.KP_INSTANSI]: 'INSTANSI',
+};
+
+const BIMBINGAN_ROLES: PenilaiRole[] = [
+  PenilaiRole.KP_PEMBIMBING,
+  PenilaiRole.TA_PEMBIMBING_1,
+  PenilaiRole.TA_PEMBIMBING_2,
+];
+
+const MENGUIJI_ROLES: PenilaiRole[] = [
+  PenilaiRole.KP_PENGUJI,
+  PenilaiRole.TA_PENGUJI_1,
+  PenilaiRole.TA_PENGUJI_2,
+  PenilaiRole.TA_KETUA_SIDANG,
+];
+
+function computeSemester(nim: string): number {
+  const angkatan = parseInt(`20${nim.slice(1, 3)}`);
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  return (currentYear - angkatan) * 2 + (currentMonth >= 8 ? 1 : 2);
+}
+
+function computeAngkatan(nim: string): number {
+  return parseInt(`20${nim.slice(1, 3)}`);
+}
+
+function computeStatusJadwal(
+  waktuMulai: Date,
+  waktuSelesai: Date
+): string {
+  const now = JadwalHelper.getCurrentJakartaTime();
+  const mulai = JadwalHelper.convertToJakartaTimezone(waktuMulai);
+  const selesai = JadwalHelper.convertToJakartaTimezone(waktuSelesai);
+
+  if (now < mulai) return 'AKAN_DATANG';
+  if (now >= mulai && now <= selesai) return 'BERLANGSUNG';
+  return 'SELESAI';
+}
+
+// ─── Service ───────────────────────────────────────────────────────
+
+export default class DosenSeminarService {
+  /**
+   * #1 GET /api/dosen/seminar/jadwal
+   */
+  public static async getJadwalSeminar(nip: string) {
+    const penilaianList = await PenilaianRepository.findByDosenNip(nip);
+
+    const data = penilaianList.map((p) => {
+      const j = p.jadwal;
+      const m = j.mahasiswa;
+      const r = j.ruangan;
+
+      const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
+        j.waktu_selesai
+      );
+
+      return {
+        id: j.id,
+        tanggal: waktuMulai.toISOString().slice(0, 10),
+        jam_mulai: waktuMulai.toISOString().slice(11, 16),
+        jam_selesai: waktuSelesai.toISOString().slice(11, 16),
+        ruangan: {
+          kode: r.kode,
+          nama: r.nama,
+          status: r.status,
+        },
+        mahasiswa: {
+          nim: m.nim,
+          nama: m.nama,
+          aktif: m.aktif,
+          email: m.email,
+          nip: '-',
+          semester: computeSemester(m.nim),
+          angkatan: computeAngkatan(m.nim),
+        },
+        jenis_seminar: JENIS_TO_FRONTEND[j.jenis],
+        status: computeStatusJadwal(j.waktu_mulai, j.waktu_selesai),
+        peran_dosen: ROLE_TO_FRONTEND[p.role as PenilaiRole],
+      };
+    });
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil data jadwal seminar',
+      data,
+    };
+  }
+
+  /**
+   * #2 GET /api/dosen/seminar/stats
+   */
+  public static async getStats(nip: string) {
+    const dosen = await DosenRepository.findByNip(nip);
+    if (!dosen) {
+      throw new APIError('Data dosen tidak ditemukan', 404);
+    }
+
+    const penilaianList = await PenilaianRepository.findByDosenNip(nip);
+
+    let total_bimbingan = 0;
+    let total_menguji = 0;
+    let sudah_dinilai = 0;
+    let belum_dinilai = 0;
+    let upcomingJadwal: any = null;
+    let agenda_hari_ini = 0;
+
+    const now = JadwalHelper.getCurrentJakartaTimezone();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    for (const p of penilaianList) {
+      const role = p.role as PenilaiRole;
+
+      if (BIMBINGAN_ROLES.includes(role)) total_bimbingan++;
+      if (MENGUIJI_ROLES.includes(role)) total_menguji++;
+
+      const hasNilai =
+        p.detail_penilaian && p.detail_penilaian.length > 0;
+      if (hasNilai) sudah_dinilai++;
+      else belum_dinilai++;
+
+      const j = p.jadwal;
+      const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
+        j.waktu_selesai
+      );
+      const jadwalDateStr = waktuMulai.toISOString().slice(0, 10);
+
+      if (jadwalDateStr === todayStr) {
+        agenda_hari_ini++;
+      }
+
+      if (waktuMulai > now && !upcomingJadwal) {
+        upcomingJadwal = {
+          jenis_seminar: JENIS_TO_FRONTEND[j.jenis],
+          mahasiswa_nama: j.mahasiswa.nama,
+          tanggal: jadwalDateStr,
+          jam_mulai: waktuMulai.toISOString().slice(11, 16),
+          jam_selesai: waktuSelesai.toISOString().slice(11, 16),
+          ruangan: j.ruangan.nama,
+        };
+      }
+    }
+
+    // Compute semester string
+    const kodeTahunAjaran = TahunAjaranHelper.findSekarang();
+    const semester = TahunAjaranHelper.parseStringNameByCode(kodeTahunAjaran);
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil statistik',
+      data: {
+        total_bimbingan,
+        total_menguji,
+        sudah_dinilai,
+        belum_dinilai,
+        upcoming_seminar: upcomingJadwal,
+        nama_dosen: dosen.nama,
+        semester: `Semester ${semester}`,
+        agenda_hari_ini,
+      },
+    };
+  }
+
+  /**
+   * #3 GET /api/dosen/seminar/komponen-penilaian
+   */
+  public static async getKomponenPenilaian() {
+    const komponenList = await KomponenPenilaianRepository.findAktif();
+
+    const data = komponenList.map((k) => ({
+      id: k.id,
+      nama_komponen: k.nama,
+      bobot_persen: k.persentase,
+      peran_penilai: [ROLE_TO_FRONTEND[k.role as PenilaiRole]],
+      is_aktif: k.is_aktif,
+      deskripsi: '', // not in schema
+    }));
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil komponen penilaian',
+      data,
+    };
+  }
+
+  /**
+   * #4 GET /api/dosen/seminar/penilaian?jadwal_id=
+   */
+  public static async getPenilaianByJadwal(jadwal_id: string) {
+    const penilaianList = await PenilaianRepository.findByJadwalId(jadwal_id);
+    if (!penilaianList || penilaianList.length === 0) {
+      throw new APIError(
+        `Data penilaian untuk jadwal ${jadwal_id} tidak ditemukan`,
+        404
+      );
+    }
+
+    const data = penilaianList.flatMap((p) =>
+      p.detail_penilaian.map((d) => ({
+        jadwal_id: p.id_jadwal,
+        komponen_id: d.id_komponen,
+        dosen_nama: p.dosen.nama,
+        dosen_nip: p.dosen.nip,
+        peran_dosen: ROLE_TO_FRONTEND[p.role as PenilaiRole],
+        nilai: d.nilai,
+        submitted_at: d.nilai != null ? new Date().toISOString() : null,
+      }))
+    );
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil data penilaian',
+      data,
+    };
+  }
+
+  /**
+   * #5 POST /api/dosen/seminar/penilaian
+   */
+  public static async submitNilai(
+    nip: string,
+    body: {
+      jadwal_id: string;
+      penilaian: {
+        komponen_id: string;
+        mahasiswa_nim: string;
+        dosen_nip: string;
+        nilai: number;
+      }[];
+    }
+  ) {
+    const { jadwal_id, penilaian } = body;
+
+    // Verify all items belong to the same dosen
+    for (const item of penilaian) {
+      if (item.dosen_nip !== nip) {
+        throw new APIError(
+          'Anda hanya dapat menilai dengan NIP Anda sendiri',
+          403
+        );
+      }
+    }
+
+    // Verify jadwal exists
+    const jadwal = await JadwalRepository.findById(jadwal_id);
+    if (!jadwal) {
+      throw new APIError(`Jadwal dengan ID ${jadwal_id} tidak ditemukan`, 404);
+    }
+
+    // Verify seminar has ended
+    const now = JadwalHelper.getCurrentJakartaTimezone();
+    const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
+      jadwal.waktu_selesai
+    );
+    if (now < waktuSelesai) {
+      throw new APIError(
+        `Penilaian hanya dapat dilakukan setelah seminar selesai`,
+        400
+      );
+    }
+
+    // Verify dosen is assigned to this jadwal
+    const penilaianRecord = await PenilaianRepository.findByJadwalAndDosen(
+      jadwal_id,
+      nip
+    );
+    if (!penilaianRecord) {
+      throw new APIError(
+        'Anda tidak ditugaskan sebagai penilai untuk jadwal ini',
+        403
+      );
+    }
+
+    // Get active components for this role
+    const activeComponents = await prisma.komponen_penilaian.findMany({
+      where: { role: penilaianRecord.role, is_aktif: true },
+    });
+    const activeComponentIds = activeComponents.map((c) => c.id);
+
+    for (const item of penilaian) {
+      if (!activeComponentIds.includes(item.komponen_id)) {
+        throw new APIError(
+          `Komponen ${item.komponen_id} tidak valid atau tidak aktif untuk role Anda`,
+          400
+        );
+      }
+    }
+
+    // Upsert in transaction
+    const context = {
+      actor_id: nip,
+      actor_type: LogActorType.DOSEN,
+    };
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of penilaian) {
+        const existingDetail = await tx.detail_penilaian.findUnique({
+          where: {
+            id_penilaian_id_komponen: {
+              id_penilaian: penilaianRecord.id,
+              id_komponen: item.komponen_id,
+            },
+          },
+        });
+
+        await tx.detail_penilaian.upsert({
+          where: {
+            id_penilaian_id_komponen: {
+              id_penilaian: penilaianRecord.id,
+              id_komponen: item.komponen_id,
+            },
+          },
+          update: { nilai: item.nilai },
+          create: {
+            id_penilaian: penilaianRecord.id,
+            id_komponen: item.komponen_id,
+            nilai: item.nilai,
+          },
+        });
+
+        await LogPenilaianService.createWithTransaction(tx, {
+          action: existingDetail
+            ? LogActionType.UPDATE
+            : LogActionType.CREATE,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          id_jadwal: jadwal_id,
+          id_komponen_penilaian: item.komponen_id,
+          old_nilai: existingDetail ? existingDetail.nilai : null,
+          new_nilai: item.nilai,
+        });
+      }
+    });
+
+    // Calculate weighted total
+    let total_nilai_weighted = 0;
+    for (const item of penilaian) {
+      const komponen = activeComponents.find(
+        (c) => c.id === item.komponen_id
+      );
+      if (komponen) {
+        total_nilai_weighted += item.nilai * (komponen.persentase / 100);
+      }
+    }
+
+    return {
+      response: true,
+      message: 'Nilai berhasil disimpan',
+      data: {
+        jadwal_id,
+        dosen_nip: nip,
+        submitted_at: new Date().toISOString(),
+        total_nilai_weighted:
+          Math.round(total_nilai_weighted * 100) / 100,
+      },
+    };
+  }
+
+  /**
+   * #6 GET /api/dosen/seminar/log-penilaian
+   */
+  public static async getLogPenilaian(nip: string) {
+    const dosen = await DosenRepository.findByNip(nip);
+    if (!dosen) {
+      throw new APIError('Data dosen tidak ditemukan', 404);
+    }
+
+    const result = await LogPenilaianService.getAll({ actor_id: nip });
+
+    // Enrich with jadwal/mahasiswa data and format
+    const enrichedData = await Promise.all(
+      (result.data || []).map(async (log: any) => {
+        const jadwal = await JadwalRepository.findById(log.id_jadwal);
+        let mahasiswa_nama = '-';
+        let jenis_jadwal = '-';
+
+        if (jadwal) {
+          mahasiswa_nama = jadwal.mahasiswa?.nama || '-';
+          jenis_jadwal = JENIS_TO_FRONTEND[jadwal.jenis] || '-';
+        }
+
+        const aksiMap: Record<string, string> = {
+          CREATE: 'INPUT_NILAI',
+          UPDATE: 'UPDATE_NILAI',
+          DELETE: 'SUBMIT_NILAI',
+        };
+
+        return {
+          id: log.id,
+          timestamp: log.timestamp,
+          dosen_nama: dosen.nama,
+          mahasiswa_nama,
+          jenis_jadwal,
+          aksi: aksiMap[log.action] || log.action,
+          detail: `Nilai ${log.old_nilai != null ? `diubah dari ${log.old_nilai} ke ${log.new_nilai}` : `diinput: ${log.new_nilai}`}`,
+        };
+      })
+    );
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil log penilaian',
+      data: enrichedData,
+    };
+  }
+
+  /**
+   * #7 GET /api/dosen/constraints
+   */
+  public static async getConstraints(nip: string) {
+    const constraints = await ConstraintDosenRepository.findByNip(nip);
+
+    const data = constraints.map((c) => ({
+      id: c.id,
+      nip: c.nip,
+      type: c.type,
+      hari: c.hari,
+      waktu_mulai: c.waktu_mulai
+        ? JadwalHelper.convertToJakartaTimezone(c.waktu_mulai)
+            .toISOString()
+            .slice(11, 16)
+        : null,
+      waktu_selesai: c.waktu_selesai
+        ? JadwalHelper.convertToJakartaTimezone(c.waktu_selesai)
+            .toISOString()
+            .slice(11, 16)
+        : null,
+      keterangan: c.keterangan,
+      priority: c.priority,
+      is_active: c.is_active,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+    }));
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil constraints',
+      data,
+    };
+  }
+
+  /**
+   * #8 POST /api/dosen/constraints
+   */
+  public static async createConstraint(
+    nip: string,
+    data: {
+      type: ConstraintType;
+      hari?: number | null;
+      waktu_mulai?: string | null;
+      waktu_selesai?: string | null;
+      keterangan?: string | null;
+      priority?: number;
+      is_active?: boolean;
+    }
+  ) {
+    const createInput: Prisma.constraint_dosenCreateInput = {
+      type: data.type,
+      hari: data.hari ?? undefined,
+      waktu_mulai: data.waktu_mulai ? new Date(data.waktu_mulai) : undefined,
+      waktu_selesai: data.waktu_selesai
+        ? new Date(data.waktu_selesai)
+        : undefined,
+      keterangan: data.keterangan ?? undefined,
+      priority: data.priority ?? 1,
+      is_active: data.is_active ?? true,
+      dosen: { connect: { nip } },
+    };
+
+    const constraint = await ConstraintDosenRepository.create(createInput);
+
+    return {
+      response: true,
+      message: 'Constraint berhasil ditambahkan',
+      data: constraint,
+    };
+  }
+}
