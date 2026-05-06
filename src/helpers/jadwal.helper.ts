@@ -45,8 +45,8 @@ export default class JadwalHelper {
       [JenisJadwal.SEMPRO]: 'TAPRO',
       [JenisJadwal.SEMHAS_LAPORAN]: 'TAHLP',
       [JenisJadwal.SEMHAS_PAPERBASED]: 'TAHPB',
-      [JenisJadwal.SIDANG_TA_LAPORAN]: 'TASLP',
-      [JenisJadwal.SIDANG_TA_PAPERBASED]: 'TASPB',
+      [JenisJadwal.SIDANG_LAPORAN]: 'TASLP',
+      [JenisJadwal.SIDANG_PAPERBASED]: 'TASPB',
     };
     return pemetaan[jenis] || 'JNS';
   }

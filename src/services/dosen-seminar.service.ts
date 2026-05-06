@@ -24,8 +24,8 @@ const JENIS_TO_FRONTEND: Record<JenisJadwal, string> = {
   [JenisJadwal.SEMPRO]: 'PROPOSAL',
   [JenisJadwal.SEMHAS_LAPORAN]: 'HASIL',
   [JenisJadwal.SEMHAS_PAPERBASED]: 'HASIL',
-  [JenisJadwal.SIDANG_TA_LAPORAN]: 'SIDANG_AKHIR',
-  [JenisJadwal.SIDANG_TA_PAPERBASED]: 'SIDANG_AKHIR',
+  [JenisJadwal.SIDANG_LAPORAN]: 'SIDANG_AKHIR',
+  [JenisJadwal.SIDANG_PAPERBASED]: 'SIDANG_AKHIR',
 };
 
 const ROLE_TO_FRONTEND: Record<PenilaiRole, string> = {
@@ -145,7 +145,7 @@ export default class DosenSeminarService {
     let upcomingJadwal: any = null;
     let agenda_hari_ini = 0;
 
-    const now = JadwalHelper.getCurrentJakartaTimezone();
+    const now = JadwalHelper.getCurrentJakartaTime();
     const todayStr = now.toISOString().slice(0, 10);
 
     for (const p of penilaianList) {
@@ -289,7 +289,7 @@ export default class DosenSeminarService {
     }
 
     // Verify seminar has ended
-    const now = JadwalHelper.getCurrentJakartaTimezone();
+    const now = JadwalHelper.getCurrentJakartaTime();
     const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
       jadwal.waktu_selesai
     );

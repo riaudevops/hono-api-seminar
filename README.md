@@ -195,8 +195,8 @@ Server berjalan di `http://localhost:8000` dan Swagger UI tersedia di `/docs`.
 | `SEMPRO`               | Seminar Proposal TA         |
 | `SEMHAS_LAPORAN`       | Seminar Hasil (Laporan)     |
 | `SEMHAS_PAPERBASED`    | Seminar Hasil (Paper-based) |
-| `SIDANG_TA_LAPORAN`    | Sidang TA (Laporan)         |
-| `SIDANG_TA_PAPERBASED` | Sidang TA (Paper-based)     |
+| `SIDANG_LAPORAN`    | Sidang TA (Laporan)         |
+| `SIDANG_PAPERBASED` | Sidang TA (Paper-based)     |
 
 ## Constraint Dosen
 

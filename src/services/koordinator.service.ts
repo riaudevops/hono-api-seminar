@@ -13,8 +13,8 @@ const JENIS_LABEL: Record<JenisJadwal, { name: string; color: string }> = {
   [JenisJadwal.SEMPRO]: { name: 'Seminar Proposal', color: '#3b82f6' },
   [JenisJadwal.SEMHAS_LAPORAN]: { name: 'Seminar Hasil', color: '#10b981' },
   [JenisJadwal.SEMHAS_PAPERBASED]: { name: 'Seminar Hasil', color: '#10b981' },
-  [JenisJadwal.SIDANG_TA_LAPORAN]: { name: 'Sidang Akhir', color: '#ef4444' },
-  [JenisJadwal.SIDANG_TA_PAPERBASED]: { name: 'Sidang Akhir', color: '#ef4444' },
+  [JenisJadwal.SIDANG_LAPORAN]: { name: 'Sidang Akhir', color: '#ef4444' },
+  [JenisJadwal.SIDANG_PAPERBASED]: { name: 'Sidang Akhir', color: '#ef4444' },
 };
 
 const BIMBINGAN_ROLES: PenilaiRole[] = [
@@ -28,8 +28,8 @@ const JENIS_FRONTEND: Record<JenisJadwal, string> = {
   [JenisJadwal.SEMPRO]: 'Seminar Proposal',
   [JenisJadwal.SEMHAS_LAPORAN]: 'Seminar Hasil',
   [JenisJadwal.SEMHAS_PAPERBASED]: 'Seminar Hasil',
-  [JenisJadwal.SIDANG_TA_LAPORAN]: 'Sidang Akhir',
-  [JenisJadwal.SIDANG_TA_PAPERBASED]: 'Sidang Akhir',
+  [JenisJadwal.SIDANG_LAPORAN]: 'Sidang Akhir',
+  [JenisJadwal.SIDANG_PAPERBASED]: 'Sidang Akhir',
 };
 
 // ─── Service ───────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ export default class KoordinatorService {
       _count: { id: true },
     });
 
-    // Merge SEMHAS_LAPORAN + SEMHAS_PAPERBASED, SIDANG_TA_LAPORAN + SIDANG_TA_PAPERBASED
+    // Merge SEMHAS_LAPORAN + SEMHAS_PAPERBASED, SIDANG_LAPORAN + SIDANG_PAPERBASED
     const aggregated: Record<string, number> = {};
     for (const row of jadwalByJenis) {
       const label = JENIS_LABEL[row.jenis as JenisJadwal];
@@ -514,7 +514,7 @@ export default class KoordinatorService {
       const label = JENIS_LABEL[jenis as JenisJadwal];
       if (!label) continue;
       // Merge SEMHAS variants and SIDANG variants into single keys
-      const key = jenis.startsWith('SEMHAS') ? 'SEMHAS' : jenis.startsWith('SIDANG') ? 'SIDANG_TA' : jenis;
+      const key = jenis.startsWith('SEMHAS') ? 'SEMHAS' : jenis.startsWith('SIDANG') ? 'SIDANG' : jenis;
       if (!jenisCount[key]) {
         jenisCount[key] = { count: 0, label: label.name, color: label.color };
       }

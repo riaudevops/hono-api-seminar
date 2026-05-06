@@ -41,6 +41,7 @@ export default class MahasiswaService {
       data: this.sanitizeMahasiswaData(mahasiswa),
     };
   }
+
   public static async getAll(
     page: number,
     limit: number,
@@ -264,6 +265,20 @@ export default class MahasiswaService {
     result += text.substring(lastIndex);
 
     return result;
+  }
+
+  public static async getPendaftaranSaya(email: string) {
+    const mahasiswa = await MahasiswaRepository.findByEmail(email);
+    if (!mahasiswa) {
+      throw new APIError('Data mahasiswa tidak ditemukan.', 404);
+    }
+
+    const pendaftaran = await MahasiswaRepository.findPendaftaranByNIM(mahasiswa.nim);
+    return {
+      response: true,
+      message: 'Data pendaftaran berhasil diambil.',
+      data: pendaftaran,
+    };
   }
 
   public static async getAngkatanList() {

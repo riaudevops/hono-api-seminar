@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../utils/zod-error.util';
+import AuthMiddleware from '../middlewares/auth.middleware';
 import DosenSeminarHandler from '../handlers/dosen-seminar.handler';
 import {
   submitNilaiSchema,
@@ -11,33 +12,59 @@ import {
 const dosenSeminarRoute = new Hono({ router: new RegExpRouter() });
 
 // #1 GET /dosen/seminar/jadwal
-dosenSeminarRoute.get('/dosen/seminar/jadwal', DosenSeminarHandler.getJadwalSeminar);
+dosenSeminarRoute.get(
+  '/dosen/seminar/jadwal',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DosenSeminarHandler.getJadwalSeminar
+);
 
 // #2 GET /dosen/seminar/stats
-dosenSeminarRoute.get('/dosen/seminar/stats', DosenSeminarHandler.getStats);
+dosenSeminarRoute.get(
+  '/dosen/seminar/stats',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DosenSeminarHandler.getStats
+);
 
 // #3 GET /dosen/seminar/komponen-penilaian
-dosenSeminarRoute.get('/dosen/seminar/komponen-penilaian', DosenSeminarHandler.getKomponenPenilaian);
+dosenSeminarRoute.get(
+  '/dosen/seminar/komponen-penilaian',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DosenSeminarHandler.getKomponenPenilaian
+);
 
 // #4 GET /dosen/seminar/penilaian?jadwal_id=
-dosenSeminarRoute.get('/dosen/seminar/penilaian', DosenSeminarHandler.getPenilaianByJadwal);
+dosenSeminarRoute.get(
+  '/dosen/seminar/penilaian',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DosenSeminarHandler.getPenilaianByJadwal
+);
 
 // #5 POST /dosen/seminar/penilaian
 dosenSeminarRoute.post(
   '/dosen/seminar/penilaian',
+  AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('json', submitNilaiSchema, zodError),
   DosenSeminarHandler.submitNilai
 );
 
 // #6 GET /dosen/seminar/log-penilaian
-dosenSeminarRoute.get('/dosen/seminar/log-penilaian', DosenSeminarHandler.getLogPenilaian);
+dosenSeminarRoute.get(
+  '/dosen/seminar/log-penilaian',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DosenSeminarHandler.getLogPenilaian
+);
 
 // #7 GET /dosen/constraints
-dosenSeminarRoute.get('/dosen/constraints', DosenSeminarHandler.getConstraints);
+dosenSeminarRoute.get(
+  '/dosen/constraints',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DosenSeminarHandler.getConstraints
+);
 
 // #8 POST /dosen/constraints
 dosenSeminarRoute.post(
   '/dosen/constraints',
+  AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('json', postConstraintSchema, zodError),
   DosenSeminarHandler.createConstraint
 );

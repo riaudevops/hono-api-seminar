@@ -144,6 +144,13 @@ export default class MahasiswaRepository {
     });
   }
 
+  public static async findPendaftaranByNIM(nim: string) {
+    return prisma.pendaftaran.findMany({
+      where: { nim },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
   // ===========================================================================
   // Sheet-based methods (Google Spreadsheet via SPSS)
   // ===========================================================================

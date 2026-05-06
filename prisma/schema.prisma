@@ -11,8 +11,8 @@ enum JenisJadwal {
   SEMPRO
   SEMHAS_LAPORAN
   SEMHAS_PAPERBASED
-  SIDANG_TA_LAPORAN
-  SIDANG_TA_PAPERBASED
+  SIDANG_LAPORAN
+  SIDANG_PAPERBASED
 }
 
 enum PenilaiRole {
@@ -51,6 +51,13 @@ enum ConstraintType {
   UNAVAILABLE_TIME  // Waktu berhalangan (Misal: Cuti atau Mengajar)
   PREFERENCE        // Preferensi (Misal: Ingin menguji maksimal 3 kali sehari)
   LOCATION          // Batasan fisik (Misal: Hanya bisa di Kampus A / Online)
+}
+
+enum StatusBerkas {
+  PENDING    // Berkas baru masuk, belum diperiksa
+  IN_REVIEW  // Sedang dalam proses verifikasi oleh admin/koordinator
+  APPROVED   // Berkas dinyatakan lengkap dan valid
+  REJECTED   // Berkas ditolak (misal: ada dokumen yang salah atau tidak terbaca)
 }
 
 model dosen {
@@ -249,4 +256,32 @@ model constraint_dosen {
 
   @@index([nip])
   @@index([type])
+}
+
+model pendaftaran {
+  id                         String      @id @db.VarChar(35)
+  nim                        String      @db.VarChar(11)
+  nama                       String      @db.VarChar(255)
+  semester                   Int
+  id_pengajuan_fst           String      @unique @db.VarChar(50)
+  no_wa                      String      @db.VarChar(15)
+  jenis_seminar              JenisJadwal
+  judul                      String?     @db.VarChar(255)
+
+  nip_pembimbing_1           String      @db.VarChar(18)
+  nip_pembimbing_2           String?     @db.VarChar(18)
+  nip_penguji_1              String      @db.VarChar(18)
+  nip_penguji_2              String      @db.VarChar(18)
+
+  mata_kuliah_pilihan        Json?
+
+  berkas_syarat_url          String      @db.Text
+  undangan_sebelumnya_url    String?     @db.Text
+
+  created_at                 DateTime    @default(now()) @db.Timestamptz
+  status_berkas              StatusBerkas     @default(PENDING)
+  status_proses              Boolean     @default(false)
+
+  @@index([nim])
+  @@index([id_pengajuan_fst])
 }

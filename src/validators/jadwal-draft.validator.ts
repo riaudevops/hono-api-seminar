@@ -13,7 +13,6 @@ const mahasiswaScheduleSchema = z.object({
   jenis: z.nativeEnum(JenisJadwal, {
     errorMap: () => ({ message: 'Jenis jadwal tidak valid' }),
   }),
-  judul: z.string().min(1, 'Judul tidak boleh kosong').max(255, 'Judul maksimal 255 karakter'),
   list_dosen: z.array(dosenAssignmentSchema).min(1, 'Minimal 1 dosen penilai'),
 });
 
@@ -28,6 +27,10 @@ export const generateJadwalSchema = z
     list_mahasiswa: z
       .array(mahasiswaScheduleSchema)
       .min(1, 'Minimal 1 mahasiswa'),
+    catatan_tambahan: z
+      .string()
+      .max(1000, 'Catatan tambahan maksimal 1000 karakter')
+      .optional(),
   })
   .refine(
     (data) => {

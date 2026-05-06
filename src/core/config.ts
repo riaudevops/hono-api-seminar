@@ -88,21 +88,17 @@ const envSchema = z.object({
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
 
+  // Webhook Configuration
+  WEBHOOK_SECRET: z.string().default('change-this-webhook-secret'),
+
+  // Spreadsheet Configuration
+  SPREADSHEET_KEY: z.string().optional(),
+  SPREADSHEET_GID: z.string().default('0'),
+
   // OpenRouter Configuration
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: z.string().default('openai/gpt-4o-mini'),
-  OPENROUTER_FREE_MODELS: z
-    .string()
-    .default(
-      'google/gemma-3-27b-it:free,deepseek/deepseek-chat-v3-0324:free,meta-llama/llama-4-maverick:free'
-    )
-    .transform((val) =>
-      val
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-    ),
 });
 
 // =============================================================================
@@ -231,7 +227,6 @@ class Config {
       apiKey: this.config.OPENROUTER_API_KEY,
       baseUrl: this.config.OPENROUTER_BASE_URL,
       model: this.config.OPENROUTER_MODEL,
-      freeModels: this.config.OPENROUTER_FREE_MODELS,
     };
   }
 

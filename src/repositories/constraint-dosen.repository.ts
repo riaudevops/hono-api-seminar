@@ -18,7 +18,7 @@ export type UpdateConstraintDosenInput =
 export default class ConstraintDosenRepository {
   public static async findByNip(nip: string) {
     return prisma.constraint_dosen.findMany({
-      where: { nip, is_active: true },
+      where: { nip },
       orderBy: { created_at: 'desc' },
     });
   }

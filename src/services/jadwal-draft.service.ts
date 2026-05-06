@@ -43,7 +43,7 @@ function generateBatchId(): string {
 
 export default class JadwalDraftService {
   public static async generate(
-    data: { tanggal_mulai: Date; list_mahasiswa: any[] },
+    data: { tanggal_mulai: Date; list_mahasiswa: any[]; catatan_tambahan?: string },
     context: LogJadwalContext
   ) {
     const batchId = generateBatchId();
@@ -103,6 +103,7 @@ export default class JadwalDraftService {
         dosen_terlibat: j.penilaian?.map((p: any) => p.nip) || [],
       })),
       constraint_dosen: constraintList,
+      ...(data.catatan_tambahan ? { catatan_tambahan: data.catatan_tambahan } : {}),
     };
 
     logger.info('Generating batch schedule', {
@@ -172,7 +173,7 @@ export default class JadwalDraftService {
           batch_id: batchId,
           nim: s.nim,
           jenis: s.jenis as JenisJadwal,
-          judul: mhsInput?.judul || '',
+          judul: '',
           tanggal: JadwalHelper.convertFromJakartaTimezone(new Date(tanggalStr)),
           waktu_mulai: JadwalHelper.convertFromJakartaTimezone(new Date(mulaiStr)),
           waktu_selesai: JadwalHelper.convertFromJakartaTimezone(new Date(selesaiStr)),

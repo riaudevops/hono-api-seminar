@@ -44,6 +44,12 @@ export default class MahasiswaHandler {
     return c.json(await MahasiswaService.getAngkatanList());
   }
 
+  public static async getPendaftaranSaya(c: Context) {
+    const { email } = c.get('user');
+    if (!email) throw new APIError('Email tidak ditemukan.', 404);
+    return c.json(await MahasiswaService.getPendaftaranSaya(email));
+  }
+
   public static async refreshSpreadsheet(c: Context) {
     spssInfrastructure.clearCache();
     const freshData = await spssInfrastructure.getDataMahasiswa();

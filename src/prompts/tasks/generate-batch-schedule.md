@@ -41,7 +41,7 @@ Kamu akan menerima JSON dengan format:
 Gunakan durasi berdasarkan jenis seminar:
 - SEMKP: 60 menit
 - SEMPRO, SEMHAS_LAPORAN, SEMHAS_PAPERBASED: 90 menit
-- SIDANG_TA_LAPORAN, SIDANG_TA_PAPERBASED: 120 menit
+- SIDANG_LAPORAN, SIDANG_PAPERBASED: 120 menit
 
 ### Langkah 3: Cari Slot untuk Setiap Mahasiswa
 

@@ -11,8 +11,8 @@ export const SEMINAR_DURATION_MINUTES: Record<string, number> = {
   SEMPRO: 90,
   SEMHAS_LAPORAN: 90,
   SEMHAS_PAPERBASED: 90,
-  SIDANG_TA_LAPORAN: 120,
-  SIDANG_TA_PAPERBASED: 120,
+  SIDANG_LAPORAN: 120,
+  SIDANG_PAPERBASED: 120,
 } as const;
 
 /** Jam operasional kampus */
@@ -41,8 +41,8 @@ export const JENIS_SEMINAR: Record<string, string> = {
   SEMPRO: 'Seminar Proposal TA',
   SEMHAS_LAPORAN: 'Seminar Hasil TA (Laporan)',
   SEMHAS_PAPERBASED: 'Seminar Hasil TA (Paper)',
-  SIDANG_TA_LAPORAN: 'Sidang TA (Laporan)',
-  SIDANG_TA_PAPERBASED: 'Sidang TA (Paper)',
+  SIDANG_LAPORAN: 'Sidang TA (Laporan)',
+  SIDANG_PAPERBASED: 'Sidang TA (Paper)',
 } as const;
 
 /** Role penilai untuk KP */
