@@ -16,11 +16,20 @@ export const postPendaftaranSchema = z.object({
   created_at: z.coerce.date().optional(),
   status_berkas: z.nativeEnum(StatusBerkas).default('PENDING'),
   status_proses: z.boolean().default(false),
-});
+}).refine(
+  (data) => {
+    const nips = [
+      data.nip_pembimbing_1,
+      data.nip_pembimbing_2,
+      data.nip_penguji_1,
+      data.nip_penguji_2,
+    ].filter(Boolean);
+    return new Set(nips).size === nips.length;
+  },
+  { message: 'NIP pembimbing dan penguji tidak boleh sama' },
+);
 
 export const putPendaftaranSchema = z.object({
-  nama: z.string().max(255).optional(),
-  semester: z.number().int().min(1).optional(),
   no_wa: z.string().max(15).optional(),
   jenis_seminar: z.nativeEnum(JenisJadwal).optional(),
   judul: z.string().max(255).optional(),
@@ -31,7 +40,18 @@ export const putPendaftaranSchema = z.object({
   mata_kuliah_pilihan: z.any().optional(),
   berkas_syarat_url: z.string().optional(),
   undangan_sebelumnya_url: z.string().nullable().optional(),
-});
+}).refine(
+  (data) => {
+    const nips = [
+      data.nip_pembimbing_1,
+      data.nip_pembimbing_2,
+      data.nip_penguji_1,
+      data.nip_penguji_2,
+    ].filter(Boolean);
+    return new Set(nips).size === nips.length;
+  },
+  { message: 'NIP pembimbing dan penguji tidak boleh sama' },
+);
 
 export const validateBerkasSchema = z.object({
   status_berkas: z.nativeEnum(StatusBerkas),

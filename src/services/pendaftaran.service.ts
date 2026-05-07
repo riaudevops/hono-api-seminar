@@ -342,6 +342,8 @@ export default class PendaftaranService {
     const angkatan = parseInt(`20${nim.slice(1, 3)}`);
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
-    return (currentYear - angkatan) * 2 + (currentMonth >= 8 ? 1 : 2);
+    // September–December = tahun ajaran baru (start of academic year), Januari–Agustus = lanjutan
+    const academicYear = currentMonth >= 8 ? currentYear : currentYear - 1;
+    return (academicYear - angkatan) * 2 + (currentMonth >= 8 ? 1 : 2);
   }
 }
