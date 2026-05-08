@@ -45,4 +45,22 @@ export default class PendaftaranRepository {
       where: { id_pengajuan_fst },
     });
   }
+
+  public static async findByNIMWithDosenNames(nim: string) {
+    return prisma.$queryRaw`
+      SELECT
+        p.*,
+        pb1.nama as nama_pembimbing_1,
+        pb2.nama as nama_pembimbing_2,
+        pg1.nama as nama_penguji_1,
+        pg2.nama as nama_penguji_2
+      FROM pendaftaran p
+      LEFT JOIN dosen pb1 ON p.nip_pembimbing_1 = pb1.nip
+      LEFT JOIN dosen pb2 ON p.nip_pembimbing_2 = pb2.nip
+      LEFT JOIN dosen pg1 ON p.nip_penguji_1 = pg1.nip
+      LEFT JOIN dosen pg2 ON p.nip_penguji_2 = pg2.nip
+      WHERE p.nim = ${nim}
+      ORDER BY p.created_at DESC
+    `;
+  }
 }

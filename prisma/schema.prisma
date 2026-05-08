@@ -54,10 +54,10 @@ enum ConstraintType {
 }
 
 enum StatusBerkas {
-  PENDING    // Berkas baru masuk, belum diperiksa
-  IN_REVIEW  // Sedang dalam proses verifikasi oleh admin/koordinator
-  APPROVED   // Berkas dinyatakan lengkap dan valid
-  REJECTED   // Berkas ditolak (misal: ada dokumen yang salah atau tidak terbaca)
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
 }
 
 model dosen {

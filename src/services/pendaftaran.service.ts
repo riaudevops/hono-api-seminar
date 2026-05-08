@@ -148,6 +148,13 @@ export default class PendaftaranService {
       throw new APIError('Anda tidak memiliki akses untuk mengubah pendaftaran ini.', 403);
     }
 
+    if (existing.status_berkas === 'APPROVED') {
+      throw new APIError(
+        'Pendaftaran tidak dapat diubah karena berkas sudah disetujui.',
+        409
+      );
+    }
+
     const updated = await PendaftaranRepository.update(id, data);
 
     return {
