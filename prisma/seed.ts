@@ -178,6 +178,336 @@ async function main() {
   } catch (error: any) {
     console.error(`[ERROR] Failed to execute mahasiswa.sql: ${error.message}`);
   }
+
+  // 5. Seeder Dokumen Template (master dokumen yang dibutuhkan saat pendaftaran)
+  // Catatan: NIP pembimbing/penguji/ketua sidang TIDAK disimpan di sini.
+  // Field-field tersebut sudah jadi kolom flat di tabel `pendaftaran` dan
+  // jumlahnya ditentukan oleh `jenis_seminar.jumlah_pembimbing` /
+  // `jumlah_penguji` / `ada_ketua_sidang` — frontend render form berdasarkan itu.
+  const resultDokumenTemplate = await prisma.dokumen_template.createMany({
+    data: [
+      // --- Data umum (TEXT / DATE / URL) ---
+      {
+        kode: 'JUDUL_KP',
+        nama: 'Judul Kerja Praktek',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'JUDUL_TA',
+        nama: 'Judul Tugas Akhir',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'NAMA_INSTANSI',
+        nama: 'Nama Instansi KP',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'TANGGAL_MULAI_KP',
+        nama: 'Tanggal Mulai KP',
+        tipe_input: 'DATE',
+      },
+      {
+        kode: 'TANGGAL_SELESAI_KP',
+        nama: 'Tanggal Selesai KP',
+        tipe_input: 'DATE',
+      },
+      {
+        kode: 'LINK_REPOSITORY',
+        nama: 'Link Repository / Dokumentasi Proyek',
+        deskripsi: 'URL GitHub / GitLab / Drive',
+        tipe_input: 'URL',
+      },
+      {
+        kode: 'LINK_PAPER_SUBMISSION',
+        nama: 'Link Bukti Submit Paper',
+        deskripsi: 'Hanya untuk paperbased — URL conference/journal submission',
+        tipe_input: 'URL',
+      },
+
+      // --- Dokumen upload ---
+      {
+        kode: 'SURAT_KET_INSTANSI',
+        nama: 'Surat Keterangan Instansi',
+        deskripsi: 'Surat balasan/penerimaan dari instansi tempat KP',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+      {
+        kode: 'LAPORAN_KP',
+        nama: 'Laporan Kerja Praktek',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 15,
+      },
+      {
+        kode: 'FORM_NILAI_INSTANSI',
+        nama: 'Form Penilaian Pembimbing Instansi',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+      {
+        kode: 'PROPOSAL_TA',
+        nama: 'Proposal Tugas Akhir',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 15,
+      },
+      {
+        kode: 'BUKTI_BIMBINGAN',
+        nama: 'Kartu / Log Bimbingan',
+        deskripsi: 'Scan kartu kontrol bimbingan (minimal sesuai ketentuan prodi)',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+      {
+        kode: 'BERKAS_SYARAT',
+        nama: 'Berkas Persyaratan Administratif',
+        deskripsi: 'Gabungan berkas administrasi (bebas SPP, transkrip, dll)',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 10,
+      },
+      {
+        kode: 'LAPORAN_HASIL_TA',
+        nama: 'Draft Laporan Seminar Hasil',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 20,
+      },
+      {
+        kode: 'LAPORAN_AKHIR_TA',
+        nama: 'Draft Laporan Akhir (Sidang)',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 20,
+      },
+      {
+        kode: 'REVISI_SEMPRO',
+        nama: 'Bukti Revisi Seminar Proposal',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+      {
+        kode: 'REVISI_SEMHAS',
+        nama: 'Bukti Revisi Seminar Hasil',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+      {
+        kode: 'DRAFT_PAPER',
+        nama: 'Draft Paper Konferensi/Jurnal',
+        deskripsi: 'Hanya untuk jalur paperbased',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 10,
+      },
+      {
+        kode: 'UNDANGAN_SEBELUMNYA',
+        nama: 'Undangan Seminar Sebelumnya',
+        deskripsi: 'Bukti telah mengikuti seminar hasil teman (syarat SEMPRO)',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+
+      // --- Pilihan ---
+      {
+        kode: 'MATA_KULIAH_PILIHAN',
+        nama: 'Mata Kuliah Pilihan',
+        deskripsi: 'Pilih mata kuliah pilihan yang relevan dengan topik TA',
+        tipe_input: 'MULTI_SELECT',
+        opsi: [
+          'Kriptografi',
+          'Jaringan Komputer Lanjut',
+          'Machine Learning',
+          'Data Mining',
+          'Pemrosesan Citra Digital',
+          'Sistem Terdistribusi',
+          'Keamanan Informasi',
+          'Pengembangan Game',
+          'Cloud Computing',
+          'Internet of Things',
+          'Natural Language Processing',
+          'Computer Vision',
+        ],
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(
+    '[DEBUG] Result of inserted dokumen_template createMany:',
+    resultDokumenTemplate.count > 0
+      ? resultDokumenTemplate
+      : 'Data was inserted previously, no new data inserted.'
+  );
+
+  // 6. Seeder Jenis Seminar
+  const resultJenisSeminar = await prisma.jenis_seminar.createMany({
+    data: [
+      {
+        kode: 'SEMKP',
+        nama: 'Seminar Kerja Praktek',
+        deskripsi:
+          'Seminar pemaparan hasil kerja praktek mahasiswa di instansi mitra.',
+        jumlah_pembimbing: 1,
+        jumlah_penguji: 1,
+        ada_ketua_sidang: false,
+      },
+      {
+        kode: 'SEMPRO',
+        nama: 'Seminar Proposal Tugas Akhir',
+        deskripsi: 'Seminar pemaparan proposal penelitian tugas akhir.',
+        jumlah_pembimbing: 2,
+        jumlah_penguji: 2,
+        ada_ketua_sidang: false,
+      },
+      {
+        kode: 'SEMHAS_LAPORAN',
+        nama: 'Seminar Hasil Tugas Akhir (Jalur Laporan)',
+        deskripsi: 'Seminar hasil penelitian tugas akhir melalui jalur laporan.',
+        jumlah_pembimbing: 2,
+        jumlah_penguji: 2,
+        ada_ketua_sidang: false,
+      },
+      {
+        kode: 'SEMHAS_PAPERBASED',
+        nama: 'Seminar Hasil Tugas Akhir (Jalur Paper)',
+        deskripsi:
+          'Seminar hasil penelitian tugas akhir melalui jalur paper konferensi/jurnal.',
+        jumlah_pembimbing: 2,
+        jumlah_penguji: 2,
+        ada_ketua_sidang: false,
+      },
+      {
+        kode: 'SIDANG_LAPORAN',
+        nama: 'Sidang Tugas Akhir (Jalur Laporan)',
+        deskripsi: 'Sidang akhir pertahanan tugas akhir melalui jalur laporan.',
+        jumlah_pembimbing: 2,
+        jumlah_penguji: 2,
+        ada_ketua_sidang: true,
+      },
+      {
+        kode: 'SIDANG_PAPERBASED',
+        nama: 'Sidang Tugas Akhir (Jalur Paper)',
+        deskripsi:
+          'Sidang akhir pertahanan tugas akhir melalui jalur paper konferensi/jurnal.',
+        jumlah_pembimbing: 2,
+        jumlah_penguji: 2,
+        ada_ketua_sidang: true,
+      },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(
+    '[DEBUG] Result of inserted jenis_seminar createMany:',
+    resultJenisSeminar.count > 0
+      ? resultJenisSeminar
+      : 'Data was inserted previously, no new data inserted.'
+  );
+
+  // 7. Seeder Requirement Dokumen (pivot jenis_seminar × dokumen_template)
+  // Ambil map kode → id karena pivot butuh FK
+  const jenisList = await prisma.jenis_seminar.findMany({
+    select: { id: true, kode: true },
+  });
+  const dokumenList = await prisma.dokumen_template.findMany({
+    select: { id: true, kode: true },
+  });
+  const jenisMap = new Map(jenisList.map((j) => [j.kode, j.id]));
+  const dokumenMap = new Map(dokumenList.map((d) => [d.kode, d.id]));
+
+  type Req = { jenis: string; dokumen: string; urutan: number; wajib?: boolean };
+  const requirements: Req[] = [
+    // --- SEMKP ---
+    { jenis: 'SEMKP', dokumen: 'JUDUL_KP', urutan: 1 },
+    { jenis: 'SEMKP', dokumen: 'NAMA_INSTANSI', urutan: 2 },
+    { jenis: 'SEMKP', dokumen: 'TANGGAL_MULAI_KP', urutan: 3 },
+    { jenis: 'SEMKP', dokumen: 'TANGGAL_SELESAI_KP', urutan: 4 },
+    { jenis: 'SEMKP', dokumen: 'SURAT_KET_INSTANSI', urutan: 5 },
+    { jenis: 'SEMKP', dokumen: 'LAPORAN_KP', urutan: 6 },
+    { jenis: 'SEMKP', dokumen: 'FORM_NILAI_INSTANSI', urutan: 7 },
+    { jenis: 'SEMKP', dokumen: 'BERKAS_SYARAT', urutan: 8 },
+    { jenis: 'SEMKP', dokumen: 'LINK_REPOSITORY', urutan: 9, wajib: false },
+
+    // --- SEMPRO ---
+    { jenis: 'SEMPRO', dokumen: 'JUDUL_TA', urutan: 1 },
+    { jenis: 'SEMPRO', dokumen: 'PROPOSAL_TA', urutan: 2 },
+    { jenis: 'SEMPRO', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
+    { jenis: 'SEMPRO', dokumen: 'BERKAS_SYARAT', urutan: 4 },
+    { jenis: 'SEMPRO', dokumen: 'UNDANGAN_SEBELUMNYA', urutan: 5 },
+    { jenis: 'SEMPRO', dokumen: 'MATA_KULIAH_PILIHAN', urutan: 6, wajib: false },
+
+    // --- SEMHAS_LAPORAN ---
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'LAPORAN_HASIL_TA', urutan: 2 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'REVISI_SEMPRO', urutan: 4 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'BERKAS_SYARAT', urutan: 5 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'LINK_REPOSITORY', urutan: 6, wajib: false },
+
+    // --- SEMHAS_PAPERBASED ---
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'DRAFT_PAPER', urutan: 2 },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'LINK_PAPER_SUBMISSION', urutan: 3 },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'BUKTI_BIMBINGAN', urutan: 4 },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'REVISI_SEMPRO', urutan: 5 },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'BERKAS_SYARAT', urutan: 6 },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'LINK_REPOSITORY', urutan: 7, wajib: false },
+
+    // --- SIDANG_LAPORAN ---
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'LAPORAN_AKHIR_TA', urutan: 2 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'REVISI_SEMHAS', urutan: 4 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'BERKAS_SYARAT', urutan: 5 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'LINK_REPOSITORY', urutan: 6, wajib: false },
+
+    // --- SIDANG_PAPERBASED ---
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'DRAFT_PAPER', urutan: 2 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'LINK_PAPER_SUBMISSION', urutan: 3 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'BUKTI_BIMBINGAN', urutan: 4 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'REVISI_SEMHAS', urutan: 5 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'BERKAS_SYARAT', urutan: 6 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'LINK_REPOSITORY', urutan: 7, wajib: false },
+  ];
+
+  const missingRefs = requirements.filter(
+    (r) => !jenisMap.get(r.jenis) || !dokumenMap.get(r.dokumen)
+  );
+  if (missingRefs.length > 0) {
+    console.error(
+      '[ERROR] Ada referensi requirement_dokumen yang tidak ditemukan:',
+      missingRefs
+    );
+  }
+
+  const resultRequirement = await prisma.requirement_dokumen.createMany({
+    data: requirements
+      .filter((r) => jenisMap.get(r.jenis) && dokumenMap.get(r.dokumen))
+      .map((r) => ({
+        id_jenis_seminar: jenisMap.get(r.jenis)!,
+        id_dokumen_template: dokumenMap.get(r.dokumen)!,
+        urutan: r.urutan,
+        is_wajib: r.wajib ?? true,
+      })),
+    skipDuplicates: true,
+  });
+
+  console.log(
+    '[DEBUG] Result of inserted requirement_dokumen createMany:',
+    resultRequirement.count > 0
+      ? resultRequirement
+      : 'Data was inserted previously, no new data inserted.'
+  );
 }
 
 main()

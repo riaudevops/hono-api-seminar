@@ -13,6 +13,7 @@ export default class PendaftaranService {
   public static async getAll(
     dateFilter: DateFilter = 'all',
     jenisSeminar?: string,
+    statusBerkas?: string,
     search?: string,
     page: number = 1,
     limit: number = 10
@@ -29,6 +30,12 @@ export default class PendaftaranService {
     mapped = this.filterByDate(mapped, dateFilter);
     if (jenisSeminar) {
       mapped = this.filterByJenisSeminar(mapped, jenisSeminar);
+    }
+    if (statusBerkas) {
+      mapped = this.filterByStatusBerkas(mapped, statusBerkas);
+    }
+    if (statusBerkas) {
+      mapped = this.filterByStatusBerkas(mapped, statusBerkas);
     }
 
     // Fuzzy search by nama/nim
@@ -67,6 +74,7 @@ export default class PendaftaranService {
       filters: {
         dateRange: dateFilter,
         jenisSeminar: jenisSeminar || null,
+        statusBerkas: statusBerkas || null,
         search: search || null,
       },
       pagination: {
@@ -288,6 +296,23 @@ export default class PendaftaranService {
     if (filtered.length === 0) {
       throw new APIError(
         `Tidak ada data pendaftaran dengan jenis seminar "${jenisSeminar}".`,
+        404
+      );
+    }
+    return filtered;
+  }
+
+  private static filterByStatusBerkas(
+    data: any[],
+    statusBerkas: string
+  ): any[] {
+    const upper = statusBerkas.toUpperCase();
+    const filtered = data.filter(
+      (p) => p.status_berkas?.toUpperCase() === upper
+    );
+    if (filtered.length === 0) {
+      throw new APIError(
+        `Tidak ada data pendaftaran dengan status berkas "${statusBerkas}".`,
         404
       );
     }

@@ -10,7 +10,7 @@ const penilaianRoute = new Hono({ router: new RegExpRouter() });
 
 // Dosen endpoints
 penilaianRoute.get(
-  '/penilaian/jadwal-saya',
+  '/dosen/penilaian/jadwal-saya',
   AuthMiddleware.JWTBearerTokenExtraction,
   PenilaianHandler.getJadwalToAssess
 );

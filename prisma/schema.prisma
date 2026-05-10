@@ -99,8 +99,10 @@ model mahasiswa {
   nama   String @db.VarChar(255)
   email  String @unique @db.VarChar(36)
   aktif  Boolean @default(true)
+  no_hp  String? @unique @db.VarChar(14)
 
   jadwal jadwal[]
+  pendaftaran pendaftaran[]
 }
 
 model ruangan {
@@ -258,30 +260,130 @@ model constraint_dosen {
   @@index([type])
 }
 
+// ============================================================
+// KONFIGURASI JENIS SEMINAR (dikelola Admin/Koordinator)
+// ============================================================
+
+model jenis_seminar {
+  id          String  @id @default(cuid())
+  kode        String  @unique @db.VarChar(20) // "SEMKP", "SEMPRO", dst
+  nama        String  @db.VarChar(100)        // "Seminar Kerja Praktek"
+  deskripsi   String? @db.Text
+  is_aktif    Boolean @default(true)
+
+  // Konfigurasi penilai: berapa pembimbing, penguji, dll
+  jumlah_pembimbing Int @default(1)
+  jumlah_penguji    Int @default(2)
+  ada_ketua_sidang  Boolean @default(false)
+
+  // Relasi ke dokumen/data yang dibutuhkan
+  requirement_dokumen requirement_dokumen[]
+
+  pendaftaran pendaftaran[]
+
+  @@index([kode])
+}
+
+// ============================================================
+// MASTER DOKUMEN/DATA YANG MUNGKIN DIBUTUHKAN
+// ============================================================
+
+enum TipeInputDokumen {
+  FILE_UPLOAD   // Upload file (PDF, docx, dll)
+  TEXT          // Input teks bebas
+  URL           // Link/URL
+  BOOLEAN       // Checkbox (sudah/belum)
+  DATE          // Tanggal
+  SELECT        // Pilihan dari opsi tertentu
+  MULTI_SELECT  // Pilihan multiple (seperti mata kuliah pilihan)
+}
+
+model dokumen_template {
+  id          String            @id @default(cuid())
+  nama        String            @db.VarChar(150)   // "Surat Keterangan Instansi"
+  kode        String            @unique @db.VarChar(50) // "SURAT_KET_INSTANSI"
+  deskripsi   String?           @db.Text
+  tipe_input  TipeInputDokumen
+  
+  // Untuk SELECT / MULTI_SELECT: simpan opsi yang tersedia
+  opsi        Json?             // ["Kriptografi", "Jaringan Komputer", ...]
+  
+  // Validasi tambahan
+  format_file  String?          @db.VarChar(50)    // "pdf,docx" jika FILE_UPLOAD
+  max_size_mb  Int?                                 // Batas ukuran file
+  
+  // Apakah ini field khusus yang punya handling tersendiri di backend
+  is_special   Boolean          @default(false)     // misal: field NIP dosen, dll
+
+  requirement_dokumen requirement_dokumen[]
+
+  data_pendaftaran data_pendaftaran[]
+}
+
+// ============================================================
+// PIVOT: Dokumen apa saja yang dibutuhkan per Jenis Seminar
+// ============================================================
+
+model requirement_dokumen {
+  id                  String   @id @default(cuid())
+  id_jenis_seminar    String
+  id_dokumen_template String
+  
+  urutan              Int      @default(0)   // Urutan tampil di form
+  is_wajib            Boolean  @default(true)
+  keterangan_tambahan String?  @db.Text      // Instruksi khusus untuk dokumen ini
+
+  jenis_seminar    jenis_seminar    @relation(fields: [id_jenis_seminar], references: [id], onDelete: Cascade)
+  dokumen_template dokumen_template @relation(fields: [id_dokumen_template], references: [id], onDelete: Cascade)
+
+  @@unique([id_jenis_seminar, id_dokumen_template])
+  @@index([id_jenis_seminar])
+}
+
 model pendaftaran {
-  id                         String      @id @db.VarChar(35)
-  nim                        String      @db.VarChar(11)
-  nama                       String      @db.VarChar(255)
-  semester                   Int
-  id_pengajuan_fst           String      @unique @db.VarChar(50)
-  no_wa                      String      @db.VarChar(15)
-  jenis_seminar              JenisJadwal
-  judul                      String?     @db.VarChar(255)
+  id                String       @id @default(cuid())
+  nim               String       @db.VarChar(11)
+  tahun_ajaran      String       @db.VarChar(5)
+  id_pengajuan_fst  String       @unique @db.VarChar(50)
 
-  nip_pembimbing_1           String      @db.VarChar(18)
-  nip_pembimbing_2           String?     @db.VarChar(18)
-  nip_penguji_1              String      @db.VarChar(18)
-  nip_penguji_2              String      @db.VarChar(18)
+  id_jenis_seminar  String
+  jenis_seminar     jenis_seminar @relation(fields: [id_jenis_seminar], references: [id])
 
-  mata_kuliah_pilihan        Json?
+  nim_mahasiswa     mahasiswa     @relation(fields: [nim], references: [nim])
 
-  berkas_syarat_url          String      @db.Text
-  undangan_sebelumnya_url    String?     @db.Text
+  // Penilai — tetap eksplisit karena sering di-query LLM
+  nip_pembimbing_1  String       @db.VarChar(18)
+  nip_pembimbing_2  String?      @db.VarChar(18)
+  nip_penguji_1     String?      @db.VarChar(18)
+  nip_penguji_2     String?      @db.VarChar(18)
+  nip_ketua_sidang  String?      @db.VarChar(18)
 
-  created_at                 DateTime    @default(now()) @db.Timestamptz
-  status_berkas              StatusBerkas     @default(PENDING)
-  status_proses              Boolean     @default(false)
+  status_berkas     StatusBerkas @default(PENDING)
+  status_proses     Boolean      @default(false)
+  created_at        DateTime     @default(now()) @db.Timestamptz
+
+  // Relasi ke jawaban/isian dokumen
+  data_pendaftaran  data_pendaftaran[]
 
   @@index([nim])
-  @@index([id_pengajuan_fst])
+  @@index([id_jenis_seminar])
+}
+
+model data_pendaftaran {
+  id                  String  @id @default(cuid())
+  id_pendaftaran      String
+  id_dokumen_template String
+
+  // Nilai disimpan sesuai tipe — hanya satu yang terisi
+  nilai_text     String?  @db.Text      // TEXT, URL
+  nilai_file_url String?  @db.Text      // FILE_UPLOAD (URL hasil upload)
+  nilai_boolean  Boolean?               // BOOLEAN
+  nilai_date     DateTime? @db.Timestamptz // DATE
+  nilai_json     Json?                  // SELECT, MULTI_SELECT, atau data kompleks
+
+  pendaftaran      pendaftaran      @relation(fields: [id_pendaftaran], references: [id], onDelete: Cascade)
+  dokumen_template dokumen_template @relation(fields: [id_dokumen_template], references: [id])
+
+  @@unique([id_pendaftaran, id_dokumen_template]) // 1 dokumen = 1 jawaban per pendaftaran
+  @@index([id_pendaftaran])
 }

@@ -9,12 +9,14 @@ export default class PendaftaranHandler {
   public static async getAll(c: Context) {
     const dateFilter = c.req.query('date') as '7' | '30' | 'all' | undefined;
     const jenisSeminar = c.req.query('jenis_seminar');
+    const statusBerkas = c.req.query('status_berkas');
     const search = c.req.query('q');
     const { page = 1, limit = 10 } = c.req.query();
     return c.json(
       await PendaftaranService.getAll(
         dateFilter || 'all',
         jenisSeminar || undefined,
+        statusBerkas || undefined,
         search || undefined,
         Number(page),
         Number(limit)

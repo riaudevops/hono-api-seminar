@@ -8,10 +8,26 @@ import { postPutJadwalSchema } from '../validators/jadwal.validator';
 
 const jadwalRoute = new Hono({ router: new RegExpRouter() });
 
-jadwalRoute.get('/jadwal-saya', AuthMiddleware.JWTBearerTokenExtraction, JadwalHandler.getMe);
-jadwalRoute.get('/jadwal', AuthMiddleware.JWTBearerTokenExtraction, JadwalHandler.getAll);
-jadwalRoute.get('/jadwal/:id', AuthMiddleware.JWTBearerTokenExtraction, JadwalHandler.get);
-jadwalRoute.get('/jadwal/:id/logs', AuthMiddleware.JWTBearerTokenExtraction, JadwalHandler.getLogs);
+jadwalRoute.get(
+  '/dosen/jadwal-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.getMe
+);
+jadwalRoute.get(
+  '/jadwal',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.getAll
+);
+jadwalRoute.get(
+  '/jadwal/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.get
+);
+jadwalRoute.get(
+  '/jadwal/:id/logs',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.getLogs
+);
 jadwalRoute.post(
   '/jadwal',
   AuthMiddleware.JWTBearerTokenExtraction,
@@ -24,6 +40,10 @@ jadwalRoute.put(
   zValidator('json', postPutJadwalSchema, zodError),
   JadwalHandler.put
 );
-jadwalRoute.delete('/jadwal/:id', AuthMiddleware.JWTBearerTokenExtraction, JadwalHandler.delete);
+jadwalRoute.delete(
+  '/jadwal/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.delete
+);
 
 export default jadwalRoute;

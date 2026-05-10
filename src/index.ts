@@ -23,6 +23,9 @@ import logPenilaianRoute from './routes/log-penilaian.route';
 import dosenSeminarRoute from './routes/dosen-seminar.route';
 import koordinatorRoute from './routes/koordinator.route';
 import pendaftaranRoute from './routes/pendaftaran.route';
+import { JenisSeminarRoute } from './modules/jenis-seminar';
+import { DokumenTemplateRoute } from './modules/dokumen-template';
+import { DokumenTemplateRoute } from './modules/dokumen-template';
 
 const logger = createLogger('Server');
 
@@ -90,6 +93,9 @@ app.route('/api', logPenilaianRoute);
 app.route('/api', dosenSeminarRoute);
 app.route('/api', koordinatorRoute);
 app.route('/api', pendaftaranRoute);
+app.route('/api', JenisSeminarRoute);
+app.route('/api', DokumenTemplateRoute);
+app.route('/api', DokumenTemplateRoute);
 
 // Graceful shutdown handlers
 process.on('SIGINT', async () => {

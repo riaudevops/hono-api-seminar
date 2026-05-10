@@ -11,45 +11,45 @@ import {
 
 const dosenSeminarRoute = new Hono({ router: new RegExpRouter() });
 
-// #1 GET /dosen/seminar/jadwal
+// #1 GET /dosen/jadwal
 dosenSeminarRoute.get(
-  '/dosen/seminar/jadwal',
+  '/dosen/jadwal',
   AuthMiddleware.JWTBearerTokenExtraction,
   DosenSeminarHandler.getJadwalSeminar
 );
 
-// #2 GET /dosen/seminar/stats
+// #2 GET /dosen/stats
 dosenSeminarRoute.get(
-  '/dosen/seminar/stats',
+  '/dosen/stats',
   AuthMiddleware.JWTBearerTokenExtraction,
   DosenSeminarHandler.getStats
 );
 
-// #3 GET /dosen/seminar/komponen-penilaian
+// #3 GET /dosen/komponen-penilaian
 dosenSeminarRoute.get(
-  '/dosen/seminar/komponen-penilaian',
+  '/dosen/komponen-penilaian',
   AuthMiddleware.JWTBearerTokenExtraction,
   DosenSeminarHandler.getKomponenPenilaian
 );
 
-// #4 GET /dosen/seminar/penilaian?jadwal_id=
+// #4 GET /dosen/penilaian?jadwal_id=
 dosenSeminarRoute.get(
-  '/dosen/seminar/penilaian',
+  '/dosen/penilaian',
   AuthMiddleware.JWTBearerTokenExtraction,
   DosenSeminarHandler.getPenilaianByJadwal
 );
 
-// #5 POST /dosen/seminar/penilaian
+// #5 POST /dosen/penilaian
 dosenSeminarRoute.post(
-  '/dosen/seminar/penilaian',
+  '/dosen/penilaian',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('json', submitNilaiSchema, zodError),
   DosenSeminarHandler.submitNilai
 );
 
-// #6 GET /dosen/seminar/log-penilaian
+// #6 GET /dosen/log-penilaian
 dosenSeminarRoute.get(
-  '/dosen/seminar/log-penilaian',
+  '/dosen/log-penilaian',
   AuthMiddleware.JWTBearerTokenExtraction,
   DosenSeminarHandler.getLogPenilaian
 );
