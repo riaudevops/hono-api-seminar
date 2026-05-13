@@ -12,6 +12,7 @@ export default class JadwalDraftRepository {
         ...(filters?.batch_id && { batch_id: filters.batch_id }),
         ...(filters?.status && { status: filters.status }),
       },
+      include: { jenis_seminar: true },
       orderBy: { created_at: 'desc' },
     });
   }
@@ -19,6 +20,7 @@ export default class JadwalDraftRepository {
   public static async findById(id: string) {
     return prisma.jadwal_draft.findUnique({
       where: { id },
+      include: { jenis_seminar: true },
     });
   }
 
@@ -31,6 +33,7 @@ export default class JadwalDraftRepository {
         batch_id,
         ...(status && { status }),
       },
+      include: { jenis_seminar: true },
       orderBy: { created_at: 'asc' },
     });
   }
@@ -40,7 +43,7 @@ export default class JadwalDraftRepository {
       data: data.map((d) => ({
         batch_id: d.batch_id,
         nim: d.nim,
-        jenis: d.jenis,
+        id_jenis_seminar: d.id_jenis_seminar,
         judul: d.judul,
         tanggal: d.tanggal,
         waktu_mulai: d.waktu_mulai,

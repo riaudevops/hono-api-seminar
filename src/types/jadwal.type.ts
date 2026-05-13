@@ -1,4 +1,23 @@
-import { JenisJadwal, PenilaiRole } from '@prisma/client';
+import { PenilaiRole } from '@prisma/client';
+
+// Jenis seminar sekarang dinamis — referensinya adalah `jenis_seminar.kode`.
+// Tipe union dipertahankan untuk kode yang sudah ter-deploy (enum-like value).
+export type JenisJadwalKode =
+  | 'SEMKP'
+  | 'SEMPRO'
+  | 'SEMHAS_LAPORAN'
+  | 'SEMHAS_PAPERBASED'
+  | 'SIDANG_LAPORAN'
+  | 'SIDANG_PAPERBASED';
+
+export const JENIS_JADWAL_KODE: Record<JenisJadwalKode, JenisJadwalKode> = {
+  SEMKP: 'SEMKP',
+  SEMPRO: 'SEMPRO',
+  SEMHAS_LAPORAN: 'SEMHAS_LAPORAN',
+  SEMHAS_PAPERBASED: 'SEMHAS_PAPERBASED',
+  SIDANG_LAPORAN: 'SIDANG_LAPORAN',
+  SIDANG_PAPERBASED: 'SIDANG_PAPERBASED',
+};
 
 export interface CreateJadwalType {
   id: string;
@@ -6,7 +25,7 @@ export interface CreateJadwalType {
   judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
-  jenis: JenisJadwal;
+  id_jenis_seminar: string;
   nim: string;
   kode_ruangan: string;
 }
@@ -16,7 +35,7 @@ export interface UpdateJadwalType {
   judul?: string;
   waktu_mulai?: Date;
   waktu_selesai?: Date;
-  jenis?: JenisJadwal;
+  id_jenis_seminar?: string;
   nim?: string;
   kode_ruangan?: string;
 }
@@ -39,7 +58,12 @@ export interface JadwalWithRelations {
   judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
-  jenis: JenisJadwal;
+  id_jenis_seminar: string;
+  jenis_seminar?: {
+    id: string;
+    kode: string;
+    nama: string;
+  };
   nim: string;
   kode_ruangan: string;
   mahasiswa?: {

@@ -7,7 +7,15 @@ import {
 
 export default class DokumenTemplateHandler {
   public static async getAll(c: Context) {
-    return c.json(await DokumenTemplateService.getAll());
+    const query = c.req.query();
+    return c.json(
+      await DokumenTemplateService.getAll({
+        jenis_seminar: query.jenis_seminar,
+        q: query.q,
+        page: query.page ? Number(query.page) : undefined,
+        limit: query.limit ? Number(query.limit) : undefined,
+      })
+    );
   }
 
   public static async getById(c: Context) {

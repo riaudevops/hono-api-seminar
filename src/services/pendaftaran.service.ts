@@ -123,12 +123,28 @@ export default class PendaftaranService {
       );
     }
 
+    // Resolve id_jenis_seminar dari kode_jenis jika perlu
+    let id_jenis_seminar = data.id_jenis_seminar;
+    if (!id_jenis_seminar && data.kode_jenis) {
+      const JenisSeminarHelper = (await import('../helpers/jenis-seminar.helper')).default;
+      id_jenis_seminar = await JenisSeminarHelper.resolveIdByKode(data.kode_jenis);
+    }
+
+    const tahun_ajaran = TahunAjaranHelper.findSekarang();
+
     const pendaftaran = await PendaftaranRepository.create({
-      id: this.generateId(data.jenis_seminar),
+      id: this.generateId(id_jenis_seminar),
       nim: mhs.nim,
-      nama: mhs.nama,
-      semester: this.computeSemester(mhs.nim),
-      ...data,
+      tahun_ajaran,
+      id_pengajuan_fst: data.id_pengajuan_fst,
+      id_jenis_seminar,
+      nip_pembimbing_1: data.nip_pembimbing_1,
+      nip_pembimbing_2: data.nip_pembimbing_2 ?? null,
+      nip_penguji_1: data.nip_penguji_1 ?? null,
+      nip_penguji_2: data.nip_penguji_2 ?? null,
+      nip_ketua_sidang: data.nip_ketua_sidang ?? null,
+      status_berkas: data.status_berkas ?? 'PENDING',
+      created_at: data.created_at,
     });
 
     return {
@@ -324,8 +340,8 @@ export default class PendaftaranService {
       id: p.id,
       timestamp: p.created_at,
       nim: p.nim,
-      nama: p.nama,
-      jenis_seminar: p.jenis_seminar,
+      nama: p.nim_mahasiswa?.nama ?? p.nim,
+      jenis_seminar: p.jenis_seminar?.kode ?? p.id_jenis_seminar,
       status_berkas: p.status_berkas,
     };
   }
@@ -338,21 +354,16 @@ export default class PendaftaranService {
       id: p.id,
       timestamp: p.created_at,
       nim: p.nim,
-      nama: p.nama,
-      semester: p.semester,
+      nama: p.nim_mahasiswa?.nama ?? p.nim,
+      tahun_ajaran: p.tahun_ajaran,
       id_pengajuan_fst: p.id_pengajuan_fst,
-      no_wa: p.no_wa,
-      jenis_seminar: p.jenis_seminar,
-      judul: p.judul,
+      jenis_seminar: p.jenis_seminar?.kode ?? p.id_jenis_seminar,
+      jenis_seminar_nama: p.jenis_seminar?.nama,
       pembimbing_1: this.resolveDosen(p.nip_pembimbing_1, dosenMap),
       pembimbing_2: this.resolveDosen(p.nip_pembimbing_2, dosenMap),
       penguji_1: this.resolveDosen(p.nip_penguji_1, dosenMap),
       penguji_2: this.resolveDosen(p.nip_penguji_2, dosenMap),
-      mata_kuliah_pilihan: p.mata_kuliah_pilihan,
-      berkas_syarat_url: p.berkas_syarat_url,
-      undangan_sebelumnya_url: p.undangan_sebelumnya_url,
       status_berkas: p.status_berkas,
-      status_proses: p.status_proses,
     };
   }
 

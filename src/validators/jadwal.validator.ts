@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { JenisJadwal } from '@prisma/client';
+
+const KODE_JENIS_VALUES = [
+  'SEMKP',
+  'SEMPRO',
+  'SEMHAS_LAPORAN',
+  'SEMHAS_PAPERBASED',
+  'SIDANG_LAPORAN',
+  'SIDANG_PAPERBASED',
+] as const;
 
 export const postPutJadwalSchema = z
   .object({
@@ -24,9 +32,12 @@ export const postPutJadwalSchema = z
           'Format waktu selesai harus dalam format ISO-8601 DateTime (contoh: 2025-10-14T09:00:00.000Z)',
       })
       .transform((str) => new Date(str)),
-    jenis: z.nativeEnum(JenisJadwal, {
-      errorMap: () => ({ message: 'Jenis jadwal tidak valid' }),
-    }),
+    kode_jenis: z
+      .enum(KODE_JENIS_VALUES, {
+        errorMap: () => ({ message: 'Kode jenis seminar tidak valid' }),
+      })
+      .optional(),
+    id_jenis_seminar: z.string().optional(),
     judul: z
       .string()
       .min(1, 'Judul tidak boleh kosong')
@@ -50,6 +61,10 @@ export const postPutJadwalSchema = z
       .max(18, 'NIP maksimal 18 karakter'),
     nip_penguji_2: z.string().max(18, 'NIP maksimal 18 karakter').optional(),
     nip_ketua_sidang: z.string().max(18, 'NIP maksimal 18 karakter').optional(),
+  })
+  .refine((d) => d.kode_jenis || d.id_jenis_seminar, {
+    message: 'Field kode_jenis atau id_jenis_seminar wajib diisi',
+    path: ['kode_jenis'],
   })
   .refine((data) => data.waktu_selesai > data.waktu_mulai, {
     message: 'Waktu selesai tidak boleh lebih awal dari waktu mulai',
@@ -109,10 +124,7 @@ export const postPutJadwalSchema = z
     (data) => {
       if (data.nip_ketua_sidang) {
         const ketuaSidang = data.nip_ketua_sidang;
-        const penguji = [
-          data.nip_penguji_1,
-          data.nip_penguji_2,
-        ].filter(Boolean);
+        const penguji = [data.nip_penguji_1, data.nip_penguji_2].filter(Boolean);
 
         if (penguji.includes(ketuaSidang)) {
           return false;
@@ -127,7 +139,7 @@ export const postPutJadwalSchema = z
   )
   .refine(
     (data) => {
-      if (data.jenis === 'SEMKP') {
+      if (data.kode_jenis === 'SEMKP') {
         if (
           data.nip_pembimbing_2 ||
           data.nip_penguji_2 ||
@@ -135,7 +147,7 @@ export const postPutJadwalSchema = z
         ) {
           return false;
         }
-      } else {
+      } else if (data.kode_jenis) {
         if (
           !data.nip_pembimbing_2 ||
           !data.nip_penguji_2 ||
@@ -149,6 +161,6 @@ export const postPutJadwalSchema = z
     {
       message:
         'Seminar KP memerlukan 1 pembimbing dan 1 penguji saja. Seminar lainnya memerlukan 2 pembimbing, 2 penguji, dan 1 ketua sidang',
-      path: ['jenis'],
+      path: ['kode_jenis'],
     }
   );

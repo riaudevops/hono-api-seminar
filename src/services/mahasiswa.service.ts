@@ -274,7 +274,7 @@ export default class MahasiswaService {
       throw new APIError('Data mahasiswa tidak ditemukan.', 404);
     }
 
-    const pendaftaran = await PendaftaranRepository.findByNIMWithDosenNames(mahasiswa.nim);
+    const pendaftaran = await PendaftaranRepository.findByNIMWithDosenNames(mahasiswa.nim) as any[];
 
     // Transform response to structure dosen data as objects
     const transformedData = pendaftaran.map((p: any) => ({
@@ -306,7 +306,6 @@ export default class MahasiswaService {
       berkas_syarat_url: p.berkas_syarat_url,
       undangan_sebelumnya_url: p.undangan_sebelumnya_url,
       status_berkas: p.status_berkas,
-      status_proses: p.status_proses,
       created_at: p.created_at,
     }));
 

@@ -1,4 +1,5 @@
-import { JenisJadwal, PenilaiRole, StatusJadwalDraft } from '@prisma/client';
+import { PenilaiRole, StatusJadwalDraft } from '@prisma/client';
+import type { JenisJadwalKode } from './jadwal.type';
 
 export interface DosenAssignmentInput {
   nip: string;
@@ -7,7 +8,7 @@ export interface DosenAssignmentInput {
 
 export interface MahasiswaScheduleInput {
   nim: string;
-  jenis: JenisJadwal;
+  kode_jenis: JenisJadwalKode;
   judul: string;
   list_dosen: DosenAssignmentInput[];
 }
@@ -27,7 +28,7 @@ export interface UpdateDraftInput {
 export interface CreateJadwalDraftInput {
   batch_id: string;
   nim: string;
-  jenis: JenisJadwal;
+  id_jenis_seminar: string;
   judul: string;
   tanggal: Date;
   waktu_mulai: Date;

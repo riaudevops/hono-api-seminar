@@ -1,17 +1,70 @@
+import Fuse from 'fuse.js';
 import { APIError } from '../../utils/api-error.util';
 import DokumenTemplateRepository from './dokumen-template.repository';
 import {
   CreateDokumenTemplateType,
+  DokumenTemplateWithJenisSeminar,
+  GetAllDokumenTemplateResponse,
   UpdateDokumenTemplateType,
 } from './dokumen-template.type';
 
+export interface GetAllParams {
+  jenis_seminar?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
 export default class DokumenTemplateService {
-  public static async getAll() {
-    const data = await DokumenTemplateRepository.findAll();
+  public static async getAll(params: GetAllParams = {}): Promise<GetAllDokumenTemplateResponse> {
+    const {
+      jenis_seminar,
+      q,
+      page = 1,
+      limit = 10,
+    } = params;
+
+    let templates = await DokumenTemplateRepository.findAllWithJenisSeminar();
+
+    if (jenis_seminar) {
+      templates = templates.filter((t) =>
+        t.jenis_seminars.some((js) => js.id === jenis_seminar)
+      );
+    }
+
+    if (q && q.trim()) {
+      const fuse = new Fuse(templates, {
+        keys: [
+          { name: 'nama', weight: 0.5 },
+          { name: 'kode', weight: 0.3 },
+          { name: 'deskripsi', weight: 0.2 },
+        ],
+        threshold: 0.4,
+        distance: 100,
+        minMatchCharLength: 2,
+        includeScore: true,
+        ignoreLocation: true,
+        findAllMatches: true,
+      });
+
+      const results = fuse.search(q.trim());
+      templates = results.map((r) => r.item);
+    }
+
+    const total = templates.length;
+    const skip = (page - 1) * limit;
+    const data = templates.slice(skip, skip + limit);
+
     return {
       response: true,
       message: 'Data template dokumen berhasil diambil.',
       data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

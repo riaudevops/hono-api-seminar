@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { JenisJadwal, PenilaiRole, StatusJadwalDraft } from '@prisma/client';
+import { PenilaiRole, StatusJadwalDraft } from '@prisma/client';
+
+const KODE_JENIS_VALUES = [
+  'SEMKP',
+  'SEMPRO',
+  'SEMHAS_LAPORAN',
+  'SEMHAS_PAPERBASED',
+  'SIDANG_LAPORAN',
+  'SIDANG_PAPERBASED',
+] as const;
 
 const dosenAssignmentSchema = z.object({
   nip: z.string().min(1, 'NIP tidak boleh kosong').max(18, 'NIP maksimal 18 karakter'),
@@ -10,8 +19,8 @@ const dosenAssignmentSchema = z.object({
 
 const mahasiswaScheduleSchema = z.object({
   nim: z.string().min(1, 'NIM tidak boleh kosong').max(11, 'NIM maksimal 11 karakter'),
-  jenis: z.nativeEnum(JenisJadwal, {
-    errorMap: () => ({ message: 'Jenis jadwal tidak valid' }),
+  kode_jenis: z.enum(KODE_JENIS_VALUES, {
+    errorMap: () => ({ message: 'Kode jenis seminar tidak valid' }),
   }),
   list_dosen: z.array(dosenAssignmentSchema).min(1, 'Minimal 1 dosen penilai'),
 });

@@ -5,6 +5,7 @@ import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
 import DokumenTemplateHandler from './dokumen-template.handler';
 import {
+  getAllDokumenTemplateQuerySchema,
   postDokumenTemplateSchema,
   putDokumenTemplateSchema,
 } from './dokumen-template.validator';
@@ -14,6 +15,7 @@ const dokumenTemplateRoute = new Hono({ router: new RegExpRouter() });
 dokumenTemplateRoute.get(
   '/data-master/dokumen-template',
   AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('query', getAllDokumenTemplateQuerySchema, zodError),
   DokumenTemplateHandler.getAll
 );
 

@@ -1,10 +1,56 @@
 import prisma from '../../infrastructures/db.infrastructure';
 import {
   CreateDokumenTemplateType,
+  DokumenTemplateWithJenisSeminar,
   UpdateDokumenTemplateType,
 } from './dokumen-template.type';
 
 export default class DokumenTemplateRepository {
+  public static async findAllWithJenisSeminar(): Promise<
+    DokumenTemplateWithJenisSeminar[]
+  > {
+    const [templates, requirements, jenisSeminars] = await Promise.all([
+      prisma.dokumen_template.findMany({
+        orderBy: { kode: 'asc' },
+      }),
+      prisma.requirement_dokumen.findMany({
+        orderBy: { urutan: 'asc' },
+      }),
+      prisma.jenis_seminar.findMany({
+        select: { id: true, nama: true, kode: true },
+      }),
+    ]);
+
+    const jenisSeminarById = new Map(
+      jenisSeminars.map((jenisSeminar) => [jenisSeminar.id, jenisSeminar])
+    );
+    const requirementsByTemplate = requirements.reduce(
+      (acc, requirement) => {
+        const jenisSeminar = jenisSeminarById.get(requirement.id_jenis_seminar);
+        if (!jenisSeminar) return acc;
+
+        const items = acc.get(requirement.id_dokumen_template) ?? [];
+        items.push(jenisSeminar);
+        acc.set(requirement.id_dokumen_template, items);
+        return acc;
+      },
+      new Map<string, { id: string; nama: string; kode: string }[]>()
+    );
+
+    return templates.map((template) => ({
+      id: template.id,
+      nama: template.nama,
+      kode: template.kode,
+      deskripsi: template.deskripsi,
+      tipe_input: template.tipe_input,
+      opsi: template.opsi ? (template.opsi as string[]) : null,
+      format_file: template.format_file,
+      max_size_mb: template.max_size_mb,
+      is_special: template.is_special,
+      jenis_seminars: requirementsByTemplate.get(template.id) ?? [],
+    }));
+  }
+
   public static async findAll(onlyAktif: boolean = false) {
     return prisma.dokumen_template.findMany({
       orderBy: { kode: 'asc' },

@@ -1,8 +1,8 @@
 import { Context } from 'hono';
 import JadwalService from '../services/jadwal.service';
 import { APIError } from '../utils/api-error.util';
-import { JenisJadwal, LogActorType } from '@prisma/client';
-import LogJadwalService from '../services/log-jadwal.service';
+import { LogActorType, LogEntityType } from '@prisma/client';
+import LogService from '../services/log.service';
 
 export default class JadwalHandler {
   public static async getMe(c: Context) {
@@ -25,7 +25,7 @@ export default class JadwalHandler {
 
   public static async getAll(c: Context) {
     const { jenis } = c.req.query();
-    return c.json(await JadwalService.getAll(jenis as JenisJadwal));
+    return c.json(await JadwalService.getAll(jenis));
   }
 
   public static async get(c: Context) {
@@ -35,7 +35,12 @@ export default class JadwalHandler {
 
   public static async getLogs(c: Context) {
     const { id } = c.req.param();
-    return c.json(await LogJadwalService.getAll({ jadwal_id: id }));
+    return c.json(
+      await LogService.getAll({
+        entity_type: LogEntityType.JADWAL,
+        entity_id: id,
+      })
+    );
   }
 
   public static async post(c: Context) {

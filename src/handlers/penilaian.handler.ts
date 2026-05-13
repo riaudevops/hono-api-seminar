@@ -1,8 +1,8 @@
 import { Context } from 'hono';
 import PenilaianService from '../services/penilaian.service';
 import { APIError } from '../utils/api-error.util';
-import { LogActorType } from '@prisma/client';
-import LogPenilaianService from '../services/log-penilaian.service';
+import { LogActorType, LogEntityType } from '@prisma/client';
+import LogService from '../services/log.service';
 
 export default class PenilaianHandler {
   public static async getJadwalToAssess(c: Context) {
@@ -28,7 +28,12 @@ export default class PenilaianHandler {
 
   public static async getLogsByJadwal(c: Context) {
     const { id_jadwal } = c.req.param();
-    return c.json(await LogPenilaianService.getAll({ id_jadwal }));
+    return c.json(
+      await LogService.getAll({
+        entity_type: LogEntityType.PENILAIAN,
+        entity_id: id_jadwal,
+      })
+    );
   }
 
   public static async submitPenilaian(c: Context) {

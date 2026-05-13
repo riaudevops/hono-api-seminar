@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { JenisJadwal, LogActionType, LogActorType, StatusJadwalDraft } from '@prisma/client';
+import { LogActionType, LogActorType, StatusJadwalDraft } from '@prisma/client';
 import { APIError } from '../utils/api-error.util';
 import { createLogger } from '../utils/logger.util';
 import { textMessage } from '../utils/openrouter.util';
@@ -15,12 +15,17 @@ import RuanganRepository from '../repositories/ruangan.repository';
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import PenilaianRepository from '../repositories/penilaian.repository';
 import JadwalService from './jadwal.service';
+import LogService from './log.service';
 import JadwalHelper from '../helpers/jadwal.helper';
+import JenisSeminarHelper from '../helpers/jenis-seminar.helper';
 import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
 import RuanganHelper from '../helpers/ruangan.helper';
 import DosenHelper from '../helpers/dosen.helper';
 import { LogJadwalContext } from './jadwal.service';
-import { CreateJadwalDraftInput, UpdateDraftInput } from '../types/jadwal-draft.type';
+import {
+  CreateJadwalDraftInput,
+  UpdateDraftInput,
+} from '../types/jadwal-draft.type';
 
 const logger = createLogger('JadwalDraftService');
 
@@ -43,20 +48,40 @@ function generateBatchId(): string {
 
 export default class JadwalDraftService {
   public static async generate(
-    data: { tanggal_mulai: Date; list_mahasiswa: any[]; catatan_tambahan?: string },
+    data: {
+      tanggal_mulai: Date;
+      list_mahasiswa: Array<{
+        nim: string;
+        kode_jenis: string;
+        list_dosen: { nip: string; role: any }[];
+      }>;
+      catatan_tambahan?: string;
+    },
     context: LogJadwalContext
   ) {
     const batchId = generateBatchId();
 
-    // Validate all mahasiswa and dosen
+    // Resolve kode_jenis → id_jenis_seminar sekali di depan
+    const kodeSet = new Set<string>();
+    for (const mhs of data.list_mahasiswa) kodeSet.add(mhs.kode_jenis);
+    const kodeToId = new Map<string, string>();
+    for (const kode of kodeSet) {
+      kodeToId.set(kode, await JenisSeminarHelper.resolveIdByKode(kode));
+    }
+
+    // Validate mahasiswa + dosen + cek existing jadwal
     const allNips = new Set<string>();
     for (const mhs of data.list_mahasiswa) {
       await JadwalService.validateMahasiswa(mhs.nim);
 
-      const existing = await JadwalRepository.existsByMahasiswaAndJenis(mhs.nim, mhs.jenis);
+      const idJenis = kodeToId.get(mhs.kode_jenis)!;
+      const existing = await JadwalRepository.existsByMahasiswaAndJenis(
+        mhs.nim,
+        idJenis
+      );
       if (existing) {
         throw new APIError(
-          `Mahasiswa ${mhs.nim} sudah memiliki jadwal untuk jenis ${mhs.jenis}`,
+          `Mahasiswa ${mhs.nim} sudah memiliki jadwal untuk jenis ${mhs.kode_jenis}`,
           400
         );
       }
@@ -67,7 +92,6 @@ export default class JadwalDraftService {
       }
     }
 
-    // Gather LLM context
     const tanggalMulai = new Date(data.tanggal_mulai);
     const endDate = new Date(tanggalMulai);
     endDate.setDate(endDate.getDate() + 30);
@@ -80,9 +104,9 @@ export default class JadwalDraftService {
 
     const contextData = {
       tanggal_mulai: tanggalMulai.toISOString().slice(0, 10),
-      list_mahasiswa: data.list_mahasiswa.map((m: any) => ({
+      list_mahasiswa: data.list_mahasiswa.map((m) => ({
         nim: m.nim,
-        jenis: m.jenis,
+        jenis: m.kode_jenis,
         list_dosen: m.list_dosen,
       })),
       ruangan_tersedia: ruanganList.map((r) => ({
@@ -103,7 +127,9 @@ export default class JadwalDraftService {
         dosen_terlibat: j.penilaian?.map((p: any) => p.nip) || [],
       })),
       constraint_dosen: constraintList,
-      ...(data.catatan_tambahan ? { catatan_tambahan: data.catatan_tambahan } : {}),
+      ...(data.catatan_tambahan
+        ? { catatan_tambahan: data.catatan_tambahan }
+        : {}),
     };
 
     logger.info('Generating batch schedule', {
@@ -111,7 +137,6 @@ export default class JadwalDraftService {
       mahasiswaCount: data.list_mahasiswa.length,
     });
 
-    // Call LLM
     const response = await openRouterService.chatCompletion({
       messages: [
         textMessage('system', PERSONA_PROMPT),
@@ -131,7 +156,6 @@ export default class JadwalDraftService {
       );
     }
 
-    // Parse JSON from AI response
     const jsonMatch =
       rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawContent];
     const jsonStr = jsonMatch[1].trim();
@@ -158,32 +182,36 @@ export default class JadwalDraftService {
       );
     }
 
-    // Map suggestions to jadwal_draft records
-    const drafts: CreateJadwalDraftInput[] = result.data.suggestions.map(
-      (s) => {
-        const tanggalStr = `${s.tanggal}T00:00:00.000Z`;
-        const mulaiStr = `${s.tanggal}T${s.waktu_mulai}:00.000Z`;
-        const selesaiStr = `${s.tanggal}T${s.waktu_selesai}:00.000Z`;
+    const drafts: CreateJadwalDraftInput[] = [];
+    for (const s of result.data.suggestions) {
+      const tanggalStr = `${s.tanggal}T00:00:00.000Z`;
+      const mulaiStr = `${s.tanggal}T${s.waktu_mulai}:00.000Z`;
+      const selesaiStr = `${s.tanggal}T${s.waktu_selesai}:00.000Z`;
 
-        const mhsInput = data.list_mahasiswa.find(
-          (m: any) => m.nim === s.nim && m.jenis === s.jenis
-        );
+      const mhsInput = data.list_mahasiswa.find(
+        (m) => m.nim === s.nim && m.kode_jenis === s.jenis
+      );
 
-        return {
-          batch_id: batchId,
-          nim: s.nim,
-          jenis: s.jenis as JenisJadwal,
-          judul: '',
-          tanggal: JadwalHelper.convertFromJakartaTimezone(new Date(tanggalStr)),
-          waktu_mulai: JadwalHelper.convertFromJakartaTimezone(new Date(mulaiStr)),
-          waktu_selesai: JadwalHelper.convertFromJakartaTimezone(new Date(selesaiStr)),
-          kode_ruangan: s.kode_ruangan,
-          list_dosen: mhsInput?.list_dosen || [],
-          llm_reasoning: { reasoning: s.reasoning },
-          confidence: s.confidence,
-        };
-      }
-    );
+      const idJenis =
+        kodeToId.get(s.jenis) ||
+        (await JenisSeminarHelper.resolveIdByKode(s.jenis));
+
+      drafts.push({
+        batch_id: batchId,
+        nim: s.nim,
+        id_jenis_seminar: idJenis,
+        judul: '',
+        tanggal: JadwalHelper.convertFromJakartaTimezone(new Date(tanggalStr)),
+        waktu_mulai: JadwalHelper.convertFromJakartaTimezone(new Date(mulaiStr)),
+        waktu_selesai: JadwalHelper.convertFromJakartaTimezone(
+          new Date(selesaiStr)
+        ),
+        kode_ruangan: s.kode_ruangan,
+        list_dosen: mhsInput?.list_dosen || [],
+        llm_reasoning: { reasoning: s.reasoning },
+        confidence: s.confidence,
+      });
+    }
 
     if (drafts.length === 0) {
       throw new APIError(
@@ -268,14 +296,10 @@ export default class JadwalDraftService {
       updateData.kode_ruangan = data.kode_ruangan;
     }
 
-    // Validate time conflicts if time fields changed
     if (updateData.waktu_mulai || updateData.waktu_selesai) {
-      const mulai =
-        updateData.waktu_mulai || draft.waktu_mulai;
-      const selesai =
-        updateData.waktu_selesai || draft.waktu_selesai;
-      const kodeRuangan =
-        updateData.kode_ruangan || draft.kode_ruangan;
+      const mulai = updateData.waktu_mulai || draft.waktu_mulai;
+      const selesai = updateData.waktu_selesai || draft.waktu_selesai;
+      const kodeRuangan = updateData.kode_ruangan || draft.kode_ruangan;
 
       await RuanganHelper.cekKonflik(kodeRuangan, mulai, selesai);
 
@@ -319,27 +343,26 @@ export default class JadwalDraftService {
     await prisma.$transaction(async (tx) => {
       for (const draft of drafts) {
         try {
-          // Re-validate mahasiswa
           await JadwalService.validateMahasiswa(draft.nim);
 
-          // Re-check no existing jadwal for this jenis
           const exists = await JadwalRepository.existsByMahasiswaAndJenis(
             draft.nim,
-            draft.jenis
+            draft.id_jenis_seminar
           );
           if (exists) {
+            const kode = await JenisSeminarHelper.resolveKodeById(
+              draft.id_jenis_seminar
+            );
             errors.push({
               draft_id: draft.id,
               nim: draft.nim,
-              error: `Mahasiswa ${draft.nim} sudah memiliki jadwal untuk jenis ${draft.jenis}`,
+              error: `Mahasiswa ${draft.nim} sudah memiliki jadwal untuk jenis ${kode}`,
             });
             continue;
           }
 
-          // Validate ruangan
           await JadwalService.validateRuangan(draft.kode_ruangan);
 
-          // Check conflicts
           await RuanganHelper.cekKonflik(
             draft.kode_ruangan,
             draft.waktu_mulai,
@@ -355,8 +378,10 @@ export default class JadwalDraftService {
             );
           }
 
-          // Create jadwal
-          const id = await JadwalHelper.generateId(draft.jenis);
+          const kode = await JenisSeminarHelper.resolveKodeById(
+            draft.id_jenis_seminar
+          );
+          const id = await JadwalHelper.generateId(kode);
           const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
           const jadwal = await tx.jadwal.create({
@@ -366,14 +391,13 @@ export default class JadwalDraftService {
               judul: draft.judul,
               waktu_mulai: draft.waktu_mulai,
               waktu_selesai: draft.waktu_selesai,
-              jenis: draft.jenis,
+              id_jenis_seminar: draft.id_jenis_seminar,
               nim: draft.nim,
               kode_ruangan: draft.kode_ruangan,
               kode_tahun_ajaran,
             },
           });
 
-          // Create penilaian records
           if (listDosen && listDosen.length > 0) {
             for (const d of listDosen) {
               await tx.penilaian.create({
@@ -386,7 +410,6 @@ export default class JadwalDraftService {
             }
           }
 
-          // Create log_jadwal
           const jadwalWithTimezone = {
             ...jadwal,
             waktu_mulai: JadwalHelper.convertToJakartaTimezone(
@@ -397,17 +420,17 @@ export default class JadwalDraftService {
             ),
           };
 
-          await tx.log_jadwal.create({
+          await tx.log.create({
             data: {
               action: LogActionType.CREATE,
               actor_type: LogActorType.KOORDINATOR,
               actor_id: context.actor_id,
-              jadwal_id: id,
+              entity_type: 'JADWAL',
+              entity_id: id,
               new_values: JSON.parse(JSON.stringify(jadwalWithTimezone)),
             },
           });
 
-          // Update draft status
           await tx.jadwal_draft.update({
             where: { id: draft.id },
             data: { status: StatusJadwalDraft.APPROVED },
@@ -417,7 +440,7 @@ export default class JadwalDraftService {
             draft_id: draft.id,
             jadwal_id: id,
             nim: draft.nim,
-            jenis: draft.jenis,
+            id_jenis_seminar: draft.id_jenis_seminar,
           });
         } catch (err: any) {
           errors.push({

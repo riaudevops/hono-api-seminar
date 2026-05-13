@@ -1,5 +1,20 @@
 import prisma from '../infrastructures/db.infrastructure';
-import { JenisJadwal } from '@prisma/client';
+
+const defaultInclude = {
+  mahasiswa: true,
+  ruangan: true,
+  jenis_seminar: true,
+  penilaian: {
+    include: {
+      dosen: true,
+      detail_penilaian: {
+        include: {
+          komponen: true,
+        },
+      },
+    },
+  },
+} as const;
 
 export interface CreateJadwalInput {
   id: string;
@@ -7,7 +22,7 @@ export interface CreateJadwalInput {
   judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
-  jenis: JenisJadwal;
+  id_jenis_seminar: string;
   nim: string;
   kode_ruangan: string;
   kode_tahun_ajaran: string;
@@ -18,74 +33,31 @@ export interface UpdateJadwalInput {
   judul?: string;
   waktu_mulai?: Date;
   waktu_selesai?: Date;
-  jenis?: JenisJadwal;
+  id_jenis_seminar?: string;
   nim?: string;
   kode_ruangan?: string;
 }
 
 export default class JadwalRepository {
-  public static async findAll(jenis?: JenisJadwal) {
+  public static async findAll(id_jenis_seminar?: string) {
     return await prisma.jadwal.findMany({
-      where: jenis ? { jenis } : undefined,
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        penilaian: {
-          include: {
-            dosen: true,
-            detail_penilaian: {
-              include: {
-                komponen: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        tanggal: 'desc',
-      },
+      where: id_jenis_seminar ? { id_jenis_seminar } : undefined,
+      include: defaultInclude,
+      orderBy: { tanggal: 'desc' },
     });
   }
 
   public static async findById(id: string) {
     return await prisma.jadwal.findUnique({
       where: { id },
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        penilaian: {
-          include: {
-            dosen: true,
-            detail_penilaian: {
-              include: {
-                komponen: true,
-              },
-            },
-          },
-        },
-      },
+      include: defaultInclude,
     });
   }
 
   public static async findByMahasiswaEmail(email: string) {
     return await prisma.jadwal.findMany({
-      where: {
-        mahasiswa: { email },
-      },
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        penilaian: {
-          include: {
-            dosen: true,
-            detail_penilaian: {
-              include: {
-                komponen: true,
-              },
-            },
-          },
-        },
-      },
+      where: { mahasiswa: { email } },
+      include: defaultInclude,
     });
   }
 
@@ -93,37 +65,22 @@ export default class JadwalRepository {
     return await prisma.jadwal.findMany({
       where: {
         penilaian: {
-          some: {
-            dosen: { email },
-          },
+          some: { dosen: { email } },
         },
       },
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        penilaian: {
-          include: {
-            dosen: true,
-            detail_penilaian: {
-              include: {
-                komponen: true,
-              },
-            },
-          },
-        },
-      },
+      include: defaultInclude,
     });
   }
 
   public static async existsByMahasiswaAndJenis(
     nim: string,
-    jenis: JenisJadwal,
+    id_jenis_seminar: string,
     excludeId?: string
   ) {
     return await prisma.jadwal.findFirst({
       where: {
         nim,
-        jenis,
+        id_jenis_seminar,
         ...(excludeId && { id: { not: excludeId } }),
       },
       select: { id: true },
@@ -138,7 +95,7 @@ export default class JadwalRepository {
         judul: data.judul,
         waktu_mulai: data.waktu_mulai,
         waktu_selesai: data.waktu_selesai,
-        jenis: data.jenis,
+        id_jenis_seminar: data.id_jenis_seminar,
         nim: data.nim,
         kode_ruangan: data.kode_ruangan,
         kode_tahun_ajaran: data.kode_tahun_ajaran,
@@ -146,6 +103,7 @@ export default class JadwalRepository {
       include: {
         mahasiswa: true,
         ruangan: true,
+        jenis_seminar: true,
       },
     });
   }
@@ -157,28 +115,17 @@ export default class JadwalRepository {
       include: {
         mahasiswa: true,
         ruangan: true,
+        jenis_seminar: true,
         penilaian: true,
       },
     });
   }
 
-  public static async findLastIdByJenis(
-    jenis: JenisJadwal,
-    prefix: string
-  ): Promise<string | null> {
+  public static async findLastIdByPrefix(prefix: string): Promise<string | null> {
     const lastJadwal = await prisma.jadwal.findFirst({
-      where: {
-        jenis,
-        id: {
-          startsWith: prefix,
-        },
-      },
-      orderBy: {
-        id: 'desc',
-      },
-      select: {
-        id: true,
-      },
+      where: { id: { startsWith: prefix } },
+      orderBy: { id: 'desc' },
+      select: { id: true },
     });
     return lastJadwal ? lastJadwal.id : null;
   }
@@ -192,25 +139,18 @@ export default class JadwalRepository {
   public static async findByTanggal(tanggal: Date) {
     const startOfDay = new Date(tanggal);
     startOfDay.setHours(0, 0, 0, 0);
-
     const endOfDay = new Date(tanggal);
     endOfDay.setHours(23, 59, 59, 999);
 
     return await prisma.jadwal.findMany({
       where: {
-        tanggal: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        tanggal: { gte: startOfDay, lte: endOfDay },
       },
       include: {
         mahasiswa: true,
         ruangan: true,
-        penilaian: {
-          include: {
-            dosen: true,
-          },
-        },
+        jenis_seminar: true,
+        penilaian: { include: { dosen: true } },
       },
     });
   }
@@ -218,19 +158,13 @@ export default class JadwalRepository {
   public static async findByDateRange(startDate: Date, endDate: Date) {
     return prisma.jadwal.findMany({
       where: {
-        tanggal: {
-          gte: startDate,
-          lte: endDate,
-        },
+        tanggal: { gte: startDate, lte: endDate },
       },
       include: {
         mahasiswa: true,
         ruangan: true,
-        penilaian: {
-          include: {
-            dosen: true,
-          },
-        },
+        jenis_seminar: true,
+        penilaian: { include: { dosen: true } },
       },
       orderBy: { tanggal: 'asc' },
     });

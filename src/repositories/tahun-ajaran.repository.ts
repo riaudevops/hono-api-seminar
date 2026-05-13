@@ -39,7 +39,7 @@ export default class TahunAjaranRepository {
     const endDate = new Date(year, 11, 31, 23, 59, 59);
 
     const stats = await prisma.jadwal.groupBy({
-      by: ['jenis'],
+      by: ['id_jenis_seminar'],
       where: {
         tanggal: {
           gte: startDate,
@@ -52,7 +52,7 @@ export default class TahunAjaranRepository {
     });
 
     return stats.map((item: any) => ({
-      jenis: item.jenis,
+      id_jenis_seminar: item.id_jenis_seminar,
       count: item._count.id,
     }));
   }

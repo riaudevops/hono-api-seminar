@@ -2,9 +2,9 @@ import PenilaianRepository from '../repositories/penilaian.repository';
 import JadwalRepository from '../repositories/jadwal.repository';
 import { APIError } from '../utils/api-error.util';
 import prisma from '../infrastructures/db.infrastructure';
-import { LogActionType, LogActorType } from '@prisma/client';
+import { LogActionType } from '@prisma/client';
 import { LogJadwalContext } from './jadwal.service';
-import LogPenilaianService from './log-penilaian.service';
+import LogService from './log.service';
 
 export interface SubmitPenilaianItem {
   id_komponen: string;
@@ -12,14 +12,10 @@ export interface SubmitPenilaianItem {
 }
 
 export default class PenilaianService {
-  /**
-   * Mengambil daftar jadwal yang harus dinilai oleh seorang dosen tertentu (untuk Dashboard Dosen)
-   */
   public static async getJadwalToAssess(nip: string) {
     const jadwalPenilaian = await PenilaianRepository.findByDosenNip(nip);
 
     const formattedData = jadwalPenilaian.map((p) => {
-      // Hitung total nilai jika sudah ada penilaian
       let totalNilai = 0;
       let totalPersentase = 0;
 
@@ -52,9 +48,6 @@ export default class PenilaianService {
     };
   }
 
-  /**
-   * Mengambil detail penilaian untuk sebuah jadwal (beserta komponen dan skor saat ini)
-   */
   public static async getNilaiByJadwal(id_jadwal: string) {
     const penilaianList = await PenilaianRepository.findByJadwalId(id_jadwal);
     if (!penilaianList || penilaianList.length === 0) {
@@ -71,16 +64,12 @@ export default class PenilaianService {
     };
   }
 
-  /**
-   * Mengirim (Submit) hasil penilaian dari seorang dosen untuk suatu komponen
-   */
   public static async submitPenilaian(
     id_penilaian: string,
     nip: string,
     details: SubmitPenilaianItem[],
     context: LogJadwalContext
   ) {
-    // 1. Verifikasi Data Penilaian dan Otentikasi
     const penilaian = await PenilaianRepository.findById(id_penilaian);
     if (!penilaian) {
       throw new APIError(
@@ -96,7 +85,6 @@ export default class PenilaianService {
       );
     }
 
-    // 2. Verifikasi Waktu (Seminar harus sudah selesai)
     const jadwal = await JadwalRepository.findById(penilaian.id_jadwal);
     if (!jadwal) {
       throw new APIError(`Data jadwal referensi tidak ditemukan`, 404);
@@ -112,7 +100,6 @@ export default class PenilaianService {
       );
     }
 
-    // 3. Verifikasi Komponen Penilaian (Validasi Role & IsAktif)
     const activeComponents = await prisma.komponen_penilaian.findMany({
       where: { role: penilaian.role, is_aktif: true },
     });
@@ -128,11 +115,9 @@ export default class PenilaianService {
       }
     }
 
-    // 4. Upsert Data (Menyimpan Nilai)
     const transactionResults = await prisma.$transaction(async (tx) => {
       const results = [];
       for (const item of details) {
-        // Ambil old_nilai jika ada untuk keperluan logging
         const existingDetail = await tx.detail_penilaian.findUnique({
           where: {
             id_penilaian_id_komponen: {
@@ -159,7 +144,7 @@ export default class PenilaianService {
           },
         });
 
-        await LogPenilaianService.createWithTransaction(tx, {
+        await LogService.createPenilaianLogTx(tx, {
           action: existingDetail ? LogActionType.UPDATE : LogActionType.CREATE,
           actor_type: context.actor_type,
           actor_id: context.actor_id,

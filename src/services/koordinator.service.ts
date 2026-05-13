@@ -1,20 +1,19 @@
 import prisma from '../infrastructures/db.infrastructure';
 import DosenRepository from '../repositories/dosen.repository';
-import MahasiswaRepository from '../repositories/mahasiswa.repository';
 import JadwalRepository from '../repositories/jadwal.repository';
 import JadwalHelper from '../helpers/jadwal.helper';
 import { APIError } from '../utils/api-error.util';
-import { JenisJadwal, PenilaiRole } from '@prisma/client';
+import { PenilaiRole, LogEntityType } from '@prisma/client';
 
 // ─── Mapping ───────────────────────────────────────────────────────
 
-const JENIS_LABEL: Record<JenisJadwal, { name: string; color: string }> = {
-  [JenisJadwal.SEMKP]: { name: 'Seminar KP', color: '#8b5cf6' },
-  [JenisJadwal.SEMPRO]: { name: 'Seminar Proposal', color: '#3b82f6' },
-  [JenisJadwal.SEMHAS_LAPORAN]: { name: 'Seminar Hasil', color: '#10b981' },
-  [JenisJadwal.SEMHAS_PAPERBASED]: { name: 'Seminar Hasil', color: '#10b981' },
-  [JenisJadwal.SIDANG_LAPORAN]: { name: 'Sidang Akhir', color: '#ef4444' },
-  [JenisJadwal.SIDANG_PAPERBASED]: { name: 'Sidang Akhir', color: '#ef4444' },
+const JENIS_LABEL: Record<string, { name: string; color: string }> = {
+  SEMKP:             { name: 'Seminar KP',      color: '#8b5cf6' },
+  SEMPRO:            { name: 'Seminar Proposal', color: '#3b82f6' },
+  SEMHAS_LAPORAN:    { name: 'Seminar Hasil',    color: '#10b981' },
+  SEMHAS_PAPERBASED: { name: 'Seminar Hasil',    color: '#10b981' },
+  SIDANG_LAPORAN:    { name: 'Sidang Akhir',     color: '#ef4444' },
+  SIDANG_PAPERBASED: { name: 'Sidang Akhir',     color: '#ef4444' },
 };
 
 const BIMBINGAN_ROLES: PenilaiRole[] = [
@@ -23,21 +22,22 @@ const BIMBINGAN_ROLES: PenilaiRole[] = [
   PenilaiRole.TA_PEMBIMBING_2,
 ];
 
-const JENIS_FRONTEND: Record<JenisJadwal, string> = {
-  [JenisJadwal.SEMKP]: 'Seminar KP',
-  [JenisJadwal.SEMPRO]: 'Seminar Proposal',
-  [JenisJadwal.SEMHAS_LAPORAN]: 'Seminar Hasil',
-  [JenisJadwal.SEMHAS_PAPERBASED]: 'Seminar Hasil',
-  [JenisJadwal.SIDANG_LAPORAN]: 'Sidang Akhir',
-  [JenisJadwal.SIDANG_PAPERBASED]: 'Sidang Akhir',
+const JENIS_FRONTEND: Record<string, string> = {
+  SEMKP:             'Seminar KP',
+  SEMPRO:            'Seminar Proposal',
+  SEMHAS_LAPORAN:    'Seminar Hasil',
+  SEMHAS_PAPERBASED: 'Seminar Hasil',
+  SIDANG_LAPORAN:    'Sidang Akhir',
+  SIDANG_PAPERBASED: 'Sidang Akhir',
 };
+
+function jenisKode(jadwal: any): string {
+  return jadwal.jenis_seminar?.kode || '';
+}
 
 // ─── Service ───────────────────────────────────────────────────────
 
 export default class KoordinatorService {
-  /**
-   * #1 GET /api/koordinator/dashboard/stats
-   */
   public static async getDashboardStats() {
     const now = JadwalHelper.getCurrentJakartaTime();
     const startOfDay = new Date(now);
@@ -82,22 +82,17 @@ export default class KoordinatorService {
     };
   }
 
-  /**
-   * #2 GET /api/koordinator/dashboard/semester-stats
-   */
   public static async getSemesterStats() {
-    const jadwalByJenis = await prisma.jadwal.groupBy({
-      by: ['jenis'],
-      _count: { id: true },
+    const jadwalList = await prisma.jadwal.findMany({
+      include: { jenis_seminar: true },
     });
 
-    // Merge SEMHAS_LAPORAN + SEMHAS_PAPERBASED, SIDANG_LAPORAN + SIDANG_PAPERBASED
     const aggregated: Record<string, number> = {};
-    for (const row of jadwalByJenis) {
-      const label = JENIS_LABEL[row.jenis as JenisJadwal];
+    for (const j of jadwalList) {
+      const kode = j.jenis_seminar?.kode || '';
+      const label = JENIS_LABEL[kode];
       if (label) {
-        aggregated[label.name] =
-          (aggregated[label.name] || 0) + row._count.id;
+        aggregated[label.name] = (aggregated[label.name] || 0) + 1;
       }
     }
 
@@ -119,22 +114,13 @@ export default class KoordinatorService {
     };
   }
 
-  /**
-   * #3 GET /api/koordinator/dashboard/recent-activity
-   */
   public static async getRecentActivity() {
     const limit = 10;
 
-    const [logJadwal, logPenilaian] = await Promise.all([
-      prisma.log_jadwal.findMany({
-        take: limit,
-        orderBy: { timestamp: 'desc' },
-      }),
-      prisma.log_penilaian.findMany({
-        take: limit,
-        orderBy: { timestamp: 'desc' },
-      }),
-    ]);
+    const logs = await prisma.log.findMany({
+      take: limit * 2,
+      orderBy: { timestamp: 'desc' },
+    });
 
     const activities: {
       id: string;
@@ -143,8 +129,7 @@ export default class KoordinatorService {
       action: string;
     }[] = [];
 
-    // Process log_jadwal
-    for (const log of logJadwal) {
+    for (const log of logs) {
       let userName = 'Koordinator';
       if (log.actor_type === 'DOSEN') {
         const dosen = await prisma.dosen.findUnique({
@@ -154,36 +139,49 @@ export default class KoordinatorService {
         userName = dosen?.nama || 'Dosen';
       }
 
-      let action = '';
-      const jadwalId = log.jadwal_id;
       const jadwal = await prisma.jadwal.findUnique({
-        where: { id: jadwalId },
-        include: { mahasiswa: true },
+        where: { id: log.entity_id },
+        include: { mahasiswa: true, jenis_seminar: true },
       });
 
       const mhsName = jadwal?.mahasiswa?.nama || 'Mahasiswa';
-      const jenisLabel = jadwal
-        ? JENIS_FRONTEND[jadwal.jenis] || jadwal.jenis
-        : 'seminar';
+      const kode = jadwal?.jenis_seminar?.kode || '';
+      const jenisLabel = JENIS_FRONTEND[kode] || kode || 'seminar';
 
-      switch (log.action) {
-        case 'CREATE':
-          action = `Membuat jadwal ${jenisLabel} ${mhsName}`;
-          break;
-        case 'UPDATE':
-          action = `Mengubah jadwal ${jenisLabel} ${mhsName}`;
-          break;
-        case 'DELETE':
-          action = `Menghapus jadwal ${jenisLabel} ${mhsName}`;
-          break;
-        case 'GANTI_JADWAL':
-          action = `Mengganti jadwal ${jenisLabel} ${mhsName}`;
-          break;
-        case 'GANTI_DOSEN':
-          action = `Mengganti dosen ${jenisLabel} ${mhsName}`;
-          break;
-        default:
-          action = `${log.action} jadwal ${mhsName}`;
+      let action = '';
+      if (log.entity_type === LogEntityType.JADWAL) {
+        switch (log.action) {
+          case 'CREATE':
+            action = `Membuat jadwal ${jenisLabel} ${mhsName}`;
+            break;
+          case 'UPDATE':
+            action = `Mengubah jadwal ${jenisLabel} ${mhsName}`;
+            break;
+          case 'DELETE':
+            action = `Menghapus jadwal ${jenisLabel} ${mhsName}`;
+            break;
+          case 'GANTI_JADWAL':
+            action = `Mengganti jadwal ${jenisLabel} ${mhsName}`;
+            break;
+          case 'GANTI_DOSEN':
+            action = `Mengganti dosen ${jenisLabel} ${mhsName}`;
+            break;
+          default:
+            action = `${log.action} jadwal ${mhsName}`;
+        }
+      } else {
+        const oldNilai = (log.old_values as any)?.nilai ?? null;
+        const newNilai = (log.new_values as any)?.nilai ?? null;
+        switch (log.action) {
+          case 'CREATE':
+            action = `Menilai ${jenisLabel} ${mhsName}`;
+            break;
+          case 'UPDATE':
+            action = `Update nilai ${jenisLabel} ${mhsName} (${oldNilai} → ${newNilai})`;
+            break;
+          default:
+            action = `${log.action} nilai ${mhsName}`;
+        }
       }
 
       activities.push({
@@ -194,48 +192,7 @@ export default class KoordinatorService {
       });
     }
 
-    // Process log_penilaian
-    for (const log of logPenilaian) {
-      const dosen = await prisma.dosen.findUnique({
-        where: { nip: log.actor_id },
-        select: { nama: true },
-      });
-      const userName = dosen?.nama || 'Dosen';
-
-      const jadwal = await prisma.jadwal.findUnique({
-        where: { id: log.id_jadwal },
-        include: { mahasiswa: true },
-      });
-
-      const mhsName = jadwal?.mahasiswa?.nama || 'Mahasiswa';
-      const jenisLabel = jadwal
-        ? JENIS_FRONTEND[jadwal.jenis] || jadwal.jenis
-        : 'seminar';
-
-      let action = '';
-      switch (log.action) {
-        case 'CREATE':
-          action = `Menilai ${jenisLabel} ${mhsName}`;
-          break;
-        case 'UPDATE':
-          action = `Update nilai ${jenisLabel} ${mhsName}`;
-          break;
-        default:
-          action = `${log.action} nilai ${mhsName}`;
-      }
-
-      activities.push({
-        id: log.id,
-        timestamp: log.timestamp,
-        user: userName,
-        action,
-      });
-    }
-
-    // Sort all by timestamp desc and take top 10
-    activities.sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
-    );
+    activities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
     const topActivities = activities.slice(0, limit);
 
     const data = topActivities.map((a) => ({
@@ -252,9 +209,6 @@ export default class KoordinatorService {
     };
   }
 
-  /**
-   * #4 GET /api/koordinator/dashboard/lecturer-workload
-   */
   public static async getLecturerWorkload() {
     const dosenList = await prisma.dosen.findMany({
       select: { nip: true, nama: true },
@@ -294,9 +248,6 @@ export default class KoordinatorService {
     };
   }
 
-  /**
-   * #5 GET /api/koordinator/dosen
-   */
   public static async getDosenList() {
     const dosenList = await prisma.dosen.findMany({
       include: {
@@ -306,7 +257,7 @@ export default class KoordinatorService {
         penilaian: {
           include: {
             jadwal: {
-              include: { mahasiswa: true },
+              include: { mahasiswa: true, jenis_seminar: true },
             },
             detail_penilaian: { select: { id: true } },
           },
@@ -317,17 +268,16 @@ export default class KoordinatorService {
         },
       },
       orderBy: { nama: 'asc' },
-    });
+    }) as any[];
 
     const now = JadwalHelper.getCurrentJakartaTime();
 
-    const data = dosenList.map((dosen) => {
+    const data = dosenList.map((dosen: any) => {
       const specializations = dosen.keahlian_dosen
-        .map((k) => k.bidang_keahlian?.nama)
+        .map((k: any) => k.bidang_keahlian?.nama)
         .filter(Boolean);
       const specialization = specializations.join(', ') || '-';
 
-      // Count bimbingan & uji
       let bimbingan = 0;
       let uji = 0;
       for (const p of dosen.penilaian) {
@@ -336,7 +286,6 @@ export default class KoordinatorService {
       }
 
       const currentLoad = bimbingan + uji;
-
       const status =
         currentLoad / 25 >= 1
           ? 'Busy'
@@ -344,24 +293,24 @@ export default class KoordinatorService {
             ? 'On Leave'
             : 'Available';
 
-      // Upcoming seminars
       const upcomingSeminars = dosen.penilaian
-        .filter((p) => {
+        .filter((p: any) => {
           const waktuMulai = JadwalHelper.convertToJakartaTimezone(
             p.jadwal.waktu_mulai
           );
           return waktuMulai > now;
         })
-        .map((p) => ({
-          title: `${JENIS_FRONTEND[p.jadwal.jenis]} - ${p.jadwal.mahasiswa?.nama || 'Mahasiswa'}`,
-          date: JadwalHelper.convertToJakartaTimezone(
-            p.jadwal.waktu_mulai
-          )
-            .toISOString()
-            .slice(0, 10),
-          type: BIMBINGAN_ROLES.includes(p.role) ? 'bimbingan' : 'uji',
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((p: any) => {
+          const kode = jenisKode(p.jadwal);
+          return {
+            title: `${JENIS_FRONTEND[kode] || kode} - ${p.jadwal.mahasiswa?.nama || 'Mahasiswa'}`,
+            date: JadwalHelper.convertToJakartaTimezone(p.jadwal.waktu_mulai)
+              .toISOString()
+              .slice(0, 10),
+            type: BIMBINGAN_ROLES.includes(p.role) ? 'bimbingan' : 'uji',
+          };
+        })
+        .sort((a: any, b: any) => a.date.localeCompare(b.date))
         .slice(0, 5);
 
       return {
@@ -389,9 +338,6 @@ export default class KoordinatorService {
     };
   }
 
-  /**
-   * #6 GET /api/koordinator/dosen/:nip
-   */
   public static async getDosenDetail(nip: string) {
     const dosen = await prisma.dosen.findUnique({
       where: { nip },
@@ -402,7 +348,7 @@ export default class KoordinatorService {
         penilaian: {
           include: {
             jadwal: {
-              include: { mahasiswa: true },
+              include: { mahasiswa: true, jenis_seminar: true },
             },
             detail_penilaian: { select: { id: true } },
           },
@@ -427,7 +373,6 @@ export default class KoordinatorService {
     }
 
     const currentLoad = bimbingan + uji;
-
     const status =
       currentLoad / 25 >= 1
         ? 'Busy'
@@ -443,13 +388,16 @@ export default class KoordinatorService {
         );
         return waktuMulai > now;
       })
-      .map((p) => ({
-        title: `${JENIS_FRONTEND[p.jadwal.jenis]} - ${p.jadwal.mahasiswa?.nama || 'Mahasiswa'}`,
-        date: JadwalHelper.convertToJakartaTimezone(p.jadwal.waktu_mulai)
-          .toISOString()
-          .slice(0, 10),
-        type: BIMBINGAN_ROLES.includes(p.role) ? 'bimbingan' : 'uji',
-      }))
+      .map((p) => {
+        const kode = jenisKode(p.jadwal);
+        return {
+          title: `${JENIS_FRONTEND[kode] || kode} - ${p.jadwal.mahasiswa?.nama || 'Mahasiswa'}`,
+          date: JadwalHelper.convertToJakartaTimezone(p.jadwal.waktu_mulai)
+            .toISOString()
+            .slice(0, 10),
+          type: BIMBINGAN_ROLES.includes(p.role) ? 'bimbingan' : 'uji',
+        };
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 5);
 
@@ -475,9 +423,6 @@ export default class KoordinatorService {
     };
   }
 
-  /**
-   * #7 GET /api/koordinator/dosen/:nip/aktivitas
-   */
   public static async getDosenAktivitas(nip: string) {
     const dosen = await prisma.dosen.findUnique({
       where: { nip },
@@ -487,17 +432,15 @@ export default class KoordinatorService {
       throw new APIError('Dosen tidak ditemukan', 404);
     }
 
-    // Get all penilaian for this dosen with jadwal info
     const penilaianList = await prisma.penilaian.findMany({
       where: { nip },
       include: {
         jadwal: {
-          include: { mahasiswa: true },
+          include: { mahasiswa: true, jenis_seminar: true },
         },
       },
     });
 
-    // Count roles
     let asPembimbing = 0;
     let asPenguji = 0;
     for (const p of penilaianList) {
@@ -506,35 +449,42 @@ export default class KoordinatorService {
     }
     const totalSeminars = asPembimbing + asPenguji;
 
-    // Seminar type breakdown
-    const jenisCount: Record<string, { count: number; label: string; color: string }> = {};
+    const jenisCount: Record<
+      string,
+      { count: number; label: string; color: string }
+    > = {};
     for (const p of penilaianList) {
       if (p.role === PenilaiRole.KP_INSTANSI) continue;
-      const jenis = p.jadwal.jenis;
-      const label = JENIS_LABEL[jenis as JenisJadwal];
+      const kode = jenisKode(p.jadwal);
+      const label = JENIS_LABEL[kode];
       if (!label) continue;
-      // Merge SEMHAS variants and SIDANG variants into single keys
-      const key = jenis.startsWith('SEMHAS') ? 'SEMHAS' : jenis.startsWith('SIDANG') ? 'SIDANG' : jenis;
+      const key = kode.startsWith('SEMHAS')
+        ? 'SEMHAS'
+        : kode.startsWith('SIDANG')
+          ? 'SIDANG'
+          : kode;
       if (!jenisCount[key]) {
         jenisCount[key] = { count: 0, label: label.name, color: label.color };
       }
       jenisCount[key].count++;
     }
-    const seminarTypeBreakdown = Object.entries(jenisCount).map(([type, v]) => ({
-      type,
-      label: v.label,
-      count: v.count,
-      color: v.color,
-    }));
+    const seminarTypeBreakdown = Object.entries(jenisCount).map(
+      ([type, v]) => ({
+        type,
+        label: v.label,
+        count: v.count,
+        color: v.color,
+      })
+    );
 
-    // Substitution & cancellation history from log_jadwal
     const jadwalIds = penilaianList.map((p) => p.id_jadwal);
 
     const logGantiDosen = jadwalIds.length
-      ? await prisma.log_jadwal.findMany({
+      ? await prisma.log.findMany({
           where: {
             action: { in: ['GANTI_DOSEN', 'DELETE'] },
-            jadwal_id: { in: jadwalIds },
+            entity_type: LogEntityType.JADWAL,
+            entity_id: { in: jadwalIds },
           },
           orderBy: { timestamp: 'desc' },
           take: 20,
@@ -556,11 +506,10 @@ export default class KoordinatorService {
       if (log.action === 'GANTI_DOSEN') {
         substitutions++;
         const myPenilaian = penilaianList.find(
-          (p) => p.id_jadwal === log.jadwal_id
+          (p) => p.id_jadwal === log.entity_id
         );
-        const jenisLabel = myPenilaian
-          ? JENIS_FRONTEND[myPenilaian.jadwal.jenis] || myPenilaian.jadwal.jenis
-          : 'seminar';
+        const kode = myPenilaian ? jenisKode(myPenilaian.jadwal) : '';
+        const jenisLabel = JENIS_FRONTEND[kode] || kode || 'seminar';
         const myRole = myPenilaian
           ? BIMBINGAN_ROLES.includes(myPenilaian.role)
             ? 'pembimbing'
@@ -569,9 +518,7 @@ export default class KoordinatorService {
         const newVals = (log.new_values || {}) as Record<string, unknown>;
         const oldVals = (log.old_values || {}) as Record<string, unknown>;
         const reason =
-          (newVals.reason as string) ||
-          (oldVals.reason as string) ||
-          '-';
+          (newVals.reason as string) || (oldVals.reason as string) || '-';
         const replacedByName =
           (newVals.replaced_by_name as string) ||
           (newVals.new_dosen_name as string) ||

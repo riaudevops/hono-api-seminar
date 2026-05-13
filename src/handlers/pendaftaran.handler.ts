@@ -31,20 +31,20 @@ export default class PendaftaranHandler {
 
   public static async createByMahasiswa(c: Context) {
     const { email } = c.get('user');
-    const data = c.req.valid('json');
+    const data = await c.req.json();
     return c.json(await PendaftaranService.createByEmail(email, data), 201);
   }
 
   public static async updateByMahasiswa(c: Context) {
     const { id } = c.req.param();
     const { email } = c.get('user');
-    const data = c.req.valid('json');
+    const data = await c.req.json();
     return c.json(await PendaftaranService.updateByEmail(email, id, data));
   }
 
   public static async validateBerkas(c: Context) {
     const { id } = c.req.param();
-    const data = c.req.valid('json');
+    const data = await c.req.json();
     return c.json(await PendaftaranService.validateBerkas(id, data));
   }
 }

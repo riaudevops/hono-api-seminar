@@ -47,9 +47,9 @@ dosenSeminarRoute.post(
   DosenSeminarHandler.submitNilai
 );
 
-// #6 GET /dosen/log-penilaian
+// #6 GET /dosen/log
 dosenSeminarRoute.get(
-  '/dosen/log-penilaian',
+  '/dosen/log',
   AuthMiddleware.JWTBearerTokenExtraction,
   DosenSeminarHandler.getLogPenilaian
 );

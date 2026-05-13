@@ -3,29 +3,30 @@ import KomponenPenilaianRepository from '../repositories/komponen-penilaian.repo
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import DosenRepository from '../repositories/dosen.repository';
 import JadwalRepository from '../repositories/jadwal.repository';
-import LogPenilaianService from './log-penilaian.service';
+import LogService from './log.service';
+import LogRepository from '../repositories/log.repository';
 import JadwalHelper from '../helpers/jadwal.helper';
 import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
 import { APIError } from '../utils/api-error.util';
 import prisma from '../infrastructures/db.infrastructure';
 import {
-  JenisJadwal,
   PenilaiRole,
   LogActionType,
   LogActorType,
+  LogEntityType,
   ConstraintType,
   Prisma,
 } from '@prisma/client';
 
 // ─── Mapping helpers ───────────────────────────────────────────────
 
-const JENIS_TO_FRONTEND: Record<JenisJadwal, string> = {
-  [JenisJadwal.SEMKP]: 'KP',
-  [JenisJadwal.SEMPRO]: 'PROPOSAL',
-  [JenisJadwal.SEMHAS_LAPORAN]: 'HASIL',
-  [JenisJadwal.SEMHAS_PAPERBASED]: 'HASIL',
-  [JenisJadwal.SIDANG_LAPORAN]: 'SIDANG_AKHIR',
-  [JenisJadwal.SIDANG_PAPERBASED]: 'SIDANG_AKHIR',
+const KODE_TO_FRONTEND: Record<string, string> = {
+  SEMKP: 'KP',
+  SEMPRO: 'PROPOSAL',
+  SEMHAS_LAPORAN: 'HASIL',
+  SEMHAS_PAPERBASED: 'HASIL',
+  SIDANG_LAPORAN: 'SIDANG_AKHIR',
+  SIDANG_PAPERBASED: 'SIDANG_AKHIR',
 };
 
 const ROLE_TO_FRONTEND: Record<PenilaiRole, string> = {
@@ -63,10 +64,7 @@ function computeAngkatan(nim: string): number {
   return parseInt(`20${nim.slice(1, 3)}`);
 }
 
-function computeStatusJadwal(
-  waktuMulai: Date,
-  waktuSelesai: Date
-): string {
+function computeStatusJadwal(waktuMulai: Date, waktuSelesai: Date): string {
   const now = JadwalHelper.getCurrentJakartaTime();
   const mulai = JadwalHelper.convertToJakartaTimezone(waktuMulai);
   const selesai = JadwalHelper.convertToJakartaTimezone(waktuSelesai);
@@ -76,24 +74,26 @@ function computeStatusJadwal(
   return 'SELESAI';
 }
 
+function jenisKodeFromJadwal(j: any): string {
+  // jadwal now includes relation jenis_seminar
+  return j.jenis_seminar?.kode || '';
+}
+
 // ─── Service ───────────────────────────────────────────────────────
 
 export default class DosenSeminarService {
-  /**
-   * #1 GET /api/dosen/seminar/jadwal
-   */
   public static async getJadwalSeminar(nip: string) {
     const penilaianList = await PenilaianRepository.findByDosenNip(nip);
 
     const data = penilaianList.map((p) => {
-      const j = p.jadwal;
+      const j: any = p.jadwal;
       const m = j.mahasiswa;
       const r = j.ruangan;
 
       const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
-      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
-        j.waktu_selesai
-      );
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(j.waktu_selesai);
+
+      const kode = jenisKodeFromJadwal(j);
 
       return {
         id: j.id,
@@ -114,7 +114,7 @@ export default class DosenSeminarService {
           semester: computeSemester(m.nim),
           angkatan: computeAngkatan(m.nim),
         },
-        jenis_seminar: JENIS_TO_FRONTEND[j.jenis],
+        jenis_seminar: KODE_TO_FRONTEND[kode] || kode,
         status: computeStatusJadwal(j.waktu_mulai, j.waktu_selesai),
         peran_dosen: ROLE_TO_FRONTEND[p.role as PenilaiRole],
       };
@@ -127,9 +127,6 @@ export default class DosenSeminarService {
     };
   }
 
-  /**
-   * #2 GET /api/dosen/seminar/stats
-   */
   public static async getStats(nip: string) {
     const dosen = await DosenRepository.findByNip(nip);
     if (!dosen) {
@@ -154,16 +151,13 @@ export default class DosenSeminarService {
       if (BIMBINGAN_ROLES.includes(role)) total_bimbingan++;
       if (MENGUIJI_ROLES.includes(role)) total_menguji++;
 
-      const hasNilai =
-        p.detail_penilaian && p.detail_penilaian.length > 0;
+      const hasNilai = p.detail_penilaian && p.detail_penilaian.length > 0;
       if (hasNilai) sudah_dinilai++;
       else belum_dinilai++;
 
-      const j = p.jadwal;
+      const j: any = p.jadwal;
       const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
-      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
-        j.waktu_selesai
-      );
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(j.waktu_selesai);
       const jadwalDateStr = waktuMulai.toISOString().slice(0, 10);
 
       if (jadwalDateStr === todayStr) {
@@ -171,8 +165,9 @@ export default class DosenSeminarService {
       }
 
       if (waktuMulai > now && !upcomingJadwal) {
+        const kode = jenisKodeFromJadwal(j);
         upcomingJadwal = {
-          jenis_seminar: JENIS_TO_FRONTEND[j.jenis],
+          jenis_seminar: KODE_TO_FRONTEND[kode] || kode,
           mahasiswa_nama: j.mahasiswa.nama,
           tanggal: jadwalDateStr,
           jam_mulai: waktuMulai.toISOString().slice(11, 16),
@@ -182,7 +177,6 @@ export default class DosenSeminarService {
       }
     }
 
-    // Compute semester string
     const kodeTahunAjaran = TahunAjaranHelper.findSekarang();
     const semester = TahunAjaranHelper.parseStringNameByCode(kodeTahunAjaran);
 
@@ -202,9 +196,6 @@ export default class DosenSeminarService {
     };
   }
 
-  /**
-   * #3 GET /api/dosen/seminar/komponen-penilaian
-   */
   public static async getKomponenPenilaian() {
     const komponenList = await KomponenPenilaianRepository.findAktif();
 
@@ -214,7 +205,7 @@ export default class DosenSeminarService {
       bobot_persen: k.persentase,
       peran_penilai: [ROLE_TO_FRONTEND[k.role as PenilaiRole]],
       is_aktif: k.is_aktif,
-      deskripsi: '', // not in schema
+      deskripsi: '',
     }));
 
     return {
@@ -224,9 +215,6 @@ export default class DosenSeminarService {
     };
   }
 
-  /**
-   * #4 GET /api/dosen/seminar/penilaian?jadwal_id=
-   */
   public static async getPenilaianByJadwal(jadwal_id: string) {
     const penilaianList = await PenilaianRepository.findByJadwalId(jadwal_id);
     if (!penilaianList || penilaianList.length === 0) {
@@ -255,9 +243,6 @@ export default class DosenSeminarService {
     };
   }
 
-  /**
-   * #5 POST /api/dosen/seminar/penilaian
-   */
   public static async submitNilai(
     nip: string,
     body: {
@@ -272,7 +257,6 @@ export default class DosenSeminarService {
   ) {
     const { jadwal_id, penilaian } = body;
 
-    // Verify all items belong to the same dosen
     for (const item of penilaian) {
       if (item.dosen_nip !== nip) {
         throw new APIError(
@@ -282,13 +266,11 @@ export default class DosenSeminarService {
       }
     }
 
-    // Verify jadwal exists
     const jadwal = await JadwalRepository.findById(jadwal_id);
     if (!jadwal) {
       throw new APIError(`Jadwal dengan ID ${jadwal_id} tidak ditemukan`, 404);
     }
 
-    // Verify seminar has ended
     const now = JadwalHelper.getCurrentJakartaTime();
     const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
       jadwal.waktu_selesai
@@ -300,7 +282,6 @@ export default class DosenSeminarService {
       );
     }
 
-    // Verify dosen is assigned to this jadwal
     const penilaianRecord = await PenilaianRepository.findByJadwalAndDosen(
       jadwal_id,
       nip
@@ -312,7 +293,6 @@ export default class DosenSeminarService {
       );
     }
 
-    // Get active components for this role
     const activeComponents = await prisma.komponen_penilaian.findMany({
       where: { role: penilaianRecord.role, is_aktif: true },
     });
@@ -327,7 +307,6 @@ export default class DosenSeminarService {
       }
     }
 
-    // Upsert in transaction
     const context = {
       actor_id: nip,
       actor_type: LogActorType.DOSEN,
@@ -359,7 +338,7 @@ export default class DosenSeminarService {
           },
         });
 
-        await LogPenilaianService.createWithTransaction(tx, {
+        await LogService.createPenilaianLogTx(tx, {
           action: existingDetail
             ? LogActionType.UPDATE
             : LogActionType.CREATE,
@@ -373,12 +352,9 @@ export default class DosenSeminarService {
       }
     });
 
-    // Calculate weighted total
     let total_nilai_weighted = 0;
     for (const item of penilaian) {
-      const komponen = activeComponents.find(
-        (c) => c.id === item.komponen_id
-      );
+      const komponen = activeComponents.find((c) => c.id === item.komponen_id);
       if (komponen) {
         total_nilai_weighted += item.nilai * (komponen.persentase / 100);
       }
@@ -391,33 +367,32 @@ export default class DosenSeminarService {
         jadwal_id,
         dosen_nip: nip,
         submitted_at: new Date().toISOString(),
-        total_nilai_weighted:
-          Math.round(total_nilai_weighted * 100) / 100,
+        total_nilai_weighted: Math.round(total_nilai_weighted * 100) / 100,
       },
     };
   }
 
-  /**
-   * #6 GET /api/dosen/seminar/log-penilaian
-   */
   public static async getLogPenilaian(nip: string) {
     const dosen = await DosenRepository.findByNip(nip);
     if (!dosen) {
       throw new APIError('Data dosen tidak ditemukan', 404);
     }
 
-    const result = await LogPenilaianService.getAll({ actor_id: nip });
+    const logs = await LogRepository.findByFilters({
+      actor_id: nip,
+      entity_type: LogEntityType.PENILAIAN,
+    });
 
-    // Enrich with jadwal/mahasiswa data and format
     const enrichedData = await Promise.all(
-      (result.data || []).map(async (log: any) => {
-        const jadwal = await JadwalRepository.findById(log.id_jadwal);
+      logs.map(async (log) => {
+        const jadwal = await JadwalRepository.findById(log.entity_id);
         let mahasiswa_nama = '-';
         let jenis_jadwal = '-';
 
         if (jadwal) {
-          mahasiswa_nama = jadwal.mahasiswa?.nama || '-';
-          jenis_jadwal = JENIS_TO_FRONTEND[jadwal.jenis] || '-';
+          mahasiswa_nama = (jadwal as any).mahasiswa?.nama || '-';
+          const kode = (jadwal as any).jenis_seminar?.kode || '';
+          jenis_jadwal = KODE_TO_FRONTEND[kode] || kode || '-';
         }
 
         const aksiMap: Record<string, string> = {
@@ -426,6 +401,9 @@ export default class DosenSeminarService {
           DELETE: 'SUBMIT_NILAI',
         };
 
+        const oldNilai = (log.old_values as any)?.nilai ?? null;
+        const newNilai = (log.new_values as any)?.nilai ?? null;
+
         return {
           id: log.id,
           timestamp: log.timestamp,
@@ -433,7 +411,7 @@ export default class DosenSeminarService {
           mahasiswa_nama,
           jenis_jadwal,
           aksi: aksiMap[log.action] || log.action,
-          detail: `Nilai ${log.old_nilai != null ? `diubah dari ${log.old_nilai} ke ${log.new_nilai}` : `diinput: ${log.new_nilai}`}`,
+          detail: `Nilai ${oldNilai != null ? `diubah dari ${oldNilai} ke ${newNilai}` : `diinput: ${newNilai}`}`,
         };
       })
     );
@@ -445,9 +423,6 @@ export default class DosenSeminarService {
     };
   }
 
-  /**
-   * #7 GET /api/dosen/constraints
-   */
   public static async getConstraints(nip: string) {
     const constraints = await ConstraintDosenRepository.findByNip(nip);
 
@@ -480,9 +455,6 @@ export default class DosenSeminarService {
     };
   }
 
-  /**
-   * #8 POST /api/dosen/constraints
-   */
   public static async createConstraint(
     nip: string,
     data: {

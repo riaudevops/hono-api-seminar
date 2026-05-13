@@ -1,43 +1,25 @@
-import { LogActionType, LogActorType, Prisma } from '@prisma/client';
+import { LogActionType, LogActorType, LogEntityType, Prisma } from '@prisma/client';
 
-export interface LogJadwalType {
+export interface LogType {
   id: string;
   timestamp: Date;
   action: LogActionType;
   actor_type: LogActorType;
   actor_id: string;
-  jadwal_id: string;
+  entity_type: LogEntityType;
+  entity_id: string;
+  context: Prisma.JsonValue | null;
   old_values: Prisma.JsonValue | null;
   new_values: Prisma.JsonValue | null;
 }
 
-export interface CreateLogJadwalType {
+export interface CreateLogType {
   action: LogActionType;
   actor_type: LogActorType;
   actor_id: string;
-  jadwal_id: string;
+  entity_type: LogEntityType;
+  entity_id: string;
+  context?: Prisma.InputJsonValue;
   old_values?: Prisma.InputJsonValue;
   new_values?: Prisma.InputJsonValue;
-}
-
-export interface LogPenilaianType {
-  id: string;
-  timestamp: Date;
-  action: LogActionType;
-  actor_type: LogActorType;
-  actor_id: string;
-  id_jadwal: string;
-  id_komponen_penilaian: string;
-  old_nilai: number | null;
-  new_nilai: number | null;
-}
-
-export interface CreateLogPenilaianType {
-  action: LogActionType;
-  actor_type: LogActorType;
-  actor_id: string;
-  id_jadwal: string;
-  id_komponen_penilaian: string;
-  old_nilai?: number;
-  new_nilai?: number;
 }

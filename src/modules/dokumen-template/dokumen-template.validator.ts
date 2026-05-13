@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export const getAllDokumenTemplateQuerySchema = z.object({
+  jenis_seminar: z.string().optional(),
+  q: z.string().optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+});
+
 const namaSchema = z
   .string()
   .min(1, 'Nama dokumen tidak boleh kosong')
@@ -16,7 +23,7 @@ const kodeSchema = z
     message: 'Kode dokumen harus huruf besar semua',
   });
 
-const deskripsiSchema = z.string().max(1000).optional();
+const deskripsiSchema = z.string().max(1000).nullable().optional();
 
 const tipeInputSchema = z.enum([
   'FILE_UPLOAD',
@@ -28,14 +35,15 @@ const tipeInputSchema = z.enum([
   'MULTI_SELECT',
 ]);
 
-const opsiSchema = z.array(z.string()).optional();
+const opsiSchema = z.array(z.string()).nullable().optional();
 
 const formatFileSchema = z
   .string()
   .max(50, 'Format file maksimal 50 karakter')
+  .nullable()
   .optional();
 
-const maxSizeMbSchema = z.number().int().min(1).max(100).optional();
+const maxSizeMbSchema = z.number().int().min(1).max(100).nullable().optional();
 
 export const postDokumenTemplateSchema = z.object({
   nama: namaSchema,

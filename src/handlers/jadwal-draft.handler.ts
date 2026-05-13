@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import JadwalDraftService from '../services/jadwal-draft.service';
 import { APIError } from '../utils/api-error.util';
-import { LogActorType } from '@prisma/client';
+import { LogActorType, StatusJadwalDraft } from '@prisma/client';
 
 function extractContext(c: Context) {
   const userPayload = c.get('user');
@@ -31,12 +31,11 @@ export default class JadwalDraftHandler {
   }
 
   public static async getDrafts(c: Context) {
-    const validated = c.req.valid('query');
+    const batch_id = c.req.query('batch_id');
+    const statusRaw = c.req.query('status');
+    const status = statusRaw as StatusJadwalDraft | undefined;
     return c.json(
-      await JadwalDraftService.getDrafts({
-        batch_id: validated.batch_id,
-        status: validated.status,
-      })
+      await JadwalDraftService.getDrafts({ batch_id, status })
     );
   }
 
