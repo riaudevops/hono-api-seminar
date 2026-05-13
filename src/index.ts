@@ -24,6 +24,7 @@ import koordinatorRoute from './routes/koordinator.route';
 import pendaftaranRoute from './routes/pendaftaran.route';
 import { JenisSeminarRoute } from './modules/jenis-seminar';
 import { DokumenTemplateRoute } from './modules/dokumen-template';
+import { RequirementDokumenRoute } from './modules/requirement-dokumen';
 import { MahasiswaModuleRoute } from './modules/mahasiswa';
 
 const logger = createLogger('Server');
@@ -93,6 +94,7 @@ app.route('/api', koordinatorRoute);
 app.route('/api', pendaftaranRoute);
 app.route('/api', JenisSeminarRoute);
 app.route('/api', DokumenTemplateRoute);
+app.route('/api', RequirementDokumenRoute);
 app.route('/api', MahasiswaModuleRoute);
 
 // Graceful shutdown handlers
