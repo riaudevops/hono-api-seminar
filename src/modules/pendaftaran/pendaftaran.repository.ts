@@ -15,6 +15,142 @@ interface CreatePendaftaranInput extends CreatePendaftaranByMahasiswaType {
   tahun_ajaran: string;
 }
 
+// Map TipeInputDokumen enum to the correct nilai_* column
+function mapNilaiByTipe(
+  tipe: string,
+  value: string | boolean | string[] | null
+): {
+  nilai_text: string | null;
+  nilai_file_url: string | null;
+  nilai_boolean: boolean | null;
+  nilai_date: Date | null;
+  nilai_json: unknown | null;
+} {
+  switch (tipe) {
+    case 'TEXT':
+    case 'SELECT':
+      return {
+        nilai_text: typeof value === 'string' ? value : null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+    case 'FILE_UPLOAD':
+    case 'URL':
+      return {
+        nilai_text: null,
+        nilai_file_url: typeof value === 'string' ? value : null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+    case 'BOOLEAN':
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: typeof value === 'boolean' ? value : null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+    case 'DATE':
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date:
+          value !== null && typeof value === 'string'
+            ? new Date(value)
+            : null,
+        nilai_json: null,
+      };
+    case 'MULTI_SELECT':
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: Array.isArray(value) ? value : null,
+      };
+    default:
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+  }
+}
+
+// Map TipeInputDokumen enum to the correct nilai_* column
+function mapNilaiByTipe(
+  tipe: string,
+  value: string | boolean | string[] | null
+): {
+  nilai_text: string | null;
+  nilai_file_url: string | null;
+  nilai_boolean: boolean | null;
+  nilai_date: Date | null;
+  nilai_json: unknown | null;
+} {
+  switch (tipe) {
+    case 'TEXT':
+    case 'SELECT':
+      return {
+        nilai_text: typeof value === 'string' ? value : null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+    case 'FILE_UPLOAD':
+    case 'URL':
+      return {
+        nilai_text: null,
+        nilai_file_url: typeof value === 'string' ? value : null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+    case 'BOOLEAN':
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: typeof value === 'boolean' ? value : null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+    case 'DATE':
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date:
+          value !== null && typeof value === 'string'
+            ? new Date(value)
+            : null,
+        nilai_json: null,
+      };
+    case 'MULTI_SELECT':
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: Array.isArray(value) ? value : null,
+      };
+    default:
+      return {
+        nilai_text: null,
+        nilai_file_url: null,
+        nilai_boolean: null,
+        nilai_date: null,
+        nilai_json: null,
+      };
+  }
+}
+
 export default class PendaftaranRepository {
   public static async findAllWithRelations(): Promise<
     PendaftaranWithDataDokumen[]
@@ -136,15 +272,27 @@ export default class PendaftaranRepository {
 
       const requirements = await tx.requirement_dokumen.findMany({
         where: { id_jenis_seminar: data.id_jenis_seminar },
-        select: { id_dokumen_template: true },
+        select: {
+          id_dokumen_template: true,
+          dokumen_template: {
+            select: { kode: true, tipe_input: true },
+          },
+        },
       });
 
       if (requirements.length > 0) {
+        const dokumenPayload = data.dokumen ?? {};
         await tx.data_pendaftaran.createMany({
-          data: requirements.map((requirement) => ({
-            id_pendaftaran: pendaftaran.id,
-            id_dokumen_template: requirement.id_dokumen_template,
-          })),
+          data: requirements.map((requirement) => {
+            const tpl = requirement.dokumen_template;
+            const value = dokumenPayload[tpl.kode] ?? null;
+            const nilai = mapNilaiByTipe(tpl.tipe_input, value);
+            return {
+              id_pendaftaran: pendaftaran.id,
+              id_dokumen_template: requirement.id_dokumen_template,
+              ...nilai,
+            };
+          }),
         });
       }
 

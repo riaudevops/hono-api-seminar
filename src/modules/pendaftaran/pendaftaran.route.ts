@@ -19,21 +19,18 @@ const pendaftaranRoute = new Hono({ router: new RegExpRouter() });
 pendaftaranRoute.get(
   '/mahasiswa/pendaftaran-saya',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('mahasiswa'),
   PendaftaranHandler.getMyAll
 );
 
 pendaftaranRoute.get(
   '/mahasiswa/pendaftaran-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('mahasiswa'),
   PendaftaranHandler.getMyById
 );
 
 pendaftaranRoute.post(
   '/mahasiswa/pendaftaran-saya',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('mahasiswa'),
   zValidator('json', postPendaftaranMahasiswaSchema, zodError),
   PendaftaranHandler.createByMahasiswa
 );
@@ -41,7 +38,6 @@ pendaftaranRoute.post(
 pendaftaranRoute.put(
   '/mahasiswa/pendaftaran-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('mahasiswa'),
   zValidator('json', putPendaftaranMahasiswaSchema, zodError),
   PendaftaranHandler.updateByMahasiswa
 );
@@ -52,7 +48,6 @@ pendaftaranRoute.put(
 pendaftaranRoute.get(
   '/koordinator/pendaftaran',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('koordinator'),
   zValidator('query', getAllPendaftaranQuerySchema, zodError),
   PendaftaranHandler.getAll
 );
@@ -60,14 +55,12 @@ pendaftaranRoute.get(
 pendaftaranRoute.get(
   '/koordinator/pendaftaran/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('koordinator'),
   PendaftaranHandler.getById
 );
 
 pendaftaranRoute.patch(
   '/koordinator/pendaftaran/:id/validasi',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('koordinator'),
   zValidator('json', patchStatusBerkasSchema, zodError),
   PendaftaranHandler.validateBerkas
 );
@@ -75,7 +68,6 @@ pendaftaranRoute.patch(
 pendaftaranRoute.delete(
   '/koordinator/pendaftaran/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('koordinator'),
   PendaftaranHandler.delete
 );
 

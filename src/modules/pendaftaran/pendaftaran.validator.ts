@@ -35,6 +35,16 @@ const nipNullableSchema = z
   .nullable()
   .optional();
 
+const dokumenNilaiSchema: z.ZodType = z.record(
+  z.string(),
+  z.union([
+    z.string(),
+    z.boolean(),
+    z.array(z.string()),
+    z.null(),
+  ])
+);
+
 const uniqueNipRefinement = (data: {
   nip_pembimbing_1?: string | null;
   nip_pembimbing_2?: string | null;
@@ -62,6 +72,7 @@ export const postPendaftaranMahasiswaSchema = z
     nip_penguji_1: nipNullableSchema,
     nip_penguji_2: nipNullableSchema,
     nip_ketua_sidang: nipNullableSchema,
+    dokumen: dokumenNilaiSchema.optional(),
   })
   .refine(uniqueNipRefinement, {
     message: 'NIP pembimbing, penguji, dan ketua sidang tidak boleh sama',

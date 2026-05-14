@@ -35,7 +35,11 @@ export interface PendaftaranWithRelations extends PendaftaranType {
 
 export type GetAllPendaftaranResponse = PaginatedResponse<PendaftaranWithDataDokumen>;
 
-// Mahasiswa create — NIM ditentukan dari JWT, bukan dari body
+export type DokumenNilaiPayload = Record<
+  string,
+  string | boolean | string[] | null
+>;
+
 export interface CreatePendaftaranByMahasiswaType {
   id_pengajuan_fst: string;
   id_jenis_seminar: string;
@@ -44,6 +48,7 @@ export interface CreatePendaftaranByMahasiswaType {
   nip_penguji_1?: string | null;
   nip_penguji_2?: string | null;
   nip_ketua_sidang?: string | null;
+  dokumen?: DokumenNilaiPayload;
 }
 
 // Mahasiswa update — field yang boleh direvisi mahasiswa
