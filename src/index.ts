@@ -21,10 +21,10 @@ import keahlianDosenRoute from './routes/keahlian-dosen.route';
 import logRoute from './routes/log.route';
 import dosenSeminarRoute from './routes/dosen-seminar.route';
 import koordinatorRoute from './routes/koordinator.route';
-import pendaftaranRoute from './routes/pendaftaran.route';
 import { JenisSeminarRoute } from './modules/jenis-seminar';
 import { DokumenTemplateRoute } from './modules/dokumen-template';
 import { RequirementDokumenRoute } from './modules/requirement-dokumen';
+import { PendaftaranModuleRoute } from './modules/pendaftaran';
 import { MahasiswaModuleRoute } from './modules/mahasiswa';
 
 const logger = createLogger('Server');
@@ -91,10 +91,10 @@ app.route('/api', keahlianDosenRoute);
 app.route('/api', logRoute);
 app.route('/api', dosenSeminarRoute);
 app.route('/api', koordinatorRoute);
-app.route('/api', pendaftaranRoute);
 app.route('/api', JenisSeminarRoute);
 app.route('/api', DokumenTemplateRoute);
 app.route('/api', RequirementDokumenRoute);
+app.route('/api', PendaftaranModuleRoute);
 app.route('/api', MahasiswaModuleRoute);
 
 // Graceful shutdown handlers

@@ -1,6 +1,5 @@
 import Fuse from 'fuse.js';
 import MahasiswaRepository from '../repositories/mahasiswa.repository';
-import PendaftaranRepository from '../repositories/pendaftaran.repository';
 import { APIError } from '../utils/api-error.util';
 
 function getCurrentAcademicInfo() {
@@ -268,53 +267,6 @@ export default class MahasiswaService {
     return result;
   }
 
-  public static async getPendaftaranSaya(email: string) {
-    const mahasiswa = await MahasiswaRepository.findByEmail(email);
-    if (!mahasiswa) {
-      throw new APIError('Data mahasiswa tidak ditemukan.', 404);
-    }
-
-    const pendaftaran = await PendaftaranRepository.findByNIMWithDosenNames(mahasiswa.nim) as any[];
-
-    // Transform response to structure dosen data as objects
-    const transformedData = pendaftaran.map((p: any) => ({
-      id: p.id,
-      nim: p.nim,
-      nama: p.nama,
-      semester: p.semester,
-      id_pengajuan_fst: p.id_pengajuan_fst,
-      no_wa: p.no_wa,
-      jenis_seminar: p.jenis_seminar,
-      judul: p.judul,
-      pembimbing_1: {
-        nip: p.nip_pembimbing_1,
-        nama: p.nama_pembimbing_1,
-      },
-      pembimbing_2: p.nip_pembimbing_2 ? {
-        nip: p.nip_pembimbing_2,
-        nama: p.nama_pembimbing_2,
-      } : null,
-      penguji_1: {
-        nip: p.nip_penguji_1,
-        nama: p.nama_penguji_1,
-      },
-      penguji_2: {
-        nip: p.nip_penguji_2,
-        nama: p.nama_penguji_2,
-      },
-      mata_kuliah_pilihan: p.mata_kuliah_pilihan,
-      berkas_syarat_url: p.berkas_syarat_url,
-      undangan_sebelumnya_url: p.undangan_sebelumnya_url,
-      status_berkas: p.status_berkas,
-      created_at: p.created_at,
-    }));
-
-    return {
-      response: true,
-      message: 'Data pendaftaran berhasil diambil.',
-      data: transformedData,
-    };
-  }
 
   public static async getAngkatanList() {
     const angkatanList = await MahasiswaRepository.findAngkatanFromSheet();
