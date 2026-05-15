@@ -25,10 +25,5 @@ mahasiswaRoute.get(
   AuthMiddleware.JWTBearerTokenExtraction,
   MahasiswaHandler.getAngkatanList
 );
-mahasiswaRoute.post(
-  '/spreadsheet/refresh',
-  AuthMiddleware.JWTBearerTokenExtraction,
-  MahasiswaHandler.refreshSpreadsheet
-);
 
 export default mahasiswaRoute;

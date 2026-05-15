@@ -91,9 +91,6 @@ const envSchema = z.object({
   // Webhook Configuration
   WEBHOOK_SECRET: z.string().default('change-this-webhook-secret'),
 
-  // Spreadsheet Configuration
-  SPREADSHEET_KEY: z.string().optional(),
-  SPREADSHEET_GID: z.string().default('0'),
 
   // OpenRouter Configuration
   OPENROUTER_API_KEY: z.string().optional(),

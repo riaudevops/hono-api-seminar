@@ -1,7 +1,6 @@
 import { Context } from 'hono';
 import { APIError } from '../utils/api-error.util';
 import MahasiswaService from '../services/mahasiswa.service';
-import { spssInfrastructure } from '../infrastructures/spss.infrastructure';
 
 export default class MahasiswaHandler {
   public static async getMe(c: Context) {
@@ -42,16 +41,5 @@ export default class MahasiswaHandler {
 
   public static async getAngkatanList(c: Context) {
     return c.json(await MahasiswaService.getAngkatanList());
-  }
-
-
-  public static async refreshSpreadsheet(c: Context) {
-    spssInfrastructure.clearCache();
-    const freshData = await spssInfrastructure.getDataMahasiswa();
-    return c.json({
-      response: true,
-      message: `Cache spreadsheet berhasil di-refresh. ${freshData.length} data mahasiswa dimuat.`,
-      data: { totalRows: freshData.length },
-    });
   }
 }

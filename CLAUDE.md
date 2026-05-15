@@ -52,7 +52,7 @@ All route groups are mounted under `/api` in `src/index.ts`.
 - **`src/validators/`** — Zod schemas for request validation, applied via `zValidator()` in routes (legacy; new features colocate validators inside their module folder)
 - **`src/prompts/`** — LLM prompt engineering: markdown persona/task prompts (`base/`, `tasks/`), typed rule constants (`context/`), Zod structured output schemas (`output/`)
 - **`src/helpers/`** — Domain-specific data transformation utilities
-- **`src/utils/`** — `APIError`, custom `Logger`, Zod error formatter, OpenRouter helpers, crypto utilities, spreadsheet (sheetsy) helpers
+- **`src/utils/`** — `APIError`, custom `Logger`, Zod error formatter, OpenRouter helpers, crypto utilities
 - **`src/types/`** — TypeScript interfaces and type definitions (legacy; new features colocate types inside their module folder)
 - **`src/modules/`** — Feature modules (see layout above)
 - **`src/worker.ts`** — Standalone background worker entry point (separate from HTTP server)

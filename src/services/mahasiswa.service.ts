@@ -7,7 +7,6 @@ function getCurrentAcademicInfo() {
   const year = now.getFullYear();
   const month = now.getMonth();
 
-  // Academic year starts in September (month 8)
   const tahunSekarang = month < 8 ? year - 1 : year;
   const semesterSekarang = month < 2 || month >= 8 ? 1 : 2;
 
@@ -47,14 +46,18 @@ export default class MahasiswaService {
     limit: number,
     sortBy?: 'asc' | 'desc'
   ) {
-    const allMahasiswa = await MahasiswaRepository.findAllFromSheet();
+    const allMahasiswa = await MahasiswaRepository.findAll(
+      undefined,
+      undefined,
+      sortBy
+    );
     if (!allMahasiswa || allMahasiswa.length === 0) {
       throw new APIError(`Tidak ada data mahasiswa`, 404);
     }
 
     const { tahunSekarang, semesterSekarang } = getCurrentAcademicInfo();
 
-    const mahasiswaWithSemester = allMahasiswa.map((m) => {
+    const mahasiswaWithSemester = allMahasiswa.map((m: any) => {
       const angkatan = m.nim ? parseInt(`20${m.nim.slice(1, 3)}`) : 0;
       const semester = (tahunSekarang - angkatan) * 2 + semesterSekarang;
       return { ...m, semester, angkatan };
@@ -64,7 +67,6 @@ export default class MahasiswaService {
       return m.semester >= 6;
     });
 
-    // Sort by nama if requested
     if (sortBy) {
       filteredMahasiswa.sort((a, b) =>
         sortBy === 'asc'
@@ -97,6 +99,7 @@ export default class MahasiswaService {
       },
     };
   }
+
   public static async get(nim: string) {
     const mahasiswa = await MahasiswaRepository.findByNIM(nim);
     if (!mahasiswa) {
@@ -108,6 +111,7 @@ export default class MahasiswaService {
       data: this.sanitizeMahasiswaData(mahasiswa),
     };
   }
+
   public static async search(
     query?: string,
     filterAngkatan?: number,
@@ -115,26 +119,22 @@ export default class MahasiswaService {
     page: number = 1,
     limit: number = 10
   ) {
-    // Ambil semua data dari spreadsheet
-    const sheetResults = await MahasiswaRepository.findAllFromSheet();
+    const dbResults = await MahasiswaRepository.search(undefined, sortBy);
 
-    if (!sheetResults || sheetResults.length === 0) {
+    if (!dbResults || dbResults.length === 0) {
       throw new APIError(`Mahasiswa tidak ditemukan`, 404);
     }
 
     const { tahunSekarang, semesterSekarang } = getCurrentAcademicInfo();
 
-    // Tambahkan informasi semester dan angkatan
-    const mahasiswaWithDetails = sheetResults.map((m: any) => {
+    const mahasiswaWithDetails = (dbResults as any[]).map((m) => {
       const angkatan = m.nim ? parseInt(`20${m.nim.slice(1, 3)}`) : 0;
       const semester = (tahunSekarang - angkatan) * 2 + semesterSekarang;
       return { ...m, semester, angkatan };
     });
 
-    // Filter hanya mahasiswa semester 6 ke atas
     let filteredMahasiswa = mahasiswaWithDetails.filter((m) => m.semester >= 6);
 
-    // Filter berdasarkan angkatan jika ada
     if (filterAngkatan) {
       filteredMahasiswa = filteredMahasiswa.filter(
         (m) => m.angkatan === filterAngkatan
@@ -145,7 +145,6 @@ export default class MahasiswaService {
       throw new APIError(`Tidak ada mahasiswa di semester 6 atau lebih.`, 404);
     }
 
-    // Jika tidak ada query, langsung return dengan pagination
     if (!query || query.trim() === '') {
       const total = filteredMahasiswa.length;
       const skip = (page - 1) * limit;
@@ -171,18 +170,17 @@ export default class MahasiswaService {
       };
     }
 
-    // Fuzzy search menggunakan Fuse.js untuk toleransi typo
     const fuseOptions = {
       keys: [
         { name: 'nama', weight: 0.7 },
         { name: 'nim', weight: 0.3 },
       ],
-      threshold: 0.4, // Lebih toleran terhadap typo (0.0 = perfect match, 1.0 = match anything)
-      distance: 100, // Jarak maksimal untuk match
-      minMatchCharLength: 2, // Minimal 2 karakter untuk match yang lebih akurat
+      threshold: 0.4,
+      distance: 100,
+      minMatchCharLength: 2,
       includeScore: true,
       includeMatches: true,
-      ignoreLocation: true, // Tidak peduli posisi match
+      ignoreLocation: true,
       findAllMatches: true,
       useExtendedSearch: false,
     };
@@ -190,7 +188,6 @@ export default class MahasiswaService {
     const fuse = new Fuse(filteredMahasiswa, fuseOptions);
     const results = fuse.search(query);
 
-    // Jika fuzzy search tidak menemukan hasil, return empty dengan message yang lebih jelas
     if (results.length === 0) {
       throw new APIError(
         `Tidak ditemukan mahasiswa dengan nama atau NIM yang mirip dengan "${query}"`,
@@ -225,9 +222,6 @@ export default class MahasiswaService {
         _score: result.score,
       };
     });
-
-    // Jika tidak ada sortBy, hasil sudah diurutkan by relevance dari Fuse.js
-    // Jika ada sortBy, sorting sudah dilakukan di SQL level
 
     return {
       response: true,
@@ -267,9 +261,8 @@ export default class MahasiswaService {
     return result;
   }
 
-
   public static async getAngkatanList() {
-    const angkatanList = await MahasiswaRepository.findAngkatanFromSheet();
+    const angkatanList = await MahasiswaRepository.findDistinctAngkatan();
     return {
       response: true,
       message: 'Data angkatan berhasil diambil.',

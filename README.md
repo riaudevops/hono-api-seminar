@@ -27,7 +27,7 @@ src/
 ├── core/               # Bootstrap, config, dependency injection
 ├── handlers/           # HTTP request handlers (controllers)
 ├── helpers/            # Utility helpers (auth, jadwal, crypto)
-├── infrastructures/    # Database, email, Google Sheets
+├── infrastructures/    # Database, email, OpenRouter
 ├── middlewares/        # JWT auth, structured logging
 ├── prompts/            # AI prompt templates
 ├── repositories/       # Data access layer (Prisma queries)
