@@ -1,4 +1,6 @@
 import Fuse from 'fuse.js';
+import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
+import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import RequirementDokumenRepository from './requirement-dokumen.repository';
 import {
@@ -113,6 +115,14 @@ export default class RequirementDokumenService {
     }
 
     const data = await RequirementDokumenRepository.create(payload);
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.REQUIREMENT_DOKUMEN,
+      entity_id: data.id,
+      new_values: data,
+    });
     return {
       response: true,
       message: 'Requirement dokumen berhasil ditambahkan.',
@@ -172,6 +182,15 @@ export default class RequirementDokumenService {
     }
 
     const data = await RequirementDokumenRepository.update(id, payload);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.REQUIREMENT_DOKUMEN,
+      entity_id: data.id,
+      old_values: existing,
+      new_values: data,
+    });
     return {
       response: true,
       message: 'Requirement dokumen berhasil diperbarui.',
@@ -186,6 +205,14 @@ export default class RequirementDokumenService {
     }
 
     await RequirementDokumenRepository.destroy(id);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.REQUIREMENT_DOKUMEN,
+      entity_id: existing.id,
+      old_values: existing,
+    });
     return {
       response: true,
       message: 'Requirement dokumen berhasil dihapus.',

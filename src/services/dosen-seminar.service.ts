@@ -3,8 +3,7 @@ import KomponenPenilaianRepository from '../repositories/komponen-penilaian.repo
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import DosenRepository from '../repositories/dosen.repository';
 import JadwalRepository from '../repositories/jadwal.repository';
-import LogService from './log.service';
-import LogRepository from '../repositories/log.repository';
+import { LogRepository, LogService } from '../modules/log';
 import JadwalHelper from '../helpers/jadwal.helper';
 import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
 import { APIError } from '../utils/api-error.util';

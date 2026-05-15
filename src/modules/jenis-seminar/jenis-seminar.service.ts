@@ -1,3 +1,5 @@
+import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
+import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import JenisSeminarRepository from './jenis-seminar.repository';
 import {
@@ -37,6 +39,14 @@ export default class JenisSeminarService {
     }
 
     const data = await JenisSeminarRepository.create(payload);
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.JENIS_SEMINAR,
+      entity_id: data.id,
+      new_values: data,
+    });
     return {
       response: true,
       message: 'Jenis seminar berhasil ditambahkan.',
@@ -61,6 +71,15 @@ export default class JenisSeminarService {
     }
 
     const data = await JenisSeminarRepository.update(id, payload);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.JENIS_SEMINAR,
+      entity_id: data.id,
+      old_values: existing,
+      new_values: data,
+    });
     return {
       response: true,
       message: 'Jenis seminar berhasil diperbarui.',
@@ -83,6 +102,14 @@ export default class JenisSeminarService {
     }
 
     await JenisSeminarRepository.destroy(id);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.JENIS_SEMINAR,
+      entity_id: existing.id,
+      old_values: existing,
+    });
     return {
       response: true,
       message: 'Jenis seminar berhasil dihapus.',

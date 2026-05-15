@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js';
-import { StatusBerkas } from '@prisma/client';
+import { LogActionType, LogActorType, LogEntityType, StatusBerkas } from '@prisma/client';
+import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import PendaftaranRepository from './pendaftaran.repository';
@@ -118,6 +119,15 @@ export default class PendaftaranService {
     }
 
     const data = await PendaftaranRepository.updateStatusBerkas(id, payload);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.PENDAFTARAN,
+      entity_id: data.id,
+      old_values: existing,
+      new_values: data,
+    });
     return {
       response: true,
       message: `Status berkas berhasil diubah ke "${payload.status_berkas}".`,
@@ -135,6 +145,14 @@ export default class PendaftaranService {
     }
 
     await PendaftaranRepository.destroy(id);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.PENDAFTARAN,
+      entity_id: existing.id,
+      old_values: existing,
+    });
     return {
       response: true,
       message: 'Pendaftaran berhasil dihapus.',
@@ -153,10 +171,12 @@ export default class PendaftaranService {
     const data = await PendaftaranRepository.findAllByNimWithRelations(
       mahasiswa.nim
     );
+    const list = data.map(({ data_pendaftaran, ...pendaftaran }) => pendaftaran);
+
     return {
       response: true,
       message: 'Data pendaftaran milik Anda berhasil diambil.',
-      data,
+      data: list,
     };
   }
 
@@ -220,6 +240,14 @@ export default class PendaftaranService {
       id,
       nim: mahasiswa.nim,
       tahun_ajaran,
+    });
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.MAHASISWA,
+      actor_id: mahasiswa.nim,
+      entity_type: LogEntityType.PENDAFTARAN,
+      entity_id: data.id,
+      new_values: data,
     });
 
     return {
@@ -295,6 +323,15 @@ export default class PendaftaranService {
     ]);
 
     const data = await PendaftaranRepository.update(id, payload);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.MAHASISWA,
+      actor_id: mahasiswa.nim,
+      entity_type: LogEntityType.PENDAFTARAN,
+      entity_id: data.id,
+      old_values: existing,
+      new_values: data,
+    });
     return {
       response: true,
       message: 'Pendaftaran berhasil diperbarui.',

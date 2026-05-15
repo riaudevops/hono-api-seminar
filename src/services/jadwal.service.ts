@@ -11,7 +11,7 @@ import MahasiswaRepository from '../repositories/mahasiswa.repository';
 import DosenRepository from '../repositories/dosen.repository';
 import RuanganRepository from '../repositories/ruangan.repository';
 import PenilaianRepository from '../repositories/penilaian.repository';
-import LogService from './log.service';
+import { LogService } from '../modules/log';
 
 export interface LogJadwalContext {
   actor_id: string;

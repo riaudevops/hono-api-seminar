@@ -18,7 +18,6 @@ import constraintDosenRoute from './routes/constraint-dosen.route';
 import jadwalDraftRoute from './routes/jadwal-draft.route';
 import bidangKeahlianRoute from './routes/bidang-keahlian.route';
 import keahlianDosenRoute from './routes/keahlian-dosen.route';
-import logRoute from './routes/log.route';
 import dosenSeminarRoute from './routes/dosen-seminar.route';
 import koordinatorRoute from './routes/koordinator.route';
 import { JenisSeminarRoute } from './modules/jenis-seminar';
@@ -26,6 +25,7 @@ import { DokumenTemplateRoute } from './modules/dokumen-template';
 import { RequirementDokumenRoute } from './modules/requirement-dokumen';
 import { PendaftaranModuleRoute } from './modules/pendaftaran';
 import { MahasiswaModuleRoute } from './modules/mahasiswa';
+import { LogModuleRoute } from './modules/log';
 
 const logger = createLogger('Server');
 
@@ -88,7 +88,7 @@ app.route('/api', constraintDosenRoute);
 app.route('/api', jadwalDraftRoute);
 app.route('/api', bidangKeahlianRoute);
 app.route('/api', keahlianDosenRoute);
-app.route('/api', logRoute);
+app.route('/api', LogModuleRoute);
 app.route('/api', dosenSeminarRoute);
 app.route('/api', koordinatorRoute);
 app.route('/api', JenisSeminarRoute);

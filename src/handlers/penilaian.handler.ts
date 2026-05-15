@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import PenilaianService from '../services/penilaian.service';
 import { APIError } from '../utils/api-error.util';
 import { LogActorType, LogEntityType } from '@prisma/client';
-import LogService from '../services/log.service';
+import { LogService } from '../modules/log';
 
 export default class PenilaianHandler {
   public static async getJadwalToAssess(c: Context) {

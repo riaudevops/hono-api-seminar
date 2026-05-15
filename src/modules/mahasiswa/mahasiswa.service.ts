@@ -1,3 +1,5 @@
+import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
+import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import MahasiswaRepository from './mahasiswa.repository';
 import { UpdateDataSayaType } from './mahasiswa.type';
@@ -35,6 +37,15 @@ export default class MahasiswaService {
     }
 
     const data = await MahasiswaRepository.updateByNim(mahasiswa.nim, payload);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.MAHASISWA,
+      actor_id: mahasiswa.nim,
+      entity_type: LogEntityType.MAHASISWA,
+      entity_id: mahasiswa.nim,
+      old_values: mahasiswa,
+      new_values: data,
+    });
     return {
       response: true,
       message: 'Data mahasiswa berhasil diperbarui.',

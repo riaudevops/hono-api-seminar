@@ -15,7 +15,7 @@ import RuanganRepository from '../repositories/ruangan.repository';
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import PenilaianRepository from '../repositories/penilaian.repository';
 import JadwalService from './jadwal.service';
-import LogService from './log.service';
+import { LogService } from '../modules/log';
 import JadwalHelper from '../helpers/jadwal.helper';
 import JenisSeminarHelper from '../helpers/jenis-seminar.helper';
 import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';

@@ -2,7 +2,7 @@ import { Context } from 'hono';
 import JadwalService from '../services/jadwal.service';
 import { APIError } from '../utils/api-error.util';
 import { LogActorType, LogEntityType } from '@prisma/client';
-import LogService from '../services/log.service';
+import { LogService } from '../modules/log';
 
 export default class JadwalHandler {
   public static async getMe(c: Context) {

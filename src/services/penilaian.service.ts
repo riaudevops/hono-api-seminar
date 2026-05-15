@@ -4,7 +4,7 @@ import { APIError } from '../utils/api-error.util';
 import prisma from '../infrastructures/db.infrastructure';
 import { LogActionType } from '@prisma/client';
 import { LogJadwalContext } from './jadwal.service';
-import LogService from './log.service';
+import { LogService } from '../modules/log';
 
 export interface SubmitPenilaianItem {
   id_komponen: string;
