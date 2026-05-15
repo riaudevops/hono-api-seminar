@@ -12,6 +12,7 @@ import {
 } from './pendaftaran.type';
 
 export interface GetAllParams {
+  periode?: 'last_7_hari' | 'last_30_hari' | 'semua';
   jenis_seminar?: string;
   status_berkas?: StatusBerkas;
   tahun_ajaran?: string;
@@ -29,6 +30,7 @@ export default class PendaftaranService {
     params: GetAllParams = {}
   ): Promise<GetAllPendaftaranResponse> {
     const {
+      periode = 'semua',
       jenis_seminar,
       status_berkas,
       tahun_ajaran,
@@ -39,6 +41,13 @@ export default class PendaftaranService {
     } = params;
 
     let pendaftaran = await PendaftaranRepository.findAllWithRelations();
+
+    if (periode !== 'semua') {
+      const days = periode === 'last_7_hari' ? 7 : 30;
+      const from = new Date();
+      from.setDate(from.getDate() - days);
+      pendaftaran = pendaftaran.filter((p) => p.created_at >= from);
+    }
 
     if (jenis_seminar) {
       pendaftaran = pendaftaran.filter(
@@ -79,7 +88,9 @@ export default class PendaftaranService {
 
     const total = pendaftaran.length;
     const skip = (page - 1) * limit;
-    const data = pendaftaran.slice(skip, skip + limit);
+    const data = pendaftaran
+      .slice(skip, skip + limit)
+      .map(({ data_pendaftaran, ...item }) => item);
 
     return {
       response: true,
@@ -230,9 +241,22 @@ export default class PendaftaranService {
       );
     }
 
-    await this.ensureForeignKeysExist(payload);
-
     const tahun_ajaran = TahunAjaranHelper.findSekarang();
+
+    const alreadyRegistered =
+      await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
+        mahasiswa.nim,
+        payload.id_jenis_seminar,
+        tahun_ajaran
+      );
+    if (alreadyRegistered) {
+      throw new APIError(
+        `Anda sudah mendaftar jenis seminar ini di tahun ajaran ${tahun_ajaran}.`,
+        409
+      );
+    }
+
+    await this.ensureForeignKeysExist(payload);
     const id = this.generateId(payload.id_jenis_seminar, tahun_ajaran);
 
     const data = await PendaftaranRepository.createWithDataDokumen({
@@ -312,6 +336,19 @@ export default class PendaftaranService {
         payload.id_jenis_seminar
       );
       if (!exists) throw new APIError('Jenis seminar tidak ditemukan.', 404);
+
+      const alreadyRegistered =
+        await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
+          mahasiswa.nim,
+          payload.id_jenis_seminar,
+          existing.tahun_ajaran
+        );
+      if (alreadyRegistered && alreadyRegistered.id !== id) {
+        throw new APIError(
+          `Anda sudah mendaftar jenis seminar ini di tahun ajaran ${existing.tahun_ajaran}.`,
+          409
+        );
+      }
     }
 
     await this.ensureDosenListExists([

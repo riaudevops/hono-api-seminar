@@ -13,6 +13,7 @@ export default class PendaftaranHandler {
     const query = c.req.query();
     return c.json(
       await PendaftaranService.getAll({
+        periode: query.periode as 'last_7_hari' | 'last_30_hari' | 'semua' | undefined,
         jenis_seminar: query.jenis_seminar,
         status_berkas: query.status_berkas as StatusBerkas | undefined,
         tahun_ajaran: query.tahun_ajaran,

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { StatusBerkas } from '@prisma/client';
 
 export const getAllPendaftaranQuerySchema = z.object({
+  periode: z.enum(['last_7_hari', 'last_30_hari', 'semua']).optional(),
   jenis_seminar: z.string().optional(),
   status_berkas: z.nativeEnum(StatusBerkas).optional(),
   tahun_ajaran: z.string().optional(),

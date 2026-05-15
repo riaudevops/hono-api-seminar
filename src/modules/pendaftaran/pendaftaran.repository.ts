@@ -83,79 +83,11 @@ function mapNilaiByTipe(
   }
 }
 
-// Map TipeInputDokumen enum to the correct nilai_* column
-function mapNilaiByTipe(
-  tipe: string,
-  value: string | boolean | string[] | null
-): {
-  nilai_text: string | null;
-  nilai_file_url: string | null;
-  nilai_boolean: boolean | null;
-  nilai_date: Date | null;
-  nilai_json: unknown | null;
-} {
-  switch (tipe) {
-    case 'TEXT':
-    case 'SELECT':
-      return {
-        nilai_text: typeof value === 'string' ? value : null,
-        nilai_file_url: null,
-        nilai_boolean: null,
-        nilai_date: null,
-        nilai_json: null,
-      };
-    case 'FILE_UPLOAD':
-    case 'URL':
-      return {
-        nilai_text: null,
-        nilai_file_url: typeof value === 'string' ? value : null,
-        nilai_boolean: null,
-        nilai_date: null,
-        nilai_json: null,
-      };
-    case 'BOOLEAN':
-      return {
-        nilai_text: null,
-        nilai_file_url: null,
-        nilai_boolean: typeof value === 'boolean' ? value : null,
-        nilai_date: null,
-        nilai_json: null,
-      };
-    case 'DATE':
-      return {
-        nilai_text: null,
-        nilai_file_url: null,
-        nilai_boolean: null,
-        nilai_date:
-          value !== null && typeof value === 'string'
-            ? new Date(value)
-            : null,
-        nilai_json: null,
-      };
-    case 'MULTI_SELECT':
-      return {
-        nilai_text: null,
-        nilai_file_url: null,
-        nilai_boolean: null,
-        nilai_date: null,
-        nilai_json: Array.isArray(value) ? value : null,
-      };
-    default:
-      return {
-        nilai_text: null,
-        nilai_file_url: null,
-        nilai_boolean: null,
-        nilai_date: null,
-        nilai_json: null,
-      };
-  }
-}
-
 export default class PendaftaranRepository {
   public static async findAllWithRelations(): Promise<
     PendaftaranWithDataDokumen[]
   > {
-    const [pendaftaranList, jenisSeminars, mahasiswas] = await Promise.all([
+    const [pendaftaranList, jenisSeminars, mahasiswas, dosens] = await Promise.all([
       prisma.pendaftaran.findMany({
         orderBy: { created_at: 'desc' },
       }),
@@ -165,6 +97,9 @@ export default class PendaftaranRepository {
       prisma.mahasiswa.findMany({
         select: { nim: true, nama: true, email: true },
       }),
+      prisma.dosen.findMany({
+        select: { nip: true, nama: true },
+      }),
     ]);
 
     const jenisSeminarById = new Map(
@@ -173,6 +108,7 @@ export default class PendaftaranRepository {
     const mahasiswaByNim = new Map(
       mahasiswas.map((mahasiswa) => [mahasiswa.nim, mahasiswa])
     );
+    const dosenByNip = new Map(dosens.map((dosen) => [dosen.nip, dosen]));
 
     const dataPendaftaran = await this.findDataPendaftaranByIds(
       pendaftaranList.map((p) => p.id)
@@ -190,7 +126,8 @@ export default class PendaftaranRepository {
               email: mahasiswa.email,
             }
           : null,
-        dataPendaftaran.get(p.id) ?? []
+        dataPendaftaran.get(p.id) ?? [],
+        dosenByNip
       );
     });
   }
@@ -216,7 +153,15 @@ export default class PendaftaranRepository {
     });
     if (!pendaftaran) return null;
 
-    const [jenisSeminar, mahasiswa, dataPendaftaran] = await Promise.all([
+    const nips = [
+      pendaftaran.nip_pembimbing_1,
+      pendaftaran.nip_pembimbing_2,
+      pendaftaran.nip_penguji_1,
+      pendaftaran.nip_penguji_2,
+      pendaftaran.nip_ketua_sidang,
+    ].filter((nip): nip is string => !!nip);
+
+    const [jenisSeminar, mahasiswa, dataPendaftaran, dosens] = await Promise.all([
       prisma.jenis_seminar.findUnique({
         where: { id: pendaftaran.id_jenis_seminar },
         select: { id: true, nama: true, kode: true },
@@ -226,7 +171,12 @@ export default class PendaftaranRepository {
         select: { nim: true, nama: true, email: true },
       }),
       this.findDataPendaftaranByIds([id]),
+      prisma.dosen.findMany({
+        where: { nip: { in: nips } },
+        select: { nip: true, nama: true },
+      }),
     ]);
+    const dosenByNip = new Map(dosens.map((dosen) => [dosen.nip, dosen]));
 
     return this.mapWithRelations(
       pendaftaran,
@@ -238,13 +188,24 @@ export default class PendaftaranRepository {
             email: mahasiswa.email,
           }
         : null,
-      dataPendaftaran.get(id) ?? []
+      dataPendaftaran.get(id) ?? [],
+      dosenByNip
     );
   }
 
   public static async findByIdPengajuanFst(id_pengajuan_fst: string) {
     return prisma.pendaftaran.findUnique({
       where: { id_pengajuan_fst },
+    });
+  }
+
+  public static async findByNimJenisSeminarTahunAjaran(
+    nim: string,
+    id_jenis_seminar: string,
+    tahun_ajaran: string
+  ) {
+    return prisma.pendaftaran.findFirst({
+      where: { nim, id_jenis_seminar, tahun_ajaran },
     });
   }
 
@@ -384,7 +345,8 @@ export default class PendaftaranRepository {
     pendaftaran: PendaftaranType,
     jenisSeminar: PendaftaranWithRelations['jenis_seminar'],
     mahasiswa: PendaftaranWithRelations['mahasiswa'],
-    dataPendaftaran: DataPendaftaranWithTemplate[]
+    dataPendaftaran: DataPendaftaranWithTemplate[],
+    dosenByNip: Map<string, { nip: string; nama: string | null }> = new Map()
   ): PendaftaranWithDataDokumen {
     return {
       id: pendaftaran.id,
@@ -393,10 +355,24 @@ export default class PendaftaranRepository {
       id_pengajuan_fst: pendaftaran.id_pengajuan_fst,
       id_jenis_seminar: pendaftaran.id_jenis_seminar,
       nip_pembimbing_1: pendaftaran.nip_pembimbing_1,
+      nama_pembimbing_1:
+        dosenByNip.get(pendaftaran.nip_pembimbing_1)?.nama ?? null,
       nip_pembimbing_2: pendaftaran.nip_pembimbing_2,
+      nama_pembimbing_2: pendaftaran.nip_pembimbing_2
+        ? dosenByNip.get(pendaftaran.nip_pembimbing_2)?.nama ?? null
+        : null,
       nip_penguji_1: pendaftaran.nip_penguji_1,
+      nama_penguji_1: pendaftaran.nip_penguji_1
+        ? dosenByNip.get(pendaftaran.nip_penguji_1)?.nama ?? null
+        : null,
       nip_penguji_2: pendaftaran.nip_penguji_2,
+      nama_penguji_2: pendaftaran.nip_penguji_2
+        ? dosenByNip.get(pendaftaran.nip_penguji_2)?.nama ?? null
+        : null,
       nip_ketua_sidang: pendaftaran.nip_ketua_sidang,
+      nama_ketua_sidang: pendaftaran.nip_ketua_sidang
+        ? dosenByNip.get(pendaftaran.nip_ketua_sidang)?.nama ?? null
+        : null,
       status_berkas: pendaftaran.status_berkas,
       created_at: pendaftaran.created_at,
       jenis_seminar: jenisSeminar,

@@ -8,10 +8,15 @@ export interface PendaftaranType {
   id_pengajuan_fst: string;
   id_jenis_seminar: string;
   nip_pembimbing_1: string;
+  nama_pembimbing_1?: string | null;
   nip_pembimbing_2: string | null;
+  nama_pembimbing_2?: string | null;
   nip_penguji_1: string | null;
+  nama_penguji_1?: string | null;
   nip_penguji_2: string | null;
+  nama_penguji_2?: string | null;
   nip_ketua_sidang: string | null;
+  nama_ketua_sidang?: string | null;
   status_berkas: StatusBerkas;
   created_at: Date;
 }
