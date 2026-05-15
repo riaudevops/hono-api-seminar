@@ -4,6 +4,7 @@ import prisma from '../../infrastructures/db.infrastructure';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
+import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
 import PendaftaranRepository from './pendaftaran.repository';
 import {
   CreatePendaftaranByMahasiswaType,
@@ -307,7 +308,7 @@ export default class PendaftaranService {
     }
 
     await this.ensureForeignKeysExist(payload);
-    const id = this.generateId(payload.id_jenis_seminar, tahun_ajaran);
+    const id = await this.generateId(payload.id_jenis_seminar, tahun_ajaran);
 
     const data = await PendaftaranRepository.createWithDataDokumen({
       ...payload,
@@ -465,8 +466,9 @@ export default class PendaftaranService {
     }
   }
 
-  private static generateId(idJenisSeminar: string, tahunAjaran: string): string {
-    const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
-    return `${idJenisSeminar}-${tahunAjaran}-${suffix}`;
+  private static async generateId(idJenisSeminar: string, tahunAjaran: string): Promise<string> {
+    const kodeJenisSeminar = await JenisSeminarHelper.resolveKodeById(idJenisSeminar);
+    const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 5);
+    return `${kodeJenisSeminar}${tahunAjaran}${suffix}`;
   }
 }
