@@ -1,6 +1,6 @@
 import { Context } from 'hono';
-import JadwalDraftService from '../services/jadwal-draft.service';
-import { APIError } from '../utils/api-error.util';
+import JadwalDraftService from './jadwal-draft.service';
+import { APIError } from '../../utils/api-error.util';
 import { LogActorType, StatusJadwalDraft } from '@prisma/client';
 
 function extractContext(c: Context) {

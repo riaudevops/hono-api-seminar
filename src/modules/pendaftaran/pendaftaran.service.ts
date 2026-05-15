@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js';
 import { LogActionType, LogActorType, LogEntityType, StatusBerkas } from '@prisma/client';
+import prisma from '../../infrastructures/db.infrastructure';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
@@ -7,6 +8,8 @@ import PendaftaranRepository from './pendaftaran.repository';
 import {
   CreatePendaftaranByMahasiswaType,
   GetAllPendaftaranResponse,
+  PendaftaranDashboardResponse,
+  TahunAjaranListResponse,
   UpdatePendaftaranByMahasiswaType,
   UpdateStatusBerkasType,
 } from './pendaftaran.type';
@@ -102,6 +105,53 @@ export default class PendaftaranService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  // ===========================================================================
+  // Koordinator: dashboard statistik
+  // ===========================================================================
+  public static async getDashboard(): Promise<PendaftaranDashboardResponse> {
+    const [total, statusCounts, avgProcessingTime] = await Promise.all([
+      prisma.pendaftaran.count(),
+      PendaftaranRepository.getStatsByStatus(),
+      PendaftaranRepository.getAvgProcessingTime(),
+    ]);
+
+    const pending = statusCounts.PENDING ?? 0;
+    const approved = statusCounts.APPROVED ?? 0;
+    const rejected = statusCounts.REJECTED ?? 0;
+    const revision = statusCounts.REVISI ?? 0;
+    const completed = approved + rejected;
+    const processingRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const avgProcessingTimeText =
+      avgProcessingTime !== null ? `${Math.round(avgProcessingTime / 3600000)} jam` : '0 jam';
+
+    return {
+      response: true,
+      message: 'Statistik pendaftaran berhasil diambil.',
+      data: {
+        total,
+        pending,
+        approved,
+        rejected,
+        revision,
+        processingRate,
+        avgProcessingTime: avgProcessingTimeText,
+      },
+    };
+  }
+
+  public static async getAllTahunAjaran(): Promise<TahunAjaranListResponse> {
+    const data = await PendaftaranRepository.getDistinctTahunAjaran();
+
+    return {
+      response: true,
+      message: 'Daftar tahun ajaran berhasil diambil.',
+      data: data.map((kode) => ({
+        kode,
+        nama: TahunAjaranHelper.parseStringNameByCode(kode),
+      })),
     };
   }
 
@@ -251,7 +301,7 @@ export default class PendaftaranService {
       );
     if (alreadyRegistered) {
       throw new APIError(
-        `Anda sudah mendaftar jenis seminar ini di tahun ajaran ${tahun_ajaran}.`,
+        `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(tahun_ajaran)}.`,
         409
       );
     }
@@ -335,7 +385,7 @@ export default class PendaftaranService {
       const exists = await PendaftaranRepository.jenisSeminarExists(
         payload.id_jenis_seminar
       );
-      if (!exists) throw new APIError('Jenis seminar tidak ditemukan.', 404);
+      if (!exists) throw new APIError('Seminar tidak ditemukan.', 404);
 
       const alreadyRegistered =
         await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
@@ -345,7 +395,7 @@ export default class PendaftaranService {
         );
       if (alreadyRegistered && alreadyRegistered.id !== id) {
         throw new APIError(
-          `Anda sudah mendaftar jenis seminar ini di tahun ajaran ${existing.tahun_ajaran}.`,
+          `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(existing.tahun_ajaran)}.`,
           409
         );
       }
@@ -360,6 +410,13 @@ export default class PendaftaranService {
     ]);
 
     const data = await PendaftaranRepository.update(id, payload);
+
+    if (payload.dokumen) {
+      await PendaftaranRepository.updateStatusBerkas(id, {
+        status_berkas: 'UPLOAD_ULANG',
+      });
+    }
+
     await LogService.createEntityLog({
       action: LogActionType.UPDATE,
       actor_type: LogActorType.MAHASISWA,

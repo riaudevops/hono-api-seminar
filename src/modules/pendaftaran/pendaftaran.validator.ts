@@ -89,6 +89,7 @@ export const putPendaftaranMahasiswaSchema = z
     nip_penguji_1: nipNullableSchema,
     nip_penguji_2: nipNullableSchema,
     nip_ketua_sidang: nipNullableSchema,
+    dokumen: dokumenNilaiSchema.optional(),
   })
   .refine(uniqueNipRefinement, {
     message: 'NIP pembimbing, penguji, dan ketua sidang tidak boleh sama',

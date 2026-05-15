@@ -46,6 +46,12 @@ pendaftaranRoute.put(
 // Koordinator endpoints — list, detail, validasi status, hapus
 // ============================================================================
 pendaftaranRoute.get(
+  '/koordinator/pendaftaran/tahun-ajaran',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  PendaftaranHandler.getAllTahunAjaran
+);
+
+pendaftaranRoute.get(
   '/koordinator/pendaftaran',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getAllPendaftaranQuerySchema, zodError),
@@ -53,7 +59,13 @@ pendaftaranRoute.get(
 );
 
 pendaftaranRoute.get(
-  '/koordinator/pendaftaran/:id',
+  '/koordinator/pendaftaran/dashboard',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  PendaftaranHandler.getDashboard
+);
+
+pendaftaranRoute.get(
+  '/koordinator/pendaftaran/detail/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   PendaftaranHandler.getById
 );

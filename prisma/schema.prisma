@@ -63,9 +63,10 @@ enum ConstraintType {
 
 enum StatusBerkas {
   PENDING
-  IN_REVIEW
+  REVISI
   APPROVED
   REJECTED
+  UPLOAD_ULANG
 }
 
 model dosen {
@@ -349,6 +350,7 @@ model pendaftaran {
 
   status_berkas     StatusBerkas @default(PENDING)
   created_at        DateTime     @default(now()) @db.Timestamptz
+  updated_at        DateTime     @updatedAt @db.Timestamptz
 
   data_pendaftaran  data_pendaftaran[]
 

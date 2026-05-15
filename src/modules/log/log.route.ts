@@ -9,16 +9,20 @@ import { getLogQuerySchema } from './log.validator';
 const logRoute = new Hono({ router: new RegExpRouter() });
 
 logRoute.get(
-  '/log',
+  '/data-master/log',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getLogQuerySchema, zodError),
   LogHandler.getAll
 );
 
-logRoute.get('/log/:id', AuthMiddleware.JWTBearerTokenExtraction, LogHandler.get);
+logRoute.get(
+  '/data-master/log/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  LogHandler.get
+);
 
 logRoute.delete(
-  '/log/:id',
+  '/data-master/log/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   LogHandler.delete
 );

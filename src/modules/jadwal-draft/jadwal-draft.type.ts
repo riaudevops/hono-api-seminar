@@ -1,5 +1,5 @@
 import { PenilaiRole, StatusJadwalDraft } from '@prisma/client';
-import type { JenisJadwalKode } from './jadwal.type';
+import type { JenisJadwalKode } from '../../types/jadwal.type';
 
 export interface DosenAssignmentInput {
   nip: string;

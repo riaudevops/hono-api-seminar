@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+import { StatusBerkas } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 import {
   CreatePendaftaranByMahasiswaType,
@@ -24,7 +26,7 @@ function mapNilaiByTipe(
   nilai_file_url: string | null;
   nilai_boolean: boolean | null;
   nilai_date: Date | null;
-  nilai_json: unknown | null;
+  nilai_json: Prisma.InputJsonValue | typeof Prisma.JsonNull;
 } {
   switch (tipe) {
     case 'TEXT':
@@ -34,7 +36,7 @@ function mapNilaiByTipe(
         nilai_file_url: null,
         nilai_boolean: null,
         nilai_date: null,
-        nilai_json: null,
+        nilai_json: Prisma.JsonNull,
       };
     case 'FILE_UPLOAD':
     case 'URL':
@@ -43,7 +45,7 @@ function mapNilaiByTipe(
         nilai_file_url: typeof value === 'string' ? value : null,
         nilai_boolean: null,
         nilai_date: null,
-        nilai_json: null,
+        nilai_json: Prisma.JsonNull,
       };
     case 'BOOLEAN':
       return {
@@ -51,7 +53,7 @@ function mapNilaiByTipe(
         nilai_file_url: null,
         nilai_boolean: typeof value === 'boolean' ? value : null,
         nilai_date: null,
-        nilai_json: null,
+        nilai_json: Prisma.JsonNull,
       };
     case 'DATE':
       return {
@@ -62,7 +64,7 @@ function mapNilaiByTipe(
           value !== null && typeof value === 'string'
             ? new Date(value)
             : null,
-        nilai_json: null,
+        nilai_json: Prisma.JsonNull,
       };
     case 'MULTI_SELECT':
       return {
@@ -70,7 +72,7 @@ function mapNilaiByTipe(
         nilai_file_url: null,
         nilai_boolean: null,
         nilai_date: null,
-        nilai_json: Array.isArray(value) ? value : null,
+        nilai_json: Array.isArray(value) ? value : Prisma.JsonNull,
       };
     default:
       return {
@@ -78,7 +80,7 @@ function mapNilaiByTipe(
         nilai_file_url: null,
         nilai_boolean: null,
         nilai_date: null,
-        nilai_json: null,
+        nilai_json: Prisma.JsonNull,
       };
   }
 }
@@ -228,6 +230,7 @@ export default class PendaftaranRepository {
           nip_penguji_2: data.nip_penguji_2 ?? null,
           nip_ketua_sidang: data.nip_ketua_sidang ?? null,
           status_berkas: 'PENDING',
+          updated_at: new Date(),
         },
       });
 
@@ -265,26 +268,55 @@ export default class PendaftaranRepository {
     id: string,
     data: UpdatePendaftaranByMahasiswaType
   ) {
-    const updateData: Record<string, unknown> = {};
+    return prisma.$transaction(async (tx) => {
+      const updateData: Record<string, unknown> = {};
 
-    if (data.id_pengajuan_fst !== undefined)
-      updateData.id_pengajuan_fst = data.id_pengajuan_fst;
-    if (data.id_jenis_seminar !== undefined)
-      updateData.id_jenis_seminar = data.id_jenis_seminar;
-    if (data.nip_pembimbing_1 !== undefined)
-      updateData.nip_pembimbing_1 = data.nip_pembimbing_1;
-    if (data.nip_pembimbing_2 !== undefined)
-      updateData.nip_pembimbing_2 = data.nip_pembimbing_2;
-    if (data.nip_penguji_1 !== undefined)
-      updateData.nip_penguji_1 = data.nip_penguji_1;
-    if (data.nip_penguji_2 !== undefined)
-      updateData.nip_penguji_2 = data.nip_penguji_2;
-    if (data.nip_ketua_sidang !== undefined)
-      updateData.nip_ketua_sidang = data.nip_ketua_sidang;
+      if (data.id_pengajuan_fst !== undefined)
+        updateData.id_pengajuan_fst = data.id_pengajuan_fst;
+      if (data.id_jenis_seminar !== undefined)
+        updateData.id_jenis_seminar = data.id_jenis_seminar;
+      if (data.nip_pembimbing_1 !== undefined)
+        updateData.nip_pembimbing_1 = data.nip_pembimbing_1;
+      if (data.nip_pembimbing_2 !== undefined)
+        updateData.nip_pembimbing_2 = data.nip_pembimbing_2;
+      if (data.nip_penguji_1 !== undefined)
+        updateData.nip_penguji_1 = data.nip_penguji_1;
+      if (data.nip_penguji_2 !== undefined)
+        updateData.nip_penguji_2 = data.nip_penguji_2;
+      if (data.nip_ketua_sidang !== undefined)
+        updateData.nip_ketua_sidang = data.nip_ketua_sidang;
 
-    return prisma.pendaftaran.update({
-      where: { id },
-      data: updateData,
+      const pendaftaran = await tx.pendaftaran.update({
+        where: { id },
+        data: updateData,
+      });
+
+      if (data.dokumen) {
+        const templates = await tx.dokumen_template.findMany({
+          where: { kode: { in: Object.keys(data.dokumen) } },
+          select: { id: true, kode: true, tipe_input: true },
+        });
+
+        for (const template of templates) {
+          const nilai = mapNilaiByTipe(template.tipe_input, data.dokumen[template.kode]);
+          await tx.data_pendaftaran.upsert({
+            where: {
+              id_pendaftaran_id_dokumen_template: {
+                id_pendaftaran: id,
+                id_dokumen_template: template.id,
+              },
+            },
+            update: nilai as Prisma.data_pendaftaranUpdateInput,
+            create: {
+              id_pendaftaran: id,
+              id_dokumen_template: template.id,
+              ...nilai,
+            },
+          });
+        }
+      }
+
+      return pendaftaran;
     });
   }
 
@@ -306,6 +338,48 @@ export default class PendaftaranRepository {
 
   public static async jenisSeminarExists(id: string) {
     return (await prisma.jenis_seminar.count({ where: { id } })) > 0;
+  }
+
+  public static async getStatsByStatus(): Promise<Record<StatusBerkas, number>> {
+    const rows = await prisma.pendaftaran.findMany({
+      select: { status_berkas: true },
+    });
+    return rows.reduce(
+      (acc, row) => {
+        acc[row.status_berkas] += 1;
+        return acc;
+      },
+      { PENDING: 0, REVISI: 0, APPROVED: 0, REJECTED: 0, UPLOAD_ULANG: 0 } as Record<StatusBerkas, number>
+    );
+  }
+
+  public static async getAvgProcessingTime(): Promise<number | null> {
+    const result = await prisma.pendaftaran.findMany({
+      where: {
+        status_berkas: { in: ['APPROVED', 'REJECTED'] },
+      },
+      select: {
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (result.length === 0) return null;
+
+    const totalMs = result.reduce((sum, p) => {
+      const diff = p.updated_at.getTime() - p.created_at.getTime();
+      return sum + diff;
+    }, 0);
+
+    return totalMs / result.length;
+  }
+
+  public static async getDistinctTahunAjaran(): Promise<string[]> {
+    const rows = await prisma.pendaftaran.findMany({
+      select: { tahun_ajaran: true },
+      distinct: ['tahun_ajaran'],
+    });
+    return rows.map((r) => r.tahun_ajaran).sort((a, b) => b.localeCompare(a));
   }
 
   public static async dosenExists(nip: string) {
@@ -375,6 +449,7 @@ export default class PendaftaranRepository {
         : null,
       status_berkas: pendaftaran.status_berkas,
       created_at: pendaftaran.created_at,
+      updated_at: pendaftaran.updated_at,
       jenis_seminar: jenisSeminar,
       mahasiswa,
       data_pendaftaran: dataPendaftaran,

@@ -9,6 +9,10 @@ import {
 
 export default class PendaftaranHandler {
   // Koordinator
+  public static async getAllTahunAjaran(c: Context) {
+    return c.json(await PendaftaranService.getAllTahunAjaran());
+  }
+
   public static async getAll(c: Context) {
     const query = c.req.query();
     return c.json(
@@ -23,6 +27,10 @@ export default class PendaftaranHandler {
         limit: query.limit ? Number(query.limit) : undefined,
       })
     );
+  }
+
+  public static async getDashboard(c: Context) {
+    return c.json(await PendaftaranService.getDashboard());
   }
 
   public static async getById(c: Context) {

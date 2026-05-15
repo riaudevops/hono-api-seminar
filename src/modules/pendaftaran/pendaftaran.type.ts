@@ -19,6 +19,7 @@ export interface PendaftaranType {
   nama_ketua_sidang?: string | null;
   status_berkas: StatusBerkas;
   created_at: Date;
+  updated_at: Date;
 }
 
 export interface PendaftaranJenisSeminar {
@@ -38,7 +39,7 @@ export interface PendaftaranWithRelations extends PendaftaranType {
   mahasiswa: PendaftaranMahasiswa | null;
 }
 
-export type GetAllPendaftaranResponse = PaginatedResponse<PendaftaranWithDataDokumen>;
+export type GetAllPendaftaranResponse = PaginatedResponse<Omit<PendaftaranWithDataDokumen, 'data_pendaftaran'>>;
 
 export type DokumenNilaiPayload = Record<
   string,
@@ -65,6 +66,7 @@ export interface UpdatePendaftaranByMahasiswaType {
   nip_penguji_1?: string | null;
   nip_penguji_2?: string | null;
   nip_ketua_sidang?: string | null;
+  dokumen?: DokumenNilaiPayload;
 }
 
 export interface UpdateStatusBerkasType {
@@ -98,4 +100,31 @@ export interface PendaftaranWithDataDokumen extends PendaftaranType {
   jenis_seminar: PendaftaranJenisSeminar | null;
   mahasiswa: PendaftaranMahasiswa | null;
   data_pendaftaran: DataPendaftaranWithTemplate[];
+}
+
+export interface PendaftaranDashboardData {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  revision: number;
+  processingRate: number;
+  avgProcessingTime: string;
+}
+
+export interface PendaftaranDashboardResponse {
+  response: boolean;
+  message: string;
+  data: PendaftaranDashboardData;
+}
+
+export interface TahunAjaranItem {
+  kode: string;
+  nama: string;
+}
+
+export interface TahunAjaranListResponse {
+  response: boolean;
+  message: string;
+  data: TahunAjaranItem[];
 }
