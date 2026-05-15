@@ -12,6 +12,14 @@ export const getAllPendaftaranQuerySchema = z.object({
   limit: z.coerce.number().int().positive().optional(),
 });
 
+export const dashboardQuerySchema = z.object({
+  tahun_ajaran: z.string().optional(),
+});
+
+export const dashboardQuerySchema = z.object({
+  tahun_ajaran: z.string().optional(),
+});
+
 const tahunAjaranSchema = z
   .string()
   .max(5, 'Tahun ajaran maksimal 5 karakter');

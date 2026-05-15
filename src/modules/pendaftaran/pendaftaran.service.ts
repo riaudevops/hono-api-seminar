@@ -112,11 +112,14 @@ export default class PendaftaranService {
   // ===========================================================================
   // Koordinator: dashboard statistik
   // ===========================================================================
-  public static async getDashboard(): Promise<PendaftaranDashboardResponse> {
+  public static async getDashboard(params: { tahun_ajaran?: string } = {}): Promise<PendaftaranDashboardResponse> {
+    const { tahun_ajaran } = params;
+    const where = tahun_ajaran ? { tahun_ajaran } : undefined;
+
     const [total, statusCounts, avgProcessingTime] = await Promise.all([
-      prisma.pendaftaran.count(),
-      PendaftaranRepository.getStatsByStatus(),
-      PendaftaranRepository.getAvgProcessingTime(),
+      prisma.pendaftaran.count({ where }),
+      PendaftaranRepository.getStatsByStatus(where),
+      PendaftaranRepository.getAvgProcessingTime(where),
     ]);
 
     const pending = statusCounts.PENDING ?? 0;

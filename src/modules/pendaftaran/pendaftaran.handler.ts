@@ -30,7 +30,10 @@ export default class PendaftaranHandler {
   }
 
   public static async getDashboard(c: Context) {
-    return c.json(await PendaftaranService.getDashboard());
+    const query = c.req.query();
+    return c.json(await PendaftaranService.getDashboard({
+      tahun_ajaran: query.tahun_ajaran,
+    }));
   }
 
   public static async getById(c: Context) {

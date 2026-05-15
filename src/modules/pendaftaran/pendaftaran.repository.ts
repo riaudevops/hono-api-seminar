@@ -340,8 +340,9 @@ export default class PendaftaranRepository {
     return (await prisma.jenis_seminar.count({ where: { id } })) > 0;
   }
 
-  public static async getStatsByStatus(): Promise<Record<StatusBerkas, number>> {
+  public static async getStatsByStatus(where?: { tahun_ajaran?: string }): Promise<Record<StatusBerkas, number>> {
     const rows = await prisma.pendaftaran.findMany({
+      where,
       select: { status_berkas: true },
     });
     return rows.reduce(
@@ -353,9 +354,10 @@ export default class PendaftaranRepository {
     );
   }
 
-  public static async getAvgProcessingTime(): Promise<number | null> {
+  public static async getAvgProcessingTime(where?: { tahun_ajaran?: string }): Promise<number | null> {
     const result = await prisma.pendaftaran.findMany({
       where: {
+        ...where,
         status_berkas: { in: ['APPROVED', 'REJECTED'] },
       },
       select: {

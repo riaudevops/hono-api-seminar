@@ -5,6 +5,7 @@ import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
 import PendaftaranHandler from './pendaftaran.handler';
 import {
+  dashboardQuerySchema,
   getAllPendaftaranQuerySchema,
   patchStatusBerkasSchema,
   postPendaftaranMahasiswaSchema,
@@ -61,6 +62,7 @@ pendaftaranRoute.get(
 pendaftaranRoute.get(
   '/koordinator/pendaftaran/dashboard',
   AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('query', dashboardQuerySchema, zodError),
   PendaftaranHandler.getDashboard
 );
 
