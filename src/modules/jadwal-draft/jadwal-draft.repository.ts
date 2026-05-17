@@ -44,7 +44,6 @@ export default class JadwalDraftRepository {
         batch_id: d.batch_id,
         nim: d.nim,
         id_jenis_seminar: d.id_jenis_seminar,
-        judul: d.judul,
         tanggal: d.tanggal,
         waktu_mulai: d.waktu_mulai,
         waktu_selesai: d.waktu_selesai,

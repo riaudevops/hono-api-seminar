@@ -1,6 +1,6 @@
-import RuanganRepository from '../repositories/ruangan.repository';
-import { APIError } from '../utils/api-error.util';
-import { CreateRuanganType, UpdateRuanganType } from '../types/ruangan.type';
+import RuanganRepository from './ruangan.repository';
+import { APIError } from '../../utils/api-error.util';
+import { CreateRuanganType, UpdateRuanganType } from './ruangan.type';
 
 export default class RuanganService {
   public static async getAll() {

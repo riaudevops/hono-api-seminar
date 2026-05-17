@@ -73,6 +73,26 @@ export interface UpdateStatusBerkasType {
   status_berkas: StatusBerkas;
 }
 
+// Koordinator update — ganti dosen (skenario dosen berhalangan hadir)
+export interface UpdateDosenByKoordinatorType {
+  nip_pembimbing_1?: string;
+  nip_pembimbing_2?: string | null;
+  nip_penguji_1?: string | null;
+  nip_penguji_2?: string | null;
+  nip_ketua_sidang?: string | null;
+  alasan_penggantian: string;
+}
+
+// Koordinator update — ganti dosen (skenario dosen berhalangan hadir)
+export interface UpdateDosenByKoordinatorType {
+  nip_pembimbing_1?: string;
+  nip_pembimbing_2?: string | null;
+  nip_penguji_1?: string | null;
+  nip_penguji_2?: string | null;
+  nip_ketua_sidang?: string | null;
+  alasan_penggantian: string;
+}
+
 export interface DataPendaftaranType {
   id: string;
   id_pendaftaran: string;

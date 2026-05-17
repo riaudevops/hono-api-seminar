@@ -7,6 +7,7 @@ import {
   PendaftaranType,
   PendaftaranWithDataDokumen,
   PendaftaranWithRelations,
+  UpdateDosenByKoordinatorType,
   UpdatePendaftaranByMahasiswaType,
   UpdateStatusBerkasType,
 } from './pendaftaran.type';
@@ -330,6 +331,32 @@ export default class PendaftaranRepository {
     });
   }
 
+  public static async updateDosenByKoordinator(
+    id: string,
+    data: UpdateDosenByKoordinatorType
+  ) {
+    return prisma.pendaftaran.update({
+      where: { id },
+      data: {
+        ...(data.nip_pembimbing_1 !== undefined && {
+          nip_pembimbing_1: data.nip_pembimbing_1,
+        }),
+        ...(data.nip_pembimbing_2 !== undefined && {
+          nip_pembimbing_2: data.nip_pembimbing_2,
+        }),
+        ...(data.nip_penguji_1 !== undefined && {
+          nip_penguji_1: data.nip_penguji_1,
+        }),
+        ...(data.nip_penguji_2 !== undefined && {
+          nip_penguji_2: data.nip_penguji_2,
+        }),
+        ...(data.nip_ketua_sidang !== undefined && {
+          nip_ketua_sidang: data.nip_ketua_sidang,
+        }),
+      },
+    });
+  }
+
   public static async destroy(id: string) {
     return prisma.pendaftaran.delete({
       where: { id },
@@ -338,6 +365,13 @@ export default class PendaftaranRepository {
 
   public static async jenisSeminarExists(id: string) {
     return (await prisma.jenis_seminar.count({ where: { id } })) > 0;
+  }
+
+  public static async findJenisSeminarById(id: string) {
+    return prisma.jenis_seminar.findUnique({
+      where: { id },
+      select: { id: true, ada_ketua_sidang: true },
+    });
   }
 
   public static async getStatsByStatus(where?: { tahun_ajaran?: string }): Promise<Record<StatusBerkas, number>> {

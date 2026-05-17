@@ -11,6 +11,7 @@ import {
   GetAllPendaftaranResponse,
   PendaftaranDashboardResponse,
   TahunAjaranListResponse,
+  UpdateDosenByKoordinatorType,
   UpdatePendaftaranByMahasiswaType,
   UpdateStatusBerkasType,
 } from './pendaftaran.type';
@@ -196,6 +197,53 @@ export default class PendaftaranService {
     return {
       response: true,
       message: `Status berkas berhasil diubah ke "${payload.status_berkas}".`,
+      data,
+    };
+  }
+
+  // ===========================================================================
+  // Koordinator: ganti dosen (skenario dosen berhalangan hadir)
+  // ===========================================================================
+  public static async updateDosenByKoordinator(
+    id: string,
+    payload: UpdateDosenByKoordinatorType
+  ) {
+    const existing = await PendaftaranRepository.findById(id);
+    if (!existing) {
+      throw new APIError('Pendaftaran tidak ditemukan.', 404);
+    }
+
+    await this.ensureKetuaSidangAllowed(
+      existing.id_jenis_seminar,
+      payload.nip_ketua_sidang
+    );
+
+    await this.ensureDosenListExists([
+      payload.nip_pembimbing_1,
+      payload.nip_pembimbing_2,
+      payload.nip_penguji_1,
+      payload.nip_penguji_2,
+      payload.nip_ketua_sidang,
+    ]);
+
+    const data = await PendaftaranRepository.updateDosenByKoordinator(id, payload);
+
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.PENDAFTARAN,
+      entity_id: data.id,
+      old_values: {
+        ...existing,
+        alasan_penggantian: payload.alasan_penggantian,
+      },
+      new_values: data,
+    });
+
+    return {
+      response: true,
+      message: 'Dosen pengganti berhasil diperbarui.',
       data,
     };
   }
@@ -405,6 +453,11 @@ export default class PendaftaranService {
       }
     }
 
+    await this.ensureKetuaSidangAllowed(
+      payload.id_jenis_seminar ?? existing.id_jenis_seminar,
+      payload.nip_ketua_sidang
+    );
+
     await this.ensureDosenListExists([
       payload.nip_pembimbing_1,
       payload.nip_pembimbing_2,
@@ -466,6 +519,22 @@ export default class PendaftaranService {
       if (!exists) {
         throw new APIError(`Dosen dengan NIP "${nip}" tidak ditemukan.`, 404);
       }
+    }
+  }
+
+  private static async ensureKetuaSidangAllowed(
+    idJenisSeminar: string,
+    nipKetuaSidang: string | null | undefined
+  ) {
+    if (!nipKetuaSidang) return;
+
+    const jenisSeminar = await PendaftaranRepository.findJenisSeminarById(idJenisSeminar);
+    if (!jenisSeminar) {
+      throw new APIError('Jenis seminar tidak ditemukan.', 404);
+    }
+
+    if (!jenisSeminar.ada_ketua_sidang) {
+      throw new APIError('Jenis seminar ini tidak menggunakan ketua sidang.', 400);
     }
   }
 

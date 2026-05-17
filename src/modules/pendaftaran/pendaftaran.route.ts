@@ -9,6 +9,7 @@ import {
   getAllPendaftaranQuerySchema,
   patchStatusBerkasSchema,
   postPendaftaranMahasiswaSchema,
+  putDosenPenggantiSchema,
   putPendaftaranMahasiswaSchema,
 } from './pendaftaran.validator';
 
@@ -77,6 +78,13 @@ pendaftaranRoute.patch(
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('json', patchStatusBerkasSchema, zodError),
   PendaftaranHandler.validateBerkas
+);
+
+pendaftaranRoute.put(
+  '/koordinator/pendaftaran/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('json', putDosenPenggantiSchema, zodError),
+  PendaftaranHandler.updateDosenByKoordinator
 );
 
 pendaftaranRoute.delete(

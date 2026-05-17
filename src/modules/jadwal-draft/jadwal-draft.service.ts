@@ -11,7 +11,7 @@ import { GenerateBatchOutputSchema } from '../../prompts/output/schedule-schema'
 import { getScheduleRulesAsText } from '../../prompts/context/schedule-rules';
 import JadwalDraftRepository from './jadwal-draft.repository';
 import JadwalRepository from '../../repositories/jadwal.repository';
-import RuanganRepository from '../../repositories/ruangan.repository';
+import RuanganRepository from '../ruangan/ruangan.repository';
 import ConstraintDosenRepository from '../../repositories/constraint-dosen.repository';
 import PenilaianRepository from '../../repositories/penilaian.repository';
 import JadwalService from '../../services/jadwal.service';
@@ -19,7 +19,7 @@ import { LogService } from '../../modules/log';
 import JadwalHelper from '../../helpers/jadwal.helper';
 import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
-import RuanganHelper from '../../helpers/ruangan.helper';
+import RuanganHelper from '../ruangan/ruangan.helper';
 import DosenHelper from '../../helpers/dosen.helper';
 import { LogJadwalContext } from '../../services/jadwal.service';
 import {
@@ -69,6 +69,8 @@ export default class JadwalDraftService {
       kodeToId.set(kode, await JenisSeminarHelper.resolveIdByKode(kode));
     }
 
+    const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
+
     // Validate mahasiswa + dosen + cek existing jadwal
     const allNips = new Set<string>();
     for (const mhs of data.list_mahasiswa) {
@@ -77,7 +79,8 @@ export default class JadwalDraftService {
       const idJenis = kodeToId.get(mhs.kode_jenis)!;
       const existing = await JadwalRepository.existsByMahasiswaAndJenis(
         mhs.nim,
-        idJenis
+        idJenis,
+        kode_tahun_ajaran
       );
       if (existing) {
         throw new APIError(
@@ -200,7 +203,6 @@ export default class JadwalDraftService {
         batch_id: batchId,
         nim: s.nim,
         id_jenis_seminar: idJenis,
-        judul: '',
         tanggal: JadwalHelper.convertFromJakartaTimezone(new Date(tanggalStr)),
         waktu_mulai: JadwalHelper.convertFromJakartaTimezone(new Date(mulaiStr)),
         waktu_selesai: JadwalHelper.convertFromJakartaTimezone(
@@ -340,6 +342,8 @@ export default class JadwalDraftService {
     const approved: any[] = [];
     const errors: any[] = [];
 
+    const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
+
     await prisma.$transaction(async (tx) => {
       for (const draft of drafts) {
         try {
@@ -347,7 +351,8 @@ export default class JadwalDraftService {
 
           const exists = await JadwalRepository.existsByMahasiswaAndJenis(
             draft.nim,
-            draft.id_jenis_seminar
+            draft.id_jenis_seminar,
+            kode_tahun_ajaran
           );
           if (exists) {
             const kode = await JenisSeminarHelper.resolveKodeById(
@@ -382,13 +387,11 @@ export default class JadwalDraftService {
             draft.id_jenis_seminar
           );
           const id = await JadwalHelper.generateId(kode);
-          const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
           const jadwal = await tx.jadwal.create({
             data: {
               id,
               tanggal: draft.tanggal,
-              judul: draft.judul,
               waktu_mulai: draft.waktu_mulai,
               waktu_selesai: draft.waktu_selesai,
               id_jenis_seminar: draft.id_jenis_seminar,

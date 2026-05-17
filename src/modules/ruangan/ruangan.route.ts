@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
-import { zodError } from '../utils/zod-error.util';
-import { postRuanganSchema } from '../validators/ruangan.validator';
-import RuanganHandler from '../handlers/ruangan.handler';
+import { zodError } from '../../utils/zod-error.util';
+import { postRuanganSchema } from './ruangan.validator';
+import RuanganHandler from './ruangan.handler';
 
 const ruanganRoute = new Hono({ router: new RegExpRouter() });
 

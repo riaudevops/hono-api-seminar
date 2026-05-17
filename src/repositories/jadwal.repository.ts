@@ -75,12 +75,14 @@ export default class JadwalRepository {
   public static async existsByMahasiswaAndJenis(
     nim: string,
     id_jenis_seminar: string,
+    kode_tahun_ajaran: string,
     excludeId?: string
   ) {
     return await prisma.jadwal.findFirst({
       where: {
         nim,
         id_jenis_seminar,
+        kode_tahun_ajaran,
         ...(excludeId && { id: { not: excludeId } }),
       },
       select: { id: true },

@@ -9,7 +9,7 @@ import GlobalHandler from './handlers/global.handler';
 import globalRoute from './routes/global.route';
 import LogMiddleware from './middlewares/log.middleware';
 import jadwalRoute from './routes/jadwal.route';
-import ruanganRoute from './routes/ruangan.route';
+import { RuanganRoute } from './modules/ruangan';
 import dosenRoute from './routes/dosen.route';
 import mahasiswaRoute from './routes/mahasiswa.route';
 import komponenRoute from './routes/komponen-penilaian.route';
@@ -79,7 +79,7 @@ app.get(
 
 app.route('/api', globalRoute);
 app.route('/api', jadwalRoute);
-app.route('/api', ruanganRoute);
+app.route('/api', RuanganRoute);
 app.route('/api', dosenRoute);
 app.route('/api', mahasiswaRoute);
 app.route('/api', komponenRoute);

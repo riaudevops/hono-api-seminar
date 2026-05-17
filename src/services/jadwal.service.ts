@@ -5,11 +5,11 @@ import JadwalHelper from '../helpers/jadwal.helper';
 import JenisSeminarHelper from '../helpers/jenis-seminar.helper';
 import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
 import { PenilaiRole, LogActionType, LogActorType } from '@prisma/client';
-import RuanganHelper from '../helpers/ruangan.helper';
+import RuanganHelper from '../modules/ruangan/ruangan.helper';
 import DosenHelper from '../helpers/dosen.helper';
 import MahasiswaRepository from '../repositories/mahasiswa.repository';
 import DosenRepository from '../repositories/dosen.repository';
-import RuanganRepository from '../repositories/ruangan.repository';
+import RuanganRepository from '../modules/ruangan/ruangan.repository';
 import PenilaianRepository from '../repositories/penilaian.repository';
 import { LogService } from '../modules/log';
 
@@ -160,21 +160,21 @@ export default class JadwalService {
       await DosenHelper.cekKonflik(nips, waktuMulaiServer, waktuSelesaiServer);
     }
 
+    const kode = await JenisSeminarHelper.resolveKodeById(id_jenis_seminar);
+    const id = await JadwalHelper.generateId(kode);
+    const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
+
     const existing = await JadwalRepository.existsByMahasiswaAndJenis(
       data.nim,
-      id_jenis_seminar
+      id_jenis_seminar,
+      kode_tahun_ajaran
     );
     if (existing) {
-      const kode = await JenisSeminarHelper.resolveKodeById(id_jenis_seminar);
       throw new APIError(
         `Mahasiswa ${data.nim} sudah memiliki jadwal untuk jenis ${kode}`,
         400
       );
     }
-
-    const kode = await JenisSeminarHelper.resolveKodeById(id_jenis_seminar);
-    const id = await JadwalHelper.generateId(kode);
-    const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
     await JadwalRepository.create({
       id,

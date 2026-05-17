@@ -1,5 +1,5 @@
-import RuanganRepository from '../repositories/ruangan.repository';
-import { APIError } from '../utils/api-error.util';
+import RuanganRepository from './ruangan.repository';
+import { APIError } from '../../utils/api-error.util';
 
 export default class RuanganHelper {
   public static async cekKonflik(

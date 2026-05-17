@@ -103,3 +103,20 @@ export const putPendaftaranMahasiswaSchema = z
 export const patchStatusBerkasSchema = z.object({
   status_berkas: z.nativeEnum(StatusBerkas),
 });
+
+// Koordinator ganti dosen
+export const putDosenPenggantiSchema = z
+  .object({
+    nip_pembimbing_1: nipSchema.optional(),
+    nip_pembimbing_2: nipNullableSchema,
+    nip_penguji_1: nipNullableSchema,
+    nip_penguji_2: nipNullableSchema,
+    nip_ketua_sidang: nipNullableSchema,
+    alasan_penggantian: z
+      .string()
+      .min(10, 'Alasan penggantian minimal 10 karakter')
+      .max(500, 'Alasan penggantian maksimal 500 karakter'),
+  })
+  .refine(uniqueNipRefinement, {
+    message: 'NIP pembimbing, penguji, dan ketua sidang tidak boleh sama',
+  });

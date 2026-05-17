@@ -3,6 +3,7 @@ import { StatusBerkas } from '@prisma/client';
 import PendaftaranService from './pendaftaran.service';
 import {
   CreatePendaftaranByMahasiswaType,
+  UpdateDosenByKoordinatorType,
   UpdatePendaftaranByMahasiswaType,
   UpdateStatusBerkasType,
 } from './pendaftaran.type';
@@ -45,6 +46,12 @@ export default class PendaftaranHandler {
     const { id } = c.req.param();
     const body = (await c.req.json()) as UpdateStatusBerkasType;
     return c.json(await PendaftaranService.validateBerkas(id, body));
+  }
+
+  public static async updateDosenByKoordinator(c: Context) {
+    const { id } = c.req.param();
+    const body = (await c.req.json()) as UpdateDosenByKoordinatorType;
+    return c.json(await PendaftaranService.updateDosenByKoordinator(id, body));
   }
 
   public static async delete(c: Context) {

@@ -1,6 +1,6 @@
 import { Context } from 'hono';
-import RuanganService from '../services/ruangan.service';
-import { CreateRuanganType, UpdateRuanganType } from '../types/ruangan.type';
+import RuanganService from './ruangan.service';
+import { CreateRuanganType, UpdateRuanganType } from './ruangan.type';
 
 export default class RuanganHandler {
   public static async getAll(c: Context) {

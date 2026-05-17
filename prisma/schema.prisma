@@ -122,7 +122,6 @@ model ruangan {
 model jadwal {
   id            String   @id @db.VarChar(14)
   tanggal       DateTime @db.Timestamptz
-  judul         String?  @db.VarChar(255)
   waktu_mulai   DateTime @db.Timestamptz
   waktu_selesai DateTime @db.Timestamptz
 
@@ -139,9 +138,12 @@ model jadwal {
 
   penilaian penilaian[]
 
+  @@unique([nim, id_jenis_seminar, kode_tahun_ajaran])
   @@index([tanggal])
   @@index([nim, kode_tahun_ajaran])
   @@index([kode_ruangan, tanggal])
+  @@index([kode_ruangan, waktu_mulai, waktu_selesai])
+  @@index([waktu_mulai, waktu_selesai])
   @@index([id_jenis_seminar])
 }
 
@@ -152,8 +154,6 @@ model jadwal_draft {
 
   id_jenis_seminar String
   jenis_seminar    jenis_seminar @relation(fields: [id_jenis_seminar], references: [id])
-
-  judul          String            @db.VarChar(255)
 
   tanggal        DateTime          @db.Timestamptz
   waktu_mulai    DateTime          @db.Timestamptz
@@ -196,6 +196,7 @@ model penilaian {
   detail_penilaian detail_penilaian[]
 
   @@unique([id_jadwal, nip])
+  @@unique([id_jadwal, role])
   @@index([id_jadwal])
   @@index([nip])
 }

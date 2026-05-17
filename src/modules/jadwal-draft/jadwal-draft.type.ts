@@ -9,7 +9,6 @@ export interface DosenAssignmentInput {
 export interface MahasiswaScheduleInput {
   nim: string;
   kode_jenis: JenisJadwalKode;
-  judul: string;
   list_dosen: DosenAssignmentInput[];
 }
 
@@ -29,7 +28,6 @@ export interface CreateJadwalDraftInput {
   batch_id: string;
   nim: string;
   id_jenis_seminar: string;
-  judul: string;
   tanggal: Date;
   waktu_mulai: Date;
   waktu_selesai: Date;
