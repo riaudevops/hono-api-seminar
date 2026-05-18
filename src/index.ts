@@ -8,7 +8,7 @@ import { createLogger } from './utils/logger.util';
 import GlobalHandler from './handlers/global.handler';
 import globalRoute from './routes/global.route';
 import LogMiddleware from './middlewares/log.middleware';
-import jadwalRoute from './routes/jadwal.route';
+import { JadwalRoute } from './modules/jadwal';
 import { RuanganRoute } from './modules/ruangan';
 import dosenRoute from './routes/dosen.route';
 import mahasiswaRoute from './routes/mahasiswa.route';
@@ -78,7 +78,7 @@ app.get(
 );
 
 app.route('/api', globalRoute);
-app.route('/api', jadwalRoute);
+app.route('/api', JadwalRoute);
 app.route('/api', RuanganRoute);
 app.route('/api', dosenRoute);
 app.route('/api', mahasiswaRoute);
@@ -122,4 +122,5 @@ logger.info(`Server is running`, {
 export default {
   port: serverPort,
   fetch: app.fetch,
+  idleTimeout: 120,
 };
