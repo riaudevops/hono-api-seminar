@@ -36,6 +36,13 @@ export const generateJadwalSchema = z
     list_mahasiswa: z
       .array(mahasiswaScheduleSchema)
       .min(1, 'Minimal 1 mahasiswa'),
+    tanggal_dikecualikan: z
+      .array(
+        z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal dikecualikan harus YYYY-MM-DD')
+      )
+      .optional(),
     catatan_tambahan: z
       .string()
       .max(1000, 'Catatan tambahan maksimal 1000 karakter')

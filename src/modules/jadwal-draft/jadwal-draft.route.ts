@@ -13,40 +13,47 @@ import {
 const jadwalDraftRoute = new Hono({ router: new RegExpRouter() });
 
 jadwalDraftRoute.get(
-  '/jadwal-draft',
+  '/koordinator/jadwal-draft',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getDraftsQuerySchema, zodError),
   JadwalDraftHandler.getDrafts
 );
 
 jadwalDraftRoute.post(
-  '/jadwal-draft/generate',
+  '/koordinator/jadwal-draft/generate',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('json', generateJadwalSchema, zodError),
   JadwalDraftHandler.generate
 );
 
+jadwalDraftRoute.post(
+  '/koordinator/jadwal-draft/generate/stream',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('json', generateJadwalSchema, zodError),
+  JadwalDraftHandler.generateStream
+);
+
 jadwalDraftRoute.get(
-  '/jadwal-draft/batch/:batch_id',
+  '/koordinator/jadwal-draft/batch/:batch_id',
   AuthMiddleware.JWTBearerTokenExtraction,
   JadwalDraftHandler.getDraftsByBatch
 );
 
 jadwalDraftRoute.put(
-  '/jadwal-draft/item/:id',
+  '/koordinator/jadwal-draft/item/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('json', updateDraftSchema, zodError),
   JadwalDraftHandler.updateDraft
 );
 
 jadwalDraftRoute.post(
-  '/jadwal-draft/batch/:batch_id/approve',
+  '/koordinator/jadwal-draft/batch/:batch_id/approve',
   AuthMiddleware.JWTBearerTokenExtraction,
   JadwalDraftHandler.approveBatch
 );
 
 jadwalDraftRoute.post(
-  '/jadwal-draft/batch/:batch_id/reject',
+  '/koordinator/jadwal-draft/batch/:batch_id/reject',
   AuthMiddleware.JWTBearerTokenExtraction,
   JadwalDraftHandler.rejectBatch
 );

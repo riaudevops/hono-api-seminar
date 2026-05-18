@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { LogActionType, LogActorType, StatusJadwalDraft } from '@prisma/client';
+import { LogActionType, LogActorType, LogEntityType, StatusJadwalDraft } from '@prisma/client';
 import { APIError } from '../../utils/api-error.util';
 import { createLogger } from '../../utils/logger.util';
 import { textMessage } from '../../utils/openrouter.util';
@@ -28,6 +28,12 @@ import {
 } from './jadwal-draft.type';
 
 const logger = createLogger('JadwalDraftService');
+const GENERATE_CHUNK_SIZE = 10;
+
+type GenerateProgressEmitter = (
+  event: string,
+  payload: Record<string, unknown>
+) => Promise<void> | void;
 
 const PERSONA_PROMPT = readFileSync(
   join(process.cwd(), 'src/prompts/base/scheduler-persona.md'),
@@ -55,13 +61,29 @@ export default class JadwalDraftService {
         kode_jenis: string;
         list_dosen: { nip: string; role: any }[];
       }>;
+      tanggal_dikecualikan?: string[];
       catatan_tambahan?: string;
     },
-    context: LogJadwalContext
+    context: LogJadwalContext,
+    emit?: GenerateProgressEmitter
   ) {
+    const sendProgress = async (
+      event: string,
+      payload: Record<string, unknown>
+    ) => {
+      if (emit) await emit(event, payload);
+    };
+
     const batchId = generateBatchId();
+    await sendProgress('batch:start', {
+      batch_id: batchId,
+      message: 'Batch generate jadwal draft dimulai',
+    });
 
     // Resolve kode_jenis → id_jenis_seminar sekali di depan
+    await sendProgress('jenis:resolving', {
+      message: 'Mencocokkan jenis seminar',
+    });
     const kodeSet = new Set<string>();
     for (const mhs of data.list_mahasiswa) kodeSet.add(mhs.kode_jenis);
     const kodeToId = new Map<string, string>();
@@ -73,7 +95,13 @@ export default class JadwalDraftService {
 
     // Validate mahasiswa + dosen + cek existing jadwal
     const allNips = new Set<string>();
-    for (const mhs of data.list_mahasiswa) {
+    for (const [index, mhs] of data.list_mahasiswa.entries()) {
+      await sendProgress('validating', {
+        current: index + 1,
+        total: data.list_mahasiswa.length,
+        nim: mhs.nim,
+        message: `Memvalidasi mahasiswa ${mhs.nim}`,
+      });
       await JadwalService.validateMahasiswa(mhs.nim);
 
       const idJenis = kodeToId.get(mhs.kode_jenis)!;
@@ -99,119 +127,112 @@ export default class JadwalDraftService {
     const endDate = new Date(tanggalMulai);
     endDate.setDate(endDate.getDate() + 30);
 
-    const [ruanganList, existingJadwal, constraintList] = await Promise.all([
+    await sendProgress('context:loading', {
+      message: 'Mengambil data ruangan, jadwal existing, dan constraint dosen',
+    });
+
+    const [ruanganList, existingJadwal] = await Promise.all([
       RuanganRepository.findAktif(),
       JadwalRepository.findByDateRange(tanggalMulai, endDate),
-      this.getConstraintsForNips([...allNips]),
     ]);
-
-    const contextData = {
-      tanggal_mulai: tanggalMulai.toISOString().slice(0, 10),
-      list_mahasiswa: data.list_mahasiswa.map((m) => ({
-        nim: m.nim,
-        jenis: m.kode_jenis,
-        list_dosen: m.list_dosen,
-      })),
-      ruangan_tersedia: ruanganList.map((r) => ({
-        kode: r.kode,
-        nama: r.nama,
-      })),
-      jadwal_ada: (existingJadwal as any[]).map((j) => ({
-        tanggal: JadwalHelper.convertToJakartaTimezone(j.tanggal)
-          .toISOString()
-          .slice(0, 10),
-        waktu_mulai: JadwalHelper.convertToJakartaTimezone(j.waktu_mulai)
-          .toISOString()
-          .slice(11, 16),
-        waktu_selesai: JadwalHelper.convertToJakartaTimezone(j.waktu_selesai)
-          .toISOString()
-          .slice(11, 16),
-        kode_ruangan: j.kode_ruangan,
-        dosen_terlibat: j.penilaian?.map((p: any) => p.nip) || [],
-      })),
-      constraint_dosen: constraintList,
-      ...(data.catatan_tambahan
-        ? { catatan_tambahan: data.catatan_tambahan }
-        : {}),
-    };
 
     logger.info('Generating batch schedule', {
       batchId,
       mahasiswaCount: data.list_mahasiswa.length,
     });
 
-    const response = await openRouterService.chatCompletion({
-      messages: [
-        textMessage('system', PERSONA_PROMPT),
-        textMessage('system', getScheduleRulesAsText()),
-        textMessage('system', BATCH_TASK_PROMPT),
-        textMessage('user', JSON.stringify(contextData, null, 2)),
-      ],
-      temperature: 0.3,
-      maxTokens: 4096,
+    const baseBlockingSchedules = this.formatExistingJadwalForAi(
+      existingJadwal as any[]
+    );
+    const mahasiswaChunks = this.chunkMahasiswa(
+      data.list_mahasiswa,
+      GENERATE_CHUNK_SIZE
+    );
+    const drafts: CreateJadwalDraftInput[] = [];
+    const generatedBlockingSchedules: any[] = [];
+
+    await sendProgress('chunks:start', {
+      batch_id: batchId,
+      total_chunks: mahasiswaChunks.length,
+      chunk_size: GENERATE_CHUNK_SIZE,
+      total_mahasiswa: data.list_mahasiswa.length,
+      message: `Generate akan diproses dalam ${mahasiswaChunks.length} chunk`,
     });
 
-    const rawContent = response.choices?.[0]?.message?.content;
-    if (!rawContent || typeof rawContent !== 'string') {
-      throw new APIError(
-        'AI tidak dapat memproses permintaan. Silakan coba lagi.',
-        502
-      );
-    }
-
-    const jsonMatch =
-      rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawContent];
-    const jsonStr = jsonMatch[1].trim();
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      logger.error('Failed to parse AI JSON output', { rawContent });
-      throw new APIError(
-        'AI mengembalikan format yang tidak valid. Silakan coba lagi.',
-        502
-      );
-    }
-
-    const result = GenerateBatchOutputSchema.safeParse(parsed);
-    if (!result.success) {
-      logger.error('AI output validation failed', {
-        errors: result.error.issues,
-      });
-      throw new APIError(
-        'AI mengembalikan data yang tidak valid. Silakan coba lagi.',
-        502
-      );
-    }
-
-    const drafts: CreateJadwalDraftInput[] = [];
-    for (const s of result.data.suggestions) {
-      const tanggalStr = `${s.tanggal}T00:00:00.000Z`;
-      const mulaiStr = `${s.tanggal}T${s.waktu_mulai}:00.000Z`;
-      const selesaiStr = `${s.tanggal}T${s.waktu_selesai}:00.000Z`;
-
-      const mhsInput = data.list_mahasiswa.find(
-        (m) => m.nim === s.nim && m.kode_jenis === s.jenis
-      );
-
-      const idJenis =
-        kodeToId.get(s.jenis) ||
-        (await JenisSeminarHelper.resolveIdByKode(s.jenis));
-
-      drafts.push({
+    for (const [chunkIndex, mahasiswaChunk] of mahasiswaChunks.entries()) {
+      const currentChunk = chunkIndex + 1;
+      await sendProgress('chunk:start', {
         batch_id: batchId,
-        nim: s.nim,
-        id_jenis_seminar: idJenis,
-        tanggal: JadwalHelper.convertFromJakartaTimezone(new Date(tanggalStr)),
-        waktu_mulai: JadwalHelper.convertFromJakartaTimezone(new Date(mulaiStr)),
-        waktu_selesai: JadwalHelper.convertFromJakartaTimezone(
-          new Date(selesaiStr)
-        ),
-        kode_ruangan: s.kode_ruangan,
-        list_dosen: mhsInput?.list_dosen || [],
-        llm_reasoning: { reasoning: s.reasoning },
-        confidence: s.confidence,
+        chunk: currentChunk,
+        total_chunks: mahasiswaChunks.length,
+        mahasiswa_count: mahasiswaChunk.length,
+        message: `Memproses chunk ${currentChunk}/${mahasiswaChunks.length}`,
+      });
+
+      const chunkNips = new Set<string>();
+      for (const mhs of mahasiswaChunk) {
+        for (const dosen of mhs.list_dosen) chunkNips.add(dosen.nip);
+      }
+      const constraintList = await this.getConstraintsForNips([...chunkNips]);
+      const contextData = this.buildChunkContextData({
+        tanggalMulai,
+        mahasiswaChunk,
+        ruanganList,
+        baseBlockingSchedules,
+        generatedBlockingSchedules,
+        constraintList,
+        tanggalDikecualikan: data.tanggal_dikecualikan,
+        catatanTambahan: data.catatan_tambahan,
+      });
+
+      await sendProgress('ai:generating', {
+        batch_id: batchId,
+        chunk: currentChunk,
+        total_chunks: mahasiswaChunks.length,
+        message: `AI sedang menyusun jadwal draft chunk ${currentChunk}/${mahasiswaChunks.length}`,
+      });
+
+      const result = await this.generateChunkSuggestions(contextData, {
+        batchId,
+        chunk: currentChunk,
+        totalChunks: mahasiswaChunks.length,
+      });
+
+      await sendProgress('ai:parsing', {
+        batch_id: batchId,
+        chunk: currentChunk,
+        total_chunks: mahasiswaChunks.length,
+        message: `Memproses hasil generate AI chunk ${currentChunk}/${mahasiswaChunks.length}`,
+      });
+
+      this.validateChunkSuggestionsCoverage(
+        result.suggestions,
+        mahasiswaChunk
+      );
+      this.validateExcludedDates(
+        result.suggestions,
+        data.tanggal_dikecualikan || []
+      );
+
+      const chunkDrafts = await this.mapSuggestionsToDrafts({
+        suggestions: result.suggestions,
+        mahasiswaChunk,
+        kodeToId,
+        batchId,
+      });
+
+      drafts.push(...chunkDrafts);
+      generatedBlockingSchedules.push(
+        ...chunkDrafts.map((draft) => this.formatGeneratedDraftForAi(draft))
+      );
+
+      await sendProgress('chunk:done', {
+        batch_id: batchId,
+        chunk: currentChunk,
+        total_chunks: mahasiswaChunks.length,
+        generated_count: chunkDrafts.length,
+        total_generated: drafts.length,
+        message: `Chunk ${currentChunk}/${mahasiswaChunks.length} selesai`,
       });
     }
 
@@ -222,16 +243,35 @@ export default class JadwalDraftService {
       );
     }
 
+    this.validateGeneratedDraftsNoObviousConflicts(drafts);
+
+    await sendProgress('saving', {
+      count: drafts.length,
+      message: 'Menyimpan jadwal draft',
+    });
+
     await JadwalDraftRepository.createMany(drafts);
 
     const savedDrafts = await JadwalDraftRepository.findByBatchId(batchId);
+    await Promise.all(
+      savedDrafts.map((draft) =>
+        LogService.createEntityLog({
+          action: LogActionType.CREATE,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          entity_type: LogEntityType.JADWAL_DRAFT,
+          entity_id: draft.id,
+          new_values: draft,
+        })
+      )
+    );
 
     logger.info('Batch schedule generated', {
       batchId,
       draftCount: savedDrafts.length,
     });
 
-    return {
+    const responseData = {
       response: true,
       message: `${savedDrafts.length} jadwal draft berhasil di-generate`,
       data: {
@@ -239,6 +279,10 @@ export default class JadwalDraftService {
         drafts: savedDrafts.map((d) => this.formatDraftResponse(d)),
       },
     };
+
+    await sendProgress('done', responseData);
+
+    return responseData;
   }
 
   public static async getDrafts(filters?: {
@@ -267,7 +311,11 @@ export default class JadwalDraftService {
     };
   }
 
-  public static async updateDraft(id: string, data: UpdateDraftInput) {
+  public static async updateDraft(
+    id: string,
+    data: UpdateDraftInput,
+    context: LogJadwalContext
+  ) {
     const draft = await JadwalDraftRepository.findById(id);
     if (!draft) {
       throw new APIError('Draft tidak ditemukan', 404);
@@ -316,6 +364,15 @@ export default class JadwalDraftService {
     }
 
     const updated = await JadwalDraftRepository.update(id, updateData);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: context.actor_type,
+      actor_id: context.actor_id,
+      entity_type: LogEntityType.JADWAL_DRAFT,
+      entity_id: id,
+      old_values: draft,
+      new_values: updated,
+    });
 
     return {
       response: true,
@@ -434,9 +491,19 @@ export default class JadwalDraftService {
             },
           });
 
-          await tx.jadwal_draft.update({
+          const updatedDraft = await tx.jadwal_draft.update({
             where: { id: draft.id },
             data: { status: StatusJadwalDraft.APPROVED },
+          });
+
+          await LogService.createEntityLogTx(tx, {
+            action: LogActionType.UPDATE,
+            actor_type: context.actor_type,
+            actor_id: context.actor_id,
+            entity_type: LogEntityType.JADWAL_DRAFT,
+            entity_id: draft.id,
+            old_values: draft,
+            new_values: updatedDraft,
           });
 
           approved.push({
@@ -462,7 +529,10 @@ export default class JadwalDraftService {
     };
   }
 
-  public static async rejectBatch(batch_id: string) {
+  public static async rejectBatch(
+    batch_id: string,
+    context: LogJadwalContext
+  ) {
     const drafts = await JadwalDraftRepository.findByBatchId(
       batch_id,
       StatusJadwalDraft.DRAFT
@@ -479,10 +549,316 @@ export default class JadwalDraftService {
       StatusJadwalDraft.REJECTED
     );
 
+    const rejectedDrafts = await JadwalDraftRepository.findByBatchId(batch_id);
+    await Promise.all(
+      drafts.map((draft) => {
+        const rejectedDraft = rejectedDrafts.find((item) => item.id === draft.id);
+        return LogService.createEntityLog({
+          action: LogActionType.UPDATE,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          entity_type: LogEntityType.JADWAL_DRAFT,
+          entity_id: draft.id,
+          old_values: draft,
+          new_values: rejectedDraft ?? { ...draft, status: StatusJadwalDraft.REJECTED },
+        });
+      })
+    );
+
     return {
       response: true,
       message: `${drafts.length} draft berhasil ditolak`,
     };
+  }
+
+  private static chunkMahasiswa<T>(items: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+      chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  private static formatExistingJadwalForAi(jadwal: any[]) {
+    return jadwal.map((j) => ({
+      tanggal: JadwalHelper.convertToJakartaTimezone(j.tanggal)
+        .toISOString()
+        .slice(0, 10),
+      waktu_mulai: JadwalHelper.convertToJakartaTimezone(j.waktu_mulai)
+        .toISOString()
+        .slice(11, 16),
+      waktu_selesai: JadwalHelper.convertToJakartaTimezone(j.waktu_selesai)
+        .toISOString()
+        .slice(11, 16),
+      kode_ruangan: j.kode_ruangan,
+      dosen_terlibat: j.penilaian?.map((p: any) => p.nip) || [],
+    }));
+  }
+
+  private static formatGeneratedDraftForAi(draft: CreateJadwalDraftInput) {
+    return {
+      tanggal: JadwalHelper.convertToJakartaTimezone(draft.tanggal)
+        .toISOString()
+        .slice(0, 10),
+      waktu_mulai: JadwalHelper.convertToJakartaTimezone(draft.waktu_mulai)
+        .toISOString()
+        .slice(11, 16),
+      waktu_selesai: JadwalHelper.convertToJakartaTimezone(draft.waktu_selesai)
+        .toISOString()
+        .slice(11, 16),
+      kode_ruangan: draft.kode_ruangan,
+      dosen_terlibat: draft.list_dosen.map((d) => d.nip),
+    };
+  }
+
+  private static buildChunkContextData(params: {
+    tanggalMulai: Date;
+    mahasiswaChunk: Array<{
+      nim: string;
+      kode_jenis: string;
+      list_dosen: { nip: string; role: any }[];
+    }>;
+    ruanganList: any[];
+    baseBlockingSchedules: any[];
+    generatedBlockingSchedules: any[];
+    constraintList: any[];
+    tanggalDikecualikan?: string[];
+    catatanTambahan?: string;
+  }) {
+    return {
+      tanggal_mulai: params.tanggalMulai.toISOString().slice(0, 10),
+      list_mahasiswa: params.mahasiswaChunk.map((m) => ({
+        nim: m.nim,
+        jenis: m.kode_jenis,
+        list_dosen: m.list_dosen,
+      })),
+      ruangan_tersedia: params.ruanganList.map((r) => ({
+        kode: r.kode,
+        nama: r.nama,
+      })),
+      jadwal_ada: [
+        ...params.baseBlockingSchedules,
+        ...params.generatedBlockingSchedules,
+      ],
+      constraint_dosen: params.constraintList,
+      tanggal_dikecualikan: params.tanggalDikecualikan || [],
+      ...(params.catatanTambahan
+        ? { catatan_tambahan: params.catatanTambahan }
+        : {}),
+    };
+  }
+
+  private static async generateChunkSuggestions(
+    contextData: Record<string, unknown>,
+    meta: { batchId: string; chunk: number; totalChunks: number }
+  ) {
+    const response = await openRouterService.chatCompletion({
+      messages: [
+        textMessage('system', PERSONA_PROMPT),
+        textMessage('system', getScheduleRulesAsText()),
+        textMessage('system', BATCH_TASK_PROMPT),
+        textMessage('user', JSON.stringify(contextData, null, 2)),
+      ],
+      temperature: 0.3,
+      maxTokens: 4096,
+    });
+
+    const rawContent = response.choices?.[0]?.message?.content;
+    if (!rawContent || typeof rawContent !== 'string') {
+      throw new APIError(
+        'AI tidak dapat memproses permintaan. Silakan coba lagi.',
+        502
+      );
+    }
+
+    const jsonMatch =
+      rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawContent];
+    const jsonStr = jsonMatch[1].trim();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      logger.error('Failed to parse AI JSON output', {
+        batchId: meta.batchId,
+        chunk: meta.chunk,
+        totalChunks: meta.totalChunks,
+        rawContent,
+      });
+      throw new APIError(
+        'AI mengembalikan format yang tidak valid. Silakan coba lagi.',
+        502
+      );
+    }
+
+    const result = GenerateBatchOutputSchema.safeParse(parsed);
+    if (!result.success) {
+      logger.error('AI output validation failed', {
+        batchId: meta.batchId,
+        chunk: meta.chunk,
+        totalChunks: meta.totalChunks,
+        errors: result.error.issues,
+      });
+      throw new APIError(
+        'AI mengembalikan data yang tidak valid. Silakan coba lagi.',
+        502
+      );
+    }
+
+    return result.data;
+  }
+
+  private static validateChunkSuggestionsCoverage(
+    suggestions: { nim: string; jenis: string }[],
+    mahasiswaChunk: Array<{ nim: string; kode_jenis: string }>
+  ) {
+    const expected = new Set(
+      mahasiswaChunk.map((m) => `${m.nim}|${m.kode_jenis}`)
+    );
+    const received = new Set<string>();
+
+    for (const suggestion of suggestions) {
+      const key = `${suggestion.nim}|${suggestion.jenis}`;
+      if (!expected.has(key) || received.has(key)) {
+        throw new APIError(
+          'AI mengembalikan jumlah jadwal yang tidak sesuai dengan daftar mahasiswa. Silakan coba lagi.',
+          502
+        );
+      }
+      received.add(key);
+    }
+
+    if (received.size !== expected.size) {
+      throw new APIError(
+        'AI mengembalikan jumlah jadwal yang tidak sesuai dengan daftar mahasiswa. Silakan coba lagi.',
+        502
+      );
+    }
+  }
+
+  private static validateExcludedDates(
+    suggestions: Array<{ tanggal: string }>,
+    excludedDates: string[]
+  ) {
+    if (excludedDates.length === 0) return;
+
+    const excluded = new Set(excludedDates);
+    const hasExcludedDate = suggestions.some((s) => excluded.has(s.tanggal));
+    if (hasExcludedDate) {
+      throw new APIError(
+        'AI menghasilkan jadwal pada tanggal yang dikecualikan. Silakan coba lagi.',
+        502
+      );
+    }
+  }
+
+  private static async mapSuggestionsToDrafts(params: {
+    suggestions: Array<{
+      tanggal: string;
+      waktu_mulai: string;
+      waktu_selesai: string;
+      kode_ruangan: string;
+      nim: string;
+      jenis: string;
+      confidence: number;
+      reasoning: string;
+    }>;
+    mahasiswaChunk: Array<{
+      nim: string;
+      kode_jenis: string;
+      list_dosen: { nip: string; role: any }[];
+    }>;
+    kodeToId: Map<string, string>;
+    batchId: string;
+  }): Promise<CreateJadwalDraftInput[]> {
+    const drafts: CreateJadwalDraftInput[] = [];
+
+    for (const s of params.suggestions) {
+      const tanggalStr = `${s.tanggal}T00:00:00.000Z`;
+      const mulaiStr = `${s.tanggal}T${s.waktu_mulai}:00.000Z`;
+      const selesaiStr = `${s.tanggal}T${s.waktu_selesai}:00.000Z`;
+      const mhsInput = params.mahasiswaChunk.find(
+        (m) => m.nim === s.nim && m.kode_jenis === s.jenis
+      );
+      const idJenis =
+        params.kodeToId.get(s.jenis) ||
+        (await JenisSeminarHelper.resolveIdByKode(s.jenis));
+
+      drafts.push({
+        batch_id: params.batchId,
+        nim: s.nim,
+        id_jenis_seminar: idJenis,
+        tanggal: JadwalHelper.convertFromJakartaTimezone(new Date(tanggalStr)),
+        waktu_mulai: JadwalHelper.convertFromJakartaTimezone(new Date(mulaiStr)),
+        waktu_selesai: JadwalHelper.convertFromJakartaTimezone(
+          new Date(selesaiStr)
+        ),
+        kode_ruangan: s.kode_ruangan,
+        list_dosen: mhsInput?.list_dosen || [],
+        llm_reasoning: { reasoning: s.reasoning },
+        confidence: s.confidence,
+      });
+    }
+
+    return drafts;
+  }
+
+  private static validateGeneratedDraftsNoObviousConflicts(
+    drafts: CreateJadwalDraftInput[]
+  ) {
+    const mahasiswaKeys = new Set<string>();
+    for (const draft of drafts) {
+      const key = `${draft.nim}|${draft.id_jenis_seminar}`;
+      if (mahasiswaKeys.has(key)) {
+        throw new APIError(
+          'AI menghasilkan jadwal duplikat untuk mahasiswa yang sama. Silakan coba lagi.',
+          502
+        );
+      }
+      mahasiswaKeys.add(key);
+    }
+
+    for (let i = 0; i < drafts.length; i++) {
+      for (let j = i + 1; j < drafts.length; j++) {
+        const first = drafts[i];
+        const second = drafts[j];
+        if (
+          !this.timeRangesOverlap(
+            first.waktu_mulai,
+            first.waktu_selesai,
+            second.waktu_mulai,
+            second.waktu_selesai
+          )
+        ) {
+          continue;
+        }
+
+        if (first.kode_ruangan === second.kode_ruangan) {
+          throw new APIError(
+            'AI menghasilkan jadwal dengan konflik ruangan. Silakan coba lagi.',
+            502
+          );
+        }
+
+        const firstNips = new Set(first.list_dosen.map((d) => d.nip));
+        const hasSameDosen = second.list_dosen.some((d) => firstNips.has(d.nip));
+        if (hasSameDosen) {
+          throw new APIError(
+            'AI menghasilkan jadwal dengan konflik dosen. Silakan coba lagi.',
+            502
+          );
+        }
+      }
+    }
+  }
+
+  private static timeRangesOverlap(
+    startA: Date,
+    endA: Date,
+    startB: Date,
+    endB: Date
+  ) {
+    return startA < endB && startB < endA;
   }
 
   private static async getConstraintsForNips(nips: string[]) {
@@ -498,6 +874,8 @@ export default class JadwalDraftService {
         constraints: constraints.map((c) => ({
           type: c.type,
           hari: c.hari,
+          waktu_mulai: c.waktu_mulai,
+          waktu_selesai: c.waktu_selesai,
           keterangan: c.keterangan,
           priority: c.priority,
         })),

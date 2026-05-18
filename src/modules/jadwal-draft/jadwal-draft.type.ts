@@ -15,6 +15,8 @@ export interface MahasiswaScheduleInput {
 export interface GenerateJadwalInput {
   tanggal_mulai: string;
   list_mahasiswa: MahasiswaScheduleInput[];
+  tanggal_dikecualikan?: string[];
+  catatan_tambahan?: string;
 }
 
 export interface UpdateDraftInput {
