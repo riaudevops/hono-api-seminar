@@ -24,7 +24,8 @@ Kamu akan menerima JSON dengan format:
   ],
   "ruangan_tersedia": [...],
   "jadwal_ada": [...],
-  "constraint_dosen": [...]
+  "constraint_dosen": [...],
+  "tanggal_dikecualikan": ["2026-05-27"]
 }
 ```
 
@@ -33,15 +34,15 @@ Kamu akan menerima JSON dengan format:
 ### Langkah 1: Pahami Data Konteks
 
 - **ruangan_tersedia**: Daftar ruangan yang aktif dan bisa digunakan
-- **jadwal_ada**: Jadwal yang sudah ada (perhatikan waktu dan ruangan agar tidak bentrok)
+- **jadwal_ada**: Jadwal yang sudah ada, termasuk jadwal draft dari chunk sebelumnya dalam batch generate yang sama (perhatikan waktu, ruangan, dan dosen agar tidak bentrok)
 - **constraint_dosen**: Batasan waktu dan preferensi setiap dosen
+- **tanggal_dikecualikan**: Daftar tanggal yang tidak boleh dipakai untuk jadwal seminar, misalnya tanggal merah kalender akademik/libur nasional
 
 ### Langkah 2: Tentukan Durasi
 
 Gunakan durasi berdasarkan jenis seminar:
-- SEMKP: 60 menit
-- SEMPRO, SEMHAS_LAPORAN, SEMHAS_PAPERBASED: 90 menit
-- SIDANG_LAPORAN, SIDANG_PAPERBASED: 120 menit
+- Seminar Kerja Praktik (SEMKP): 60 menit / 1 jam
+- Semua seminar Tugas Akhir (SEMPRO, SEMHAS_LAPORAN, SEMHAS_PAPERBASED, SIDANG_LAPORAN, SIDANG_PAPERBASED): 120 menit / 2 jam
 
 ### Langkah 3: Cari Slot untuk Setiap Mahasiswa
 
@@ -49,15 +50,16 @@ Untuk setiap mahasiswa, cari slot yang memenuhi:
 
 1. **Berada di jam kerja** (08:00–17:00 WIB, Senin–Jumat)
 2. **Mulai dari tanggal_mulai** atau setelahnya
-3. **Ruangan tidak terpakai** pada slot tersebut (+ buffer 15 menit dari jadwal yang sudah ada)
-4. **Semua dosen penilai AVAILABLE** pada slot tersebut (cek constraint)
-5. **Tidak ada dosen yang double-booked** antar mahasiswa dalam batch ini
-6. **Maks 3 seminar per dosen per hari** (preferensi)
+3. **Tidak menggunakan tanggal_dikecualikan**
+4. **Ruangan tidak terpakai** pada slot tersebut; tidak ada buffer 15 menit, sehingga jadwal boleh berurutan langsung
+5. **Semua dosen penilai AVAILABLE** pada slot tersebut (cek constraint)
+6. **Tidak ada dosen yang double-booked** pada waktu yang overlap; dosen yang sama boleh dijadwalkan berurutan langsung
+7. **Maks 3 seminar per dosen per hari** (preferensi)
 
 ### Langkah 4: Optimalkan Penempatan Batch
 
 - **Kelompokkan** mahasiswa dengan dosen yang sama di hari yang berdekatan
-- **Hindari** menjadwalkan dosen yang sama di dua ruangan bersamaan
+- **Hindari** menjadwalkan dosen yang sama di dua ruangan pada waktu yang overlap; jadwal berurutan langsung untuk dosen yang sama diperbolehkan
 - **Minimalkan** jumlah hari yang dibutuhkan
 - Prioritaskan **slot paling awal** yang tersedia
 
@@ -86,6 +88,7 @@ Untuk setiap mahasiswa, berikan tepat **1 suggestion**:
 
 - Output **harus** berisi tepat 1 suggestion per mahasiswa dalam input
 - Jika tidak memungkinkan menemukan slot untuk seorang mahasiswa, tetap sertakan dengan `confidence: 0.0` dan jelaskan di `reasoning`
-- Selalu pertimbangkan **buffer 15 menit** antar seminar di ruangan yang sama
-- Pastikan **tidak ada bentrokan** antar mahasiswa dalam batch yang sama (dosen sama tidak dijadwalkan bersamaan)
+- Jangan gunakan tanggal yang ada di **tanggal_dikecualikan**
+- Tidak ada **buffer 15 menit** antar seminar; jadwal boleh berurutan langsung jika waktu selesai satu seminar sama dengan waktu mulai seminar berikutnya
+- Pastikan **tidak ada bentrokan overlap** antar mahasiswa dalam batch yang sama; dosen yang sama boleh memiliki jadwal berurutan langsung
 - **Urutan suggestions** boleh berbeda dari urutan input jika itu menghasilkan jadwal yang lebih optimal

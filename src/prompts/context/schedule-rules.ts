@@ -8,9 +8,9 @@
 /** Durasi seminar dalam menit berdasarkan jenis */
 export const SEMINAR_DURATION_MINUTES: Record<string, number> = {
   SEMKP: 60,
-  SEMPRO: 90,
-  SEMHAS_LAPORAN: 90,
-  SEMHAS_PAPERBASED: 90,
+  SEMPRO: 120,
+  SEMHAS_LAPORAN: 120,
+  SEMHAS_PAPERBASED: 120,
   SIDANG_LAPORAN: 120,
   SIDANG_PAPERBASED: 120,
 } as const;
@@ -66,7 +66,7 @@ export const CONSTRAINT_TYPES = {
 } as const;
 
 /** Buffer waktu antar seminar di ruangan yang sama (menit) */
-export const ROOM_BUFFER_MINUTES = 15;
+export const ROOM_BUFFER_MINUTES = 0;
 
 /** Maksimal seminar per dosen per hari */
 export const MAX_SEMINAR_PER_DOSEN_PER_DAY = 3;
@@ -88,7 +88,8 @@ ${Object.entries(SEMINAR_DURATION_MINUTES)
 - Hari kerja: ${WORK_DAYS.map((d) => DAY_NAMES[d]).join(', ')}
 
 ### Constraint
-- Buffer antar seminar di ruangan sama: ${ROOM_BUFFER_MINUTES} menit
+- Tidak ada buffer antar seminar di ruangan yang sama; jadwal boleh berurutan langsung jika waktu selesai sama dengan waktu mulai berikutnya
+- Dosen yang sama boleh memiliki jadwal berurutan langsung, tetapi tidak boleh overlap pada waktu yang sama
 - Maksimal seminar per dosen per hari: ${MAX_SEMINAR_PER_DOSEN_PER_DAY}
 - Satu mahasiswa hanya boleh punya 1 jadwal per jenis seminar
 

@@ -1,5 +1,7 @@
+import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import BidangKeahlianRepository from '../repositories/bidang-keahlian.repository';
 import KeahlianDosenRepository from '../repositories/keahlian-dosen.repository';
+import { LogService } from '../modules/log';
 import { APIError } from '../utils/api-error.util';
 import {
   CreateBidangKeahlianType,
@@ -39,6 +41,14 @@ export default class BidangKeahlianService {
     }
 
     const bidangKeahlian = await BidangKeahlianRepository.create(data);
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.BIDANG_KEAHLIAN,
+      entity_id: bidangKeahlian.id,
+      new_values: bidangKeahlian,
+    });
 
     return {
       response: true,
@@ -48,7 +58,7 @@ export default class BidangKeahlianService {
   }
 
   public static async update(id: string, data: UpdateBidangKeahlianType) {
-    await this.get(id);
+    const existingData = (await this.get(id)).data;
 
     if (data.nama) {
       const existing = await BidangKeahlianRepository.findByNama(data.nama);
@@ -61,6 +71,15 @@ export default class BidangKeahlianService {
     }
 
     const bidangKeahlian = await BidangKeahlianRepository.update(id, data);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.BIDANG_KEAHLIAN,
+      entity_id: id,
+      old_values: existingData,
+      new_values: bidangKeahlian,
+    });
 
     return {
       response: true,
@@ -70,7 +89,7 @@ export default class BidangKeahlianService {
   }
 
   public static async delete(id: string) {
-    await this.get(id);
+    const existingData = (await this.get(id)).data;
 
     const used = await KeahlianDosenRepository.existsByBidangKeahlianId(id);
 
@@ -82,6 +101,14 @@ export default class BidangKeahlianService {
     }
 
     await BidangKeahlianRepository.destroy(id);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.BIDANG_KEAHLIAN,
+      entity_id: id,
+      old_values: existingData,
+    });
 
     return {
       response: true,

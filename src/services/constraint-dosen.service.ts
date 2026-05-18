@@ -1,7 +1,8 @@
 import DosenRepository from '../repositories/dosen.repository';
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import { APIError } from '../utils/api-error.util';
-import { ConstraintType, Prisma } from '@prisma/client';
+import { ConstraintType, LogActionType, LogActorType, LogEntityType, Prisma } from '@prisma/client';
+import { LogService } from '../modules/log';
 import openRouterService from '../infrastructures/openrouter.infrastructure';
 import { textMessage } from '../utils/openrouter.util';
 import { ParseConstraintOutputSchema, ParsedConstraint } from '../prompts/output/constraint-schema';
@@ -91,6 +92,14 @@ export default class ConstraintDosenService {
     };
 
     const constraint = await ConstraintDosenRepository.create(createInput);
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.DOSEN,
+      actor_id: nip,
+      entity_type: LogEntityType.CONSTRAINT_DOSEN,
+      entity_id: constraint.id,
+      new_values: constraint,
+    });
 
     return {
       response: true,
@@ -138,6 +147,15 @@ export default class ConstraintDosenService {
       updateInput.raw_data = data.raw_data as Prisma.InputJsonValue;
 
     const constraint = await ConstraintDosenRepository.update(id, updateInput);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.DOSEN,
+      actor_id: nip,
+      entity_type: LogEntityType.CONSTRAINT_DOSEN,
+      entity_id: id,
+      old_values: existing,
+      new_values: constraint,
+    });
 
     return {
       response: true,
@@ -161,6 +179,14 @@ export default class ConstraintDosenService {
     }
 
     await ConstraintDosenRepository.destroy(id);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.DOSEN,
+      actor_id: nip,
+      entity_type: LogEntityType.CONSTRAINT_DOSEN,
+      entity_id: id,
+      old_values: existing,
+    });
 
     return {
       response: true,
@@ -220,6 +246,19 @@ export default class ConstraintDosenService {
           priority: c.priority ?? 1,
           raw_data: { original_message: message } as unknown as Prisma.InputJsonValue,
           dosen: { connect: { nip } },
+        })
+      )
+    );
+
+    await Promise.all(
+      created.map((constraint) =>
+        LogService.createEntityLog({
+          action: LogActionType.CREATE,
+          actor_type: LogActorType.DOSEN,
+          actor_id: nip,
+          entity_type: LogEntityType.CONSTRAINT_DOSEN,
+          entity_id: constraint.id,
+          new_values: constraint,
         })
       )
     );

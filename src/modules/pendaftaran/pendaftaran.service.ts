@@ -95,7 +95,12 @@ export default class PendaftaranService {
     const skip = (page - 1) * limit;
     const data = pendaftaran
       .slice(skip, skip + limit)
-      .map(({ data_pendaftaran, ...item }) => item);
+      .map(({ data_pendaftaran, ...item }) => ({
+        ...item,
+        tahun_ajaran_nama: TahunAjaranHelper.parseStringNameByCode(
+          item.tahun_ajaran
+        ),
+      }));
 
     return {
       response: true,

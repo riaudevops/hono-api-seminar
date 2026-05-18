@@ -39,7 +39,11 @@ export interface PendaftaranWithRelations extends PendaftaranType {
   mahasiswa: PendaftaranMahasiswa | null;
 }
 
-export type GetAllPendaftaranResponse = PaginatedResponse<Omit<PendaftaranWithDataDokumen, 'data_pendaftaran'>>;
+export type GetAllPendaftaranResponse = PaginatedResponse<
+  Omit<PendaftaranWithDataDokumen, 'data_pendaftaran'> & {
+    tahun_ajaran_nama: string;
+  }
+>;
 
 export type DokumenNilaiPayload = Record<
   string,

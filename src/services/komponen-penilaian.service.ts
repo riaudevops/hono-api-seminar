@@ -1,6 +1,7 @@
 import prisma from '../infrastructures/db.infrastructure';
 import { APIError } from '../utils/api-error.util';
-import { PenilaiRole, Prisma } from '@prisma/client';
+import { LogActionType, LogActorType, LogEntityType, PenilaiRole, Prisma } from '@prisma/client';
+import { LogService } from '../modules/log';
 
 export interface CreateKomponenInput {
   nama: string;
@@ -171,6 +172,15 @@ export default class KomponenPenilaianService {
       throw new APIError('Gagal membuat ID komponen penilaian unik', 500);
     }
 
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KOMPONEN_PENILAIAN,
+      entity_id: newComponent.id,
+      new_values: newComponent,
+    });
+
     return {
       response: true,
       message: 'Komponen penilaian berhasil dibuat',
@@ -208,6 +218,15 @@ export default class KomponenPenilaianService {
         role: data.role,
       },
     });
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KOMPONEN_PENILAIAN,
+      entity_id: id,
+      old_values: existing,
+      new_values: updatedComponent,
+    });
 
     return {
       response: true,
@@ -243,6 +262,14 @@ export default class KomponenPenilaianService {
     await prisma.komponen_penilaian.delete({
       where: { id },
     });
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KOMPONEN_PENILAIAN,
+      entity_id: id,
+      old_values: existing,
+    });
 
     return {
       response: true,
@@ -274,6 +301,15 @@ export default class KomponenPenilaianService {
     const updatedComponent = await prisma.komponen_penilaian.update({
       where: { id },
       data: { is_aktif },
+    });
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KOMPONEN_PENILAIAN,
+      entity_id: id,
+      old_values: existing,
+      new_values: updatedComponent,
     });
 
     // Validasi apakah setelah toggle, totalnya menjadi kurang dari 100%

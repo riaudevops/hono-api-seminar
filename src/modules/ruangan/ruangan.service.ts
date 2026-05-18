@@ -1,5 +1,7 @@
+import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import RuanganRepository from './ruangan.repository';
 import { APIError } from '../../utils/api-error.util';
+import { LogService } from '../log';
 import { CreateRuanganType, UpdateRuanganType } from './ruangan.type';
 
 export default class RuanganService {
@@ -31,6 +33,15 @@ export default class RuanganService {
     }
 
     const ruangan = await RuanganRepository.create(data);
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.RUANGAN,
+      entity_id: ruangan.kode,
+      new_values: ruangan,
+    });
+
     return {
       response: true,
       message: 'Ruangan berhasil ditambahkan',
@@ -39,8 +50,18 @@ export default class RuanganService {
   }
 
   public static async put(kode: string, data: UpdateRuanganType) {
-    await this.get(kode);
+    const existing = (await this.get(kode)).data;
     const ruangan = await RuanganRepository.update(kode, data);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.RUANGAN,
+      entity_id: kode,
+      old_values: existing,
+      new_values: ruangan,
+    });
+
     return {
       response: true,
       message: 'Ruangan berhasil diperbarui',
@@ -49,8 +70,17 @@ export default class RuanganService {
   }
 
   public static async delete(kode: string) {
-    await this.get(kode);
+    const existing = (await this.get(kode)).data;
     await RuanganRepository.destroy(kode);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.RUANGAN,
+      entity_id: kode,
+      old_values: existing,
+    });
+
     return {
       response: true,
       message: 'Ruangan berhasil dihapus',

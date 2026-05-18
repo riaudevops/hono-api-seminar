@@ -1,5 +1,7 @@
+import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import DosenRepository from '../repositories/dosen.repository';
 import BidangKeahlianRepository from '../repositories/bidang-keahlian.repository';
+import { LogService } from '../modules/log';
 import KeahlianDosenRepository from '../repositories/keahlian-dosen.repository';
 import { APIError } from '../utils/api-error.util';
 import {
@@ -65,6 +67,14 @@ export default class KeahlianDosenService {
     }
 
     const keahlianDosen = await KeahlianDosenRepository.create(data);
+    await LogService.createEntityLog({
+      action: LogActionType.CREATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KEAHLIAN_DOSEN,
+      entity_id: keahlianDosen.id,
+      new_values: keahlianDosen,
+    });
 
     return {
       response: true,
@@ -111,6 +121,15 @@ export default class KeahlianDosenService {
     }
 
     const keahlianDosen = await KeahlianDosenRepository.update(id, data);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KEAHLIAN_DOSEN,
+      entity_id: id,
+      old_values: existingData,
+      new_values: keahlianDosen,
+    });
 
     return {
       response: true,
@@ -120,8 +139,16 @@ export default class KeahlianDosenService {
   }
 
   public static async delete(id: string) {
-    await this.get(id);
+    const existingData = (await this.get(id)).data;
     await KeahlianDosenRepository.destroy(id);
+    await LogService.createEntityLog({
+      action: LogActionType.DELETE,
+      actor_type: LogActorType.KOORDINATOR,
+      actor_id: 'system',
+      entity_type: LogEntityType.KEAHLIAN_DOSEN,
+      entity_id: id,
+      old_values: existingData,
+    });
 
     return {
       response: true,
