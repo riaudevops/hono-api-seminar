@@ -179,7 +179,6 @@ export default class JadwalService {
     await JadwalRepository.create({
       id,
       tanggal: new Date(data.tanggal),
-      judul: data.judul,
       waktu_mulai: waktuMulaiServer,
       waktu_selesai: waktuSelesaiServer,
       id_jenis_seminar,

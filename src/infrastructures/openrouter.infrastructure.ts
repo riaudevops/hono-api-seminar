@@ -45,6 +45,32 @@ class OpenRouterService {
     }
   }
 
+  public async initialize(): Promise<void> {
+    this.validateConfig();
+    const config = getOpenRouterConfig();
+    const baseUrl = config.baseUrl.replace(/\/$/, '');
+
+    const response = await fetch(`${baseUrl}/models`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      const responseBody = await response.text();
+      throw new Error(
+        `OpenRouter initialization failed (${response.status}): ${responseBody}`
+      );
+    }
+
+    this.isInitialized = true;
+    logger.info('OpenRouter client initialized', {
+      baseUrl,
+      model: config.model,
+    });
+  }
+
   // ===========================================================================
   // Core chat completion
   // ===========================================================================
@@ -85,28 +111,51 @@ class OpenRouterService {
     }
 
     try {
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      const baseUrl = config.baseUrl.replace(/\/$/, '');
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'application/json',
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify(body),
       });
 
+      const responseBody = await response.text();
+
       if (!response.ok) {
-        const errorBody = await response.text();
         throw new Error(
-          `OpenRouter API error (${response.status}): ${errorBody}`
+          `OpenRouter API error (${response.status}): ${responseBody}`
         );
       }
 
-      const result = (await response.json()) as ChatCompletionResponse;
+      let result: ChatCompletionResponse;
+      try {
+        result = JSON.parse(responseBody) as ChatCompletionResponse;
+      } catch {
+        throw new Error(
+          `OpenRouter API returned invalid JSON (${response.status}): ${responseBody.slice(0, 500)}`
+        );
+      }
+
+      if (!Array.isArray(result.choices) || result.choices.length === 0) {
+        throw new Error(
+          `OpenRouter API returned response without choices: ${responseBody.slice(0, 500)}`
+        );
+      }
+
+      const content = result.choices[0]?.message?.content;
+      if (!content || typeof content !== 'string') {
+        throw new Error(
+          `OpenRouter API returned empty content: ${responseBody.slice(0, 500)}`
+        );
+      }
 
       if (!this.isInitialized) {
         this.isInitialized = true;
         logger.info('OpenRouter client initialized', {
-          baseUrl: config.baseUrl,
+          baseUrl,
           model: config.model,
         });
       }
@@ -211,9 +260,11 @@ class OpenRouterService {
     try {
       this.validateConfig();
       const config = getOpenRouterConfig();
+      const baseUrl = config.baseUrl.replace(/\/$/, '');
 
-      const response = await fetch(`${config.baseUrl}/models`, {
+      const response = await fetch(`${baseUrl}/models`, {
         headers: {
+          Accept: 'application/json',
           Authorization: `Bearer ${config.apiKey}`,
         },
       });

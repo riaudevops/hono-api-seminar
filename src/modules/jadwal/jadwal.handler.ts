@@ -40,8 +40,7 @@ export default class JadwalHandler {
   }
 
   public static async getAll(c: Context) {
-    const { jenis } = c.req.query();
-    return c.json(await JadwalService.getAll(jenis));
+    return c.json(await JadwalService.getAll(c.req.query() as any));
   }
 
   public static async get(c: Context) {
@@ -51,10 +50,12 @@ export default class JadwalHandler {
 
   public static async getLogs(c: Context) {
     const { id } = c.req.param();
+    const query = c.req.query() as any;
     return c.json(
       await LogService.getAll({
         entity_type: LogEntityType.JADWAL,
         entity_id: id,
+        ...query,
       })
     );
   }

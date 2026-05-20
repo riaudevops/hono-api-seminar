@@ -1,6 +1,20 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 
-const defaultInclude = {
+type PrismaClientOrTx = any;
+
+const listInclude = {
+  mahasiswa: true,
+  ruangan: true,
+  jenis_seminar: true,
+  penilaian: {
+    include: {
+      dosen: true,
+    },
+  },
+} as const;
+
+const detailInclude = {
   mahasiswa: true,
   ruangan: true,
   jenis_seminar: true,
@@ -16,10 +30,19 @@ const defaultInclude = {
   },
 } as const;
 
+export interface JadwalFilter {
+  id_jenis_seminar?: string;
+  tanggal_mulai?: Date;
+  tanggal_selesai?: Date;
+  kode_ruangan?: string;
+  nim?: string;
+  nip_dosen?: string;
+  kode_tahun_ajaran?: string;
+}
+
 export interface CreateJadwalInput {
   id: string;
   tanggal: Date;
-  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   id_jenis_seminar: string;
@@ -30,7 +53,6 @@ export interface CreateJadwalInput {
 
 export interface UpdateJadwalInput {
   tanggal?: Date;
-  judul?: string;
   waktu_mulai?: Date;
   waktu_selesai?: Date;
   id_jenis_seminar?: string;
@@ -38,26 +60,53 @@ export interface UpdateJadwalInput {
   kode_ruangan?: string;
 }
 
+function buildWhere(filters: JadwalFilter): Prisma.jadwalWhereInput {
+  return {
+    ...(filters.id_jenis_seminar && { id_jenis_seminar: filters.id_jenis_seminar }),
+    ...(filters.kode_ruangan && { kode_ruangan: filters.kode_ruangan }),
+    ...(filters.nim && { nim: filters.nim }),
+    ...(filters.kode_tahun_ajaran && { kode_tahun_ajaran: filters.kode_tahun_ajaran }),
+    ...(filters.nip_dosen && {
+      penilaian: {
+        some: { nip: filters.nip_dosen },
+      },
+    }),
+    ...((filters.tanggal_mulai || filters.tanggal_selesai) && {
+      tanggal: {
+        ...(filters.tanggal_mulai && { gte: filters.tanggal_mulai }),
+        ...(filters.tanggal_selesai && { lte: filters.tanggal_selesai }),
+      },
+    }),
+  };
+}
+
 export default class JadwalRepository {
-  public static async findAll(id_jenis_seminar?: string) {
+  public static async findAll(filters: JadwalFilter = {}, limit = 20, offset = 0) {
     return await prisma.jadwal.findMany({
-      where: id_jenis_seminar ? { id_jenis_seminar } : undefined,
-      include: defaultInclude,
-      orderBy: { tanggal: 'desc' },
+      where: buildWhere(filters),
+      include: listInclude,
+      orderBy: [{ tanggal: 'desc' }, { waktu_mulai: 'asc' }],
+      take: limit,
+      skip: offset,
     });
   }
 
-  public static async findById(id: string) {
-    return await prisma.jadwal.findUnique({
+  public static async count(filters: JadwalFilter = {}) {
+    return await prisma.jadwal.count({ where: buildWhere(filters) });
+  }
+
+  public static async findById(id: string, client: PrismaClientOrTx = prisma) {
+    return await client.jadwal.findUnique({
       where: { id },
-      include: defaultInclude,
+      include: detailInclude,
     });
   }
 
   public static async findByMahasiswaEmail(email: string) {
     return await prisma.jadwal.findMany({
       where: { mahasiswa: { email } },
-      include: defaultInclude,
+      include: listInclude,
+      orderBy: [{ tanggal: 'asc' }, { waktu_mulai: 'asc' }],
     });
   }
 
@@ -68,7 +117,8 @@ export default class JadwalRepository {
           some: { dosen: { email } },
         },
       },
-      include: defaultInclude,
+      include: listInclude,
+      orderBy: [{ tanggal: 'asc' }, { waktu_mulai: 'asc' }],
     });
   }
 
@@ -76,9 +126,10 @@ export default class JadwalRepository {
     nim: string,
     id_jenis_seminar: string,
     kode_tahun_ajaran: string,
-    excludeId?: string
+    excludeId?: string,
+    client: PrismaClientOrTx = prisma
   ) {
-    return await prisma.jadwal.findFirst({
+    return await client.jadwal.findFirst({
       where: {
         nim,
         id_jenis_seminar,
@@ -89,36 +140,40 @@ export default class JadwalRepository {
     });
   }
 
-  public static async create(data: CreateJadwalInput) {
-    return await prisma.jadwal.create({
-      data: {
-        id: data.id,
-        tanggal: data.tanggal,
-        waktu_mulai: data.waktu_mulai,
-        waktu_selesai: data.waktu_selesai,
-        id_jenis_seminar: data.id_jenis_seminar,
-        nim: data.nim,
-        kode_ruangan: data.kode_ruangan,
-        kode_tahun_ajaran: data.kode_tahun_ajaran,
+  public static async existsByMahasiswaAndTime(
+    nim: string,
+    waktu_mulai: Date,
+    waktu_selesai: Date,
+    excludeId?: string,
+    client: PrismaClientOrTx = prisma
+  ) {
+    return await client.jadwal.findFirst({
+      where: {
+        nim,
+        ...(excludeId && { id: { not: excludeId } }),
+        waktu_mulai: { lt: waktu_selesai },
+        waktu_selesai: { gt: waktu_mulai },
       },
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        jenis_seminar: true,
-      },
+      select: { id: true },
     });
   }
 
-  public static async update(id: string, data: UpdateJadwalInput) {
-    return await prisma.jadwal.update({
+  public static async create(data: CreateJadwalInput, client: PrismaClientOrTx = prisma) {
+    return await client.jadwal.create({
+      data,
+      include: listInclude,
+    });
+  }
+
+  public static async update(
+    id: string,
+    data: UpdateJadwalInput,
+    client: PrismaClientOrTx = prisma
+  ) {
+    return await client.jadwal.update({
       where: { id },
       data,
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        jenis_seminar: true,
-        penilaian: true,
-      },
+      include: listInclude,
     });
   }
 
@@ -131,8 +186,8 @@ export default class JadwalRepository {
     return lastJadwal ? lastJadwal.id : null;
   }
 
-  public static async destroy(id: string) {
-    return await prisma.jadwal.delete({
+  public static async destroy(id: string, client: PrismaClientOrTx = prisma) {
+    return await client.jadwal.delete({
       where: { id },
     });
   }
@@ -147,12 +202,7 @@ export default class JadwalRepository {
       where: {
         tanggal: { gte: startOfDay, lte: endOfDay },
       },
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        jenis_seminar: true,
-        penilaian: { include: { dosen: true } },
-      },
+      include: listInclude,
     });
   }
 
@@ -161,12 +211,7 @@ export default class JadwalRepository {
       where: {
         tanggal: { gte: startDate, lte: endDate },
       },
-      include: {
-        mahasiswa: true,
-        ruangan: true,
-        jenis_seminar: true,
-        penilaian: { include: { dosen: true } },
-      },
+      include: listInclude,
       orderBy: { tanggal: 'asc' },
     });
   }
@@ -181,12 +226,8 @@ export default class JadwalRepository {
       where: {
         kode_ruangan,
         ...(excludeId && { id: { not: excludeId } }),
-        AND: [
-          {
-            waktu_mulai: { lt: waktu_selesai },
-            waktu_selesai: { gt: waktu_mulai },
-          },
-        ],
+        waktu_mulai: { lt: waktu_selesai },
+        waktu_selesai: { gt: waktu_mulai },
       },
     });
   }

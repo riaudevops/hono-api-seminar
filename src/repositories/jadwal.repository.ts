@@ -19,7 +19,6 @@ const defaultInclude = {
 export interface CreateJadwalInput {
   id: string;
   tanggal: Date;
-  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   id_jenis_seminar: string;
@@ -94,7 +93,6 @@ export default class JadwalRepository {
       data: {
         id: data.id,
         tanggal: data.tanggal,
-        judul: data.judul,
         waktu_mulai: data.waktu_mulai,
         waktu_selesai: data.waktu_selesai,
         id_jenis_seminar: data.id_jenis_seminar,

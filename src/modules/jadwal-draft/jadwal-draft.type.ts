@@ -1,5 +1,4 @@
 import { PenilaiRole, StatusJadwalDraft } from '@prisma/client';
-import type { JenisJadwalKode } from '../../types/jadwal.type';
 
 export interface DosenAssignmentInput {
   nip: string;
@@ -8,7 +7,7 @@ export interface DosenAssignmentInput {
 
 export interface MahasiswaScheduleInput {
   nim: string;
-  kode_jenis: JenisJadwalKode;
+  kode_jenis: string;
   list_dosen: DosenAssignmentInput[];
 }
 

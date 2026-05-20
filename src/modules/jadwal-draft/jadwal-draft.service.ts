@@ -671,9 +671,7 @@ export default class JadwalDraftService {
       );
     }
 
-    const jsonMatch =
-      rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawContent];
-    const jsonStr = jsonMatch[1].trim();
+    const jsonStr = this.extractJsonFromAiContent(rawContent);
 
     let parsed: unknown;
     try {
@@ -706,6 +704,25 @@ export default class JadwalDraftService {
     }
 
     return result.data;
+  }
+
+  private static extractJsonFromAiContent(content: string) {
+    const jsonFenceMatch = content.match(/```json\s*([\s\S]*?)```/i);
+    if (jsonFenceMatch?.[1]) return jsonFenceMatch[1].trim();
+
+    const fencedBlocks = [...content.matchAll(/```(?:\w+)?\s*([\s\S]*?)```/g)];
+    for (const block of fencedBlocks) {
+      const candidate = block[1]?.trim();
+      if (candidate?.startsWith('{') || candidate?.startsWith('[')) return candidate;
+    }
+
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      return content.slice(firstBrace, lastBrace + 1).trim();
+    }
+
+    return content.trim();
   }
 
   private static validateChunkSuggestionsCoverage(

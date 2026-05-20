@@ -1,26 +1,10 @@
 import { LogActorType, PenilaiRole } from '@prisma/client';
 
-export type JenisJadwalKode =
-  | 'SEMKP'
-  | 'SEMPRO'
-  | 'SEMHAS_LAPORAN'
-  | 'SEMHAS_PAPERBASED'
-  | 'SIDANG_LAPORAN'
-  | 'SIDANG_PAPERBASED';
-
-export const JENIS_JADWAL_KODE: Record<JenisJadwalKode, JenisJadwalKode> = {
-  SEMKP: 'SEMKP',
-  SEMPRO: 'SEMPRO',
-  SEMHAS_LAPORAN: 'SEMHAS_LAPORAN',
-  SEMHAS_PAPERBASED: 'SEMHAS_PAPERBASED',
-  SIDANG_LAPORAN: 'SIDANG_LAPORAN',
-  SIDANG_PAPERBASED: 'SIDANG_PAPERBASED',
-};
+export type JenisJadwalKode = string;
 
 export interface CreateJadwalType {
   id: string;
   tanggal: Date;
-  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   id_jenis_seminar: string;
@@ -30,7 +14,6 @@ export interface CreateJadwalType {
 
 export interface UpdateJadwalType {
   tanggal?: Date;
-  judul?: string;
   waktu_mulai?: Date;
   waktu_selesai?: Date;
   id_jenis_seminar?: string;
@@ -53,7 +36,6 @@ export interface CreateDetailPenilaianType {
 export interface JadwalWithRelations {
   id: string;
   tanggal: Date;
-  judul: string;
   waktu_mulai: Date;
   waktu_selesai: Date;
   id_jenis_seminar: string;

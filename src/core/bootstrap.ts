@@ -5,6 +5,7 @@ import {
   mailService,
   getTransporter,
 } from '../infrastructures/mail.infrastructure';
+import openRouterService from '../infrastructures/openrouter.infrastructure';
 
 // =============================================================================
 // Bootstrap: Register all services in the DI Container
@@ -34,6 +35,15 @@ export async function bootstrap(): Promise<void> {
   // Register Mailer (Singleton - lazy getter)
   container.registerSingleton(ServiceTokens.MAILER, () => getTransporter());
   bootstrapLogger.debug('Mailer registered');
+
+  try {
+    await openRouterService.initialize();
+    bootstrapLogger.debug('OpenRouter initialized');
+  } catch (error) {
+    bootstrapLogger.error('OpenRouter initialization failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   // Log registered services
   bootstrapLogger.info('Bootstrap completed', {
