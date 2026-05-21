@@ -2,9 +2,46 @@ import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import MahasiswaRepository from './mahasiswa.repository';
-import { UpdateDataSayaType } from './mahasiswa.type';
+import { GetAllMahasiswaQuery, UpdateDataSayaType } from './mahasiswa.type';
 
 export default class MahasiswaService {
+  public static async getAll(query: GetAllMahasiswaQuery) {
+    const { mahasiswa, total } = await MahasiswaRepository.findAll(query);
+    return {
+      response: true,
+      message: 'Data semua mahasiswa berhasil diambil.',
+      data: {
+        mahasiswa,
+        pagination: {
+          total,
+          page: query.page,
+          limit: query.limit,
+          totalPages: Math.ceil(total / query.limit),
+        },
+        filters: {
+          search: query.search,
+          nim: query.nim,
+          nama: query.nama,
+          email: query.email,
+          no_hp: query.no_hp,
+          aktif: query.aktif,
+          angkatan: query.angkatan,
+          sortBy: query.sortBy,
+          sortOrder: query.sortOrder,
+        },
+      },
+    };
+  }
+
+  public static async getStatistics() {
+    const data = await MahasiswaRepository.getStatistics();
+    return {
+      response: true,
+      message: 'Statistik mahasiswa berhasil diambil.',
+      data,
+    };
+  }
+
   public static async getDataSaya(email: string) {
     const mahasiswa = await MahasiswaRepository.findByEmail(email);
     if (!mahasiswa) {

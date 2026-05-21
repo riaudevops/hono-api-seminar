@@ -82,6 +82,7 @@ export interface ChatCompletionOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  signal?: AbortSignal;
 
   // Latency & Performance
   /** Predicted output to reduce latency */

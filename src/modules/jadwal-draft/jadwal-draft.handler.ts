@@ -2,7 +2,10 @@ import { Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import JadwalDraftService from './jadwal-draft.service';
 import { APIError } from '../../utils/api-error.util';
+import { createLogger } from '../../utils/logger.util';
 import { LogActorType, StatusJadwalDraft } from '@prisma/client';
+
+const logger = createLogger('JadwalDraftHandler');
 
 function extractContext(c: Context) {
   const userPayload = c.get('user');
@@ -34,6 +37,11 @@ export default class JadwalDraftHandler {
   public static async generateStream(c: Context) {
     const data = await c.req.json();
     const context = extractContext(c);
+    const abortController = new AbortController();
+
+    c.header('Cache-Control', 'no-cache, no-transform');
+    c.header('Connection', 'keep-alive');
+    c.header('X-Accel-Buffering', 'no');
 
     return streamSSE(c, async (stream) => {
       let isClosed = false;
@@ -46,6 +54,12 @@ export default class JadwalDraftHandler {
         });
       };
 
+      logger.info('SSE stream connected');
+      await sendEvent('connected', {
+        message: 'Stream generate jadwal terhubung',
+        timestamp: new Date().toISOString(),
+      });
+
       const heartbeat = setInterval(() => {
         void sendEvent('heartbeat', {
           message: 'Generate jadwal masih diproses',
@@ -55,20 +69,32 @@ export default class JadwalDraftHandler {
 
       stream.onAbort(() => {
         isClosed = true;
+        abortController.abort();
         clearInterval(heartbeat);
+        logger.info('SSE stream aborted');
       });
 
       try {
-        await JadwalDraftService.generate(data, context, sendEvent);
+        await JadwalDraftService.generate(
+          data,
+          context,
+          sendEvent,
+          abortController.signal
+        );
       } catch (err: any) {
-        await sendEvent('error', {
-          response: false,
-          message: err.message || 'Gagal generate jadwal draft',
-          statusCode: err.statusCode || 500,
-        });
+        if (!abortController.signal.aborted) {
+          await sendEvent('error', {
+            response: false,
+            message: err.message || 'Gagal generate jadwal draft',
+            statusCode: err.statusCode || 500,
+          });
+        }
       } finally {
         isClosed = true;
         clearInterval(heartbeat);
+        logger.info('SSE stream finished', {
+          aborted: abortController.signal.aborted,
+        });
       }
     });
   }

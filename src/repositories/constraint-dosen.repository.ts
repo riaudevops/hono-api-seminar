@@ -23,6 +23,23 @@ export default class ConstraintDosenRepository {
     });
   }
 
+  public static async findByNips(nips: string[]) {
+    if (nips.length === 0) return [];
+
+    return prisma.constraint_dosen.findMany({
+      where: { nip: { in: nips } },
+      select: {
+        nip: true,
+        type: true,
+        hari: true,
+        waktu_mulai: true,
+        waktu_selesai: true,
+        priority: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
   public static async findById(id: string) {
     return prisma.constraint_dosen.findUnique({
       where: { id },

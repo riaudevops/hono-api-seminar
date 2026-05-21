@@ -91,6 +91,32 @@ export default class JadwalHelper {
     return new Date(jakartaDate.getTime() - JAKARTA_OFFSET_MINUTES * 60000);
   }
 
+  public static formatDateInJakarta(date: Date): string {
+    return new Intl.DateTimeFormat('sv-SE', {
+      timeZone: this.CLIENT_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  }
+
+  public static formatTimeInJakarta(date: Date): string {
+    return new Intl.DateTimeFormat('sv-SE', {
+      timeZone: this.CLIENT_TIMEZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+  }
+
+  public static createDateFromJakartaDate(date: string): Date {
+    return this.createDateFromJakartaDateTime(date, '00:00');
+  }
+
+  public static createDateFromJakartaDateTime(date: string, time: string): Date {
+    return new Date(`${date}T${time}:00.000+07:00`);
+  }
+
   public static getCurrentJakartaTime(): Date {
     const today = new Date();
     const dateFormatter = new Intl.DateTimeFormat('sv-SE', {

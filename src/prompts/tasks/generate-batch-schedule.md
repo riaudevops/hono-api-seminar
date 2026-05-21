@@ -75,7 +75,7 @@ Untuk setiap mahasiswa, berikan tepat **1 suggestion**:
       "jenis": "SEMPRO",
       "tanggal": "2026-04-20",
       "waktu_mulai": "08:00",
-      "waktu_selesai": "09:30",
+      "waktu_selesai": "10:00",
       "kode_ruangan": "R-101",
       "confidence": 0.95,
       "reasoning": "Slot pertama hari Senin, semua dosen available, tidak ada konflik."
@@ -83,6 +83,16 @@ Untuk setiap mahasiswa, berikan tepat **1 suggestion**:
   ]
 }
 ```
+
+## Aturan Output Wajib
+
+- Kembalikan HANYA JSON valid.
+- Jangan tulis markdown.
+- Jangan tulis analisis.
+- Jangan tulis penjelasan di luar JSON.
+- Jangan gunakan code fence.
+- Response harus langsung dimulai dengan `{` dan diakhiri dengan `}`.
+- Jika perlu reasoning, tulis singkat hanya pada field `reasoning` di setiap suggestion.
 
 ## Catatan Penting
 

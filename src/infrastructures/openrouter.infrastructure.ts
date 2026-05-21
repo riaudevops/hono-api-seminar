@@ -120,6 +120,7 @@ class OpenRouterService {
           Authorization: `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify(body),
+        signal: options.signal,
       });
 
       const responseBody = await response.text();
@@ -145,7 +146,16 @@ class OpenRouterService {
         );
       }
 
-      const content = result.choices[0]?.message?.content;
+      const choice = result.choices[0];
+      const finishReason = choice?.finish_reason;
+      const content = choice?.message?.content;
+
+      if (finishReason === 'length') {
+        throw new Error(
+          `AI output terpotong karena batas token. Naikkan maxTokens atau kecilkan chunk size. Response: ${responseBody.slice(0, 500)}`
+        );
+      }
+
       if (!content || typeof content !== 'string') {
         throw new Error(
           `OpenRouter API returned empty content: ${responseBody.slice(0, 500)}`
