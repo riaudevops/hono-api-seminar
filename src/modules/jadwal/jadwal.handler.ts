@@ -24,18 +24,18 @@ export default class JadwalHandler {
   }
 
   private static getEmail(c: Context) {
-    const userPayload = this.getUserPayload(c);
+    const userPayload = JadwalHandler.getUserPayload(c);
     if (!userPayload.email) throw new APIError('Email tidak ditemukan', 404);
     return userPayload.email;
   }
 
   public static async getJadwalDosenSaya(c: Context) {
-    const email = this.getEmail(c);
+    const email = JadwalHandler.getEmail(c);
     return c.json(await JadwalService.getJadwalDosenSaya(email));
   }
 
   public static async getJadwalMahasiswaSaya(c: Context) {
-    const email = this.getEmail(c);
+    const email = JadwalHandler.getEmail(c);
     return c.json(await JadwalService.getJadwalMahasiswaSaya(email));
   }
 
@@ -62,20 +62,20 @@ export default class JadwalHandler {
 
   public static async post(c: Context) {
     const data = await c.req.json();
-    const context = LogService.getActorContext(this.getUserPayload(c));
+    const context = LogService.getActorContext(JadwalHandler.getUserPayload(c));
     return c.json(await JadwalService.post(data, context), 201);
   }
 
   public static async put(c: Context) {
     const { id } = c.req.param();
     const body = await c.req.json();
-    const context = LogService.getActorContext(this.getUserPayload(c));
+    const context = LogService.getActorContext(JadwalHandler.getUserPayload(c));
     return c.json(await JadwalService.put(id, body, context));
   }
 
   public static async delete(c: Context) {
     const { id } = c.req.param();
-    const context = LogService.getActorContext(this.getUserPayload(c));
+    const context = LogService.getActorContext(JadwalHandler.getUserPayload(c));
     return c.json(await JadwalService.delete(id, context));
   }
 }

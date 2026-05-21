@@ -24,7 +24,7 @@ mahasiswaModuleRoute.get(
 );
 
 mahasiswaModuleRoute.get(
-  '/mahasiswa',
+  '/koordinator/mahasiswa',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getAllMahasiswaQuerySchema, zodError),
   MahasiswaHandler.getAll
