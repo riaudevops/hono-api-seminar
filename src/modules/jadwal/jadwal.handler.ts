@@ -34,13 +34,28 @@ export default class JadwalHandler {
     return c.json(await JadwalService.getJadwalDosenSaya(email));
   }
 
+  public static async getStatistikDosenSaya(c: Context) {
+    const email = JadwalHandler.getEmail(c);
+    return c.json(await JadwalService.getStatistikDosenSaya(email));
+  }
+
   public static async getJadwalMahasiswaSaya(c: Context) {
     const email = JadwalHandler.getEmail(c);
     return c.json(await JadwalService.getJadwalMahasiswaSaya(email));
   }
 
+  public static async getJadwalMahasiswaSayaById(c: Context) {
+    const email = JadwalHandler.getEmail(c);
+    const { id } = c.req.param();
+    return c.json(await JadwalService.getJadwalMahasiswaSayaById(email, id));
+  }
+
   public static async getAll(c: Context) {
     return c.json(await JadwalService.getAll(c.req.query() as any));
+  }
+
+  public static async getAllTahunAjaran(c: Context) {
+    return c.json(await JadwalService.getAllTahunAjaran());
   }
 
   public static async get(c: Context) {

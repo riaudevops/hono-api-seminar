@@ -62,10 +62,14 @@ export interface UpdateJadwalInput {
 
 function buildWhere(filters: JadwalFilter): Prisma.jadwalWhereInput {
   return {
-    ...(filters.id_jenis_seminar && { id_jenis_seminar: filters.id_jenis_seminar }),
+    ...(filters.id_jenis_seminar && {
+      id_jenis_seminar: filters.id_jenis_seminar,
+    }),
     ...(filters.kode_ruangan && { kode_ruangan: filters.kode_ruangan }),
     ...(filters.nim && { nim: filters.nim }),
-    ...(filters.kode_tahun_ajaran && { kode_tahun_ajaran: filters.kode_tahun_ajaran }),
+    ...(filters.kode_tahun_ajaran && {
+      kode_tahun_ajaran: filters.kode_tahun_ajaran,
+    }),
     ...(filters.nip_dosen && {
       penilaian: {
         some: { nip: filters.nip_dosen },
@@ -81,7 +85,11 @@ function buildWhere(filters: JadwalFilter): Prisma.jadwalWhereInput {
 }
 
 export default class JadwalRepository {
-  public static async findAll(filters: JadwalFilter = {}, limit = 20, offset = 0) {
+  public static async findAll(
+    filters: JadwalFilter = {},
+    limit = 20,
+    offset = 0
+  ) {
     return await prisma.jadwal.findMany({
       where: buildWhere(filters),
       include: listInclude,
@@ -93,6 +101,17 @@ export default class JadwalRepository {
 
   public static async count(filters: JadwalFilter = {}) {
     return await prisma.jadwal.count({ where: buildWhere(filters) });
+  }
+
+  public static async getDistinctTahunAjaran(): Promise<string[]> {
+    const rows = await prisma.jadwal.findMany({
+      select: { kode_tahun_ajaran: true },
+      distinct: ['kode_tahun_ajaran'],
+    });
+
+    return rows
+      .map((row) => row.kode_tahun_ajaran)
+      .sort((a, b) => b.localeCompare(a));
   }
 
   public static async findById(id: string, client: PrismaClientOrTx = prisma) {
@@ -158,7 +177,10 @@ export default class JadwalRepository {
     });
   }
 
-  public static async create(data: CreateJadwalInput, client: PrismaClientOrTx = prisma) {
+  public static async create(
+    data: CreateJadwalInput,
+    client: PrismaClientOrTx = prisma
+  ) {
     return await client.jadwal.create({
       data,
       include: listInclude,
@@ -177,7 +199,9 @@ export default class JadwalRepository {
     });
   }
 
-  public static async findLastIdByPrefix(prefix: string): Promise<string | null> {
+  public static async findLastIdByPrefix(
+    prefix: string
+  ): Promise<string | null> {
     const lastJadwal = await prisma.jadwal.findFirst({
       where: { id: { startsWith: prefix } },
       orderBy: { id: 'desc' },

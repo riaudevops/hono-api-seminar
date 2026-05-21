@@ -9,6 +9,13 @@ import { getLogQuerySchema } from './log.validator';
 const logRoute = new Hono({ router: new RegExpRouter() });
 
 logRoute.get(
+  '/dosen/log-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('query', getLogQuerySchema, zodError),
+  LogHandler.getLogSaya
+);
+
+logRoute.get(
   '/data-master/log',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getLogQuerySchema, zodError),

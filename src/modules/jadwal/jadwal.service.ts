@@ -13,6 +13,7 @@ import RuanganHelper from '../ruangan/ruangan.helper';
 import DosenHelper from '../../helpers/dosen.helper';
 import { MahasiswaModuleRepository as MahasiswaRepository } from '../mahasiswa';
 import DosenRepository from '../../repositories/dosen.repository';
+import PenilaianRepository from '../../repositories/penilaian.repository';
 import RuanganRepository from '../ruangan/ruangan.repository';
 import PendaftaranRepository from '../pendaftaran/pendaftaran.repository';
 import prisma from '../../infrastructures/db.infrastructure';
@@ -52,6 +53,28 @@ type GetAllJadwalParams = {
   limit?: number;
 };
 
+const BIMBINGAN_ROLES: PenilaiRole[] = [
+  PenilaiRole.KP_PEMBIMBING,
+  PenilaiRole.TA_PEMBIMBING_1,
+  PenilaiRole.TA_PEMBIMBING_2,
+];
+
+const MENGUJI_ROLES: PenilaiRole[] = [
+  PenilaiRole.KP_PENGUJI,
+  PenilaiRole.TA_PENGUJI_1,
+  PenilaiRole.TA_PENGUJI_2,
+  PenilaiRole.TA_KETUA_SIDANG,
+];
+
+const KODE_TO_FRONTEND: Record<string, string> = {
+  SEMKP: 'KP',
+  SEMPRO: 'PROPOSAL',
+  SEMHAS_LAPORAN: 'HASIL',
+  SEMHAS_PAPERBASED: 'HASIL',
+  SIDANG_LAPORAN: 'SIDANG_AKHIR',
+  SIDANG_PAPERBASED: 'SIDANG_AKHIR',
+};
+
 export default class JadwalService {
   public static async getJadwalMahasiswaSaya(email: string) {
     const jadwal = await JadwalRepository.findByMahasiswaEmail(email);
@@ -61,7 +84,25 @@ export default class JadwalService {
       message: jadwal.length
         ? 'Data jadwal mahasiswa berhasil diambil'
         : 'Data jadwal mahasiswa masih kosong',
-      data: this.formatJadwalListTimezone(jadwal),
+      data: this.formatJadwalListRingkas(jadwal),
+    };
+  }
+
+  public static async getJadwalMahasiswaSayaById(email: string, id: string) {
+    const jadwal = await JadwalRepository.findById(id);
+
+    if (!jadwal) {
+      throw new APIError(`Jadwal dengan ID ${id} tidak ditemukan`, 404);
+    }
+
+    if (jadwal.mahasiswa?.email !== email) {
+      throw new APIError('Anda tidak memiliki akses ke jadwal ini', 403);
+    }
+
+    return {
+      response: true,
+      message: 'Detail jadwal mahasiswa berhasil diambil',
+      data: this.formatJadwalDetailTimezone(jadwal),
     };
   }
 
@@ -74,6 +115,81 @@ export default class JadwalService {
         ? 'Data jadwal dosen berhasil diambil'
         : 'Data jadwal dosen masih kosong',
       data: this.formatJadwalListTimezone(jadwal),
+    };
+  }
+
+  public static async getStatistikDosenSaya(email: string) {
+    const dosen = await DosenRepository.findByEmail(email);
+    if (!dosen) {
+      throw new APIError('Data dosen tidak ditemukan untuk email ini.', 404);
+    }
+
+    const penilaianList = await PenilaianRepository.findByDosenNip(dosen.nip);
+    const now = JadwalHelper.getCurrentJakartaTime();
+    const mahasiswaBimbingan = new Set<string>();
+    const mahasiswaUji = new Set<string>();
+    let mahasiswaTerdekat: any = null;
+
+    for (const p of penilaianList) {
+      const role = p.role as PenilaiRole;
+      const j: any = p.jadwal;
+      const nim = j.mahasiswa?.nim ?? j.nim;
+
+      if (BIMBINGAN_ROLES.includes(role)) {
+        mahasiswaBimbingan.add(nim);
+      }
+
+      if (MENGUJI_ROLES.includes(role)) {
+        mahasiswaUji.add(nim);
+      }
+
+      const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(j.waktu_selesai);
+
+      if (waktuMulai > now) {
+        if (!mahasiswaTerdekat || waktuMulai < mahasiswaTerdekat.waktu_mulai_raw) {
+          const kode = j.jenis_seminar?.kode || '';
+          mahasiswaTerdekat = {
+            nim,
+            nama: j.mahasiswa?.nama ?? null,
+            jenis_seminar: KODE_TO_FRONTEND[kode] || kode,
+            tanggal: waktuMulai.toISOString().slice(0, 10),
+            jam_mulai: waktuMulai.toISOString().slice(11, 16),
+            jam_selesai: waktuSelesai.toISOString().slice(11, 16),
+            ruangan: j.ruangan?.nama ?? null,
+            role,
+            waktu_mulai_raw: waktuMulai,
+          };
+        }
+      }
+    }
+
+    if (mahasiswaTerdekat) {
+      delete mahasiswaTerdekat.waktu_mulai_raw;
+    }
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil statistik jadwal dosen',
+      data: {
+        total_seminar: penilaianList.length,
+        total_mahasiswa_bimbingan: mahasiswaBimbingan.size,
+        total_mahasiswa_uji: mahasiswaUji.size,
+        mahasiswa_terdekat: mahasiswaTerdekat,
+      },
+    };
+  }
+
+  public static async getAllTahunAjaran() {
+    const data = await JadwalRepository.getDistinctTahunAjaran();
+
+    return {
+      response: true,
+      message: 'Daftar tahun ajaran jadwal berhasil diambil.',
+      data: data.map((kode) => ({
+        kode,
+        nama: TahunAjaranHelper.parseStringNameByCode(kode),
+      })),
     };
   }
 
@@ -374,6 +490,13 @@ export default class JadwalService {
     await prisma.$transaction(async (tx) => {
       await tx.penilaian.deleteMany({ where: { id_jadwal: id } });
       await JadwalRepository.destroy(id, tx);
+      await PendaftaranRepository.updateStatusJadwalByJadwalData(
+        jadwal.nim,
+        jadwal.id_jenis_seminar,
+        jadwal.kode_tahun_ajaran,
+        StatusJadwal.BELUM_JADWAL,
+        tx
+      );
       await tx.log.create({
         data: {
           action: LogActionType.DELETE,
@@ -623,6 +746,22 @@ export default class JadwalService {
     return jadwal.map((item) => this.formatJadwalTimezone(item));
   }
 
+  private static formatJadwalListRingkas(jadwal: any[]) {
+    return jadwal.map((item) => {
+      const formatted = this.formatJadwalTimezone(item);
+      const { penilai, ...ringkas } = formatted;
+      return {
+        ...ringkas,
+        penilaian: Array.isArray(item?.penilaian)
+          ? item.penilaian.map((penilaian: any) => {
+              const { detail_penilaian, ...penilaianRingkas } = penilaian;
+              return penilaianRingkas;
+            })
+          : [],
+      };
+    });
+  }
+
   private static calculateSemesterFromNimAndTahunAjaran(
     nim?: string,
     tahunAjaran?: string
@@ -648,21 +787,7 @@ export default class JadwalService {
   private static formatJadwalTimezone(jadwal: any) {
     return {
       ...jadwal,
-      penilai: Array.isArray(jadwal?.penilaian)
-        ? jadwal.penilaian.map((item: any) => ({
-            id: item.id,
-            nip: item.nip,
-            role: item.role,
-            dosen: item.dosen
-              ? {
-                  nip: item.dosen.nip,
-                  nama: item.dosen.nama,
-                  email: item.dosen.email,
-                  no_hp: item.dosen.no_hp,
-                }
-              : null,
-          }))
-        : [],
+      penilai: this.formatPenilai(jadwal?.penilaian, false),
       waktu_mulai: jadwal?.waktu_mulai
         ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
         : null,
@@ -670,5 +795,41 @@ export default class JadwalService {
         ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_selesai)
         : null,
     };
+  }
+
+  private static formatJadwalDetailTimezone(jadwal: any) {
+    return {
+      ...jadwal,
+      penilaian: Array.isArray(jadwal?.penilaian) ? jadwal.penilaian : [],
+      waktu_mulai: jadwal?.waktu_mulai
+        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
+        : null,
+      waktu_selesai: jadwal?.waktu_selesai
+        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_selesai)
+        : null,
+    };
+  }
+
+  private static formatPenilai(penilaian: any, includeDetailPenilaian: boolean) {
+    if (!Array.isArray(penilaian)) {
+      return [];
+    }
+
+    return penilaian.map((item: any) => ({
+      id: item.id,
+      nip: item.nip,
+      role: item.role,
+      dosen: item.dosen
+        ? {
+            nip: item.dosen.nip,
+            nama: item.dosen.nama,
+            email: item.dosen.email,
+            no_hp: item.dosen.no_hp,
+          }
+        : null,
+      ...(includeDetailPenilaian
+        ? { detail_penilaian: item.detail_penilaian ?? [] }
+        : {}),
+    }));
   }
 }

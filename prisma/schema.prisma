@@ -211,6 +211,7 @@ model detail_penilaian {
   id_penilaian    String
   id_komponen     String
   nilai           Float
+  catatan         String? @db.Text
 
   penilaian penilaian @relation(fields: [id_penilaian], references: [id], onDelete: Cascade)
   komponen  komponen_penilaian @relation(fields: [id_komponen], references: [id])

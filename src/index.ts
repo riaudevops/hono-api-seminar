@@ -25,6 +25,7 @@ import { RequirementDokumenRoute } from './modules/requirement-dokumen';
 import { PendaftaranModuleRoute } from './modules/pendaftaran';
 import { MahasiswaModuleRoute } from './modules/mahasiswa';
 import { LogModuleRoute } from './modules/log';
+import { DetailPenilaianRoute } from './modules/detail-penilaian';
 
 const logger = createLogger('Server');
 
@@ -94,6 +95,7 @@ app.route('/api', DokumenTemplateRoute);
 app.route('/api', RequirementDokumenRoute);
 app.route('/api', PendaftaranModuleRoute);
 app.route('/api', MahasiswaModuleRoute);
+app.route('/api', DetailPenilaianRoute);
 
 // Graceful shutdown handlers
 process.on('SIGINT', async () => {

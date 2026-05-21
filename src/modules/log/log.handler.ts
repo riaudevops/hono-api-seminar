@@ -4,9 +4,8 @@ import LogService from './log.service';
 import { GetLogParams } from './log.type';
 
 export default class LogHandler {
-  public static async getAll(c: Context) {
-    const query = c.req.query();
-    const params: GetLogParams = {
+  private static buildParams(query: Record<string, string>): GetLogParams {
+    return {
       entity_type: query.entity_type as LogEntityType | undefined,
       entity_id: query.entity_id,
       actor_id: query.actor_id,
@@ -17,8 +16,31 @@ export default class LogHandler {
       start_date: query.start_date,
       end_date: query.end_date,
     };
+  }
 
-    return c.json(await LogService.getAll(params));
+  public static async getAll(c: Context) {
+    return c.json(await LogService.getAll(LogHandler.buildParams(c.req.query())));
+  }
+
+  public static async getLogSaya(c: Context) {
+    const user = c.get('user') as
+      | {
+          id?: string;
+          email?: string;
+          role?: string;
+          nip?: string;
+          nim?: string;
+        }
+      | undefined;
+    const context = LogService.getActorContext(user);
+
+    return c.json(
+      await LogService.getAll({
+        ...LogHandler.buildParams(c.req.query()),
+        actor_id: context.actor_id,
+        actor_type: context.actor_type,
+      })
+    );
   }
 
   public static async get(c: Context) {

@@ -21,9 +21,22 @@ jadwalRoute.get(
 );
 
 jadwalRoute.get(
+  '/dosen/jadwal/statistik-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalHandler.getStatistikDosenSaya
+);
+
+jadwalRoute.get(
   '/mahasiswa/jadwal-saya',
   AuthMiddleware.JWTBearerTokenExtraction,
   JadwalHandler.getJadwalMahasiswaSaya
+);
+
+jadwalRoute.get(
+  '/mahasiswa/jadwal-saya/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('param', jadwalIdParamSchema, zodError),
+  JadwalHandler.getJadwalMahasiswaSayaById
 );
 
 jadwalRoute.get(
@@ -32,6 +45,12 @@ jadwalRoute.get(
   zValidator('query', getJadwalQuerySchema, zodError),
   JadwalHandler.getAll
 );
+
+// jadwalRoute.get(
+//   '/koordinator/jadwal/detail/tahun-ajaran',
+//   AuthMiddleware.JWTBearerTokenExtraction,
+//   JadwalHandler.getAllTahunAjaran
+// );
 
 jadwalRoute.get(
   '/koordinator/jadwal/:id/logs',
