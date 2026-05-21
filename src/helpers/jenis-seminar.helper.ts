@@ -1,6 +1,6 @@
 import prisma from '../infrastructures/db.infrastructure';
 import { APIError } from '../utils/api-error.util';
-import type { JenisJadwalKode } from '../types/jadwal.type';
+import type { JenisJadwalKode } from '../modules/jadwal';
 
 /**
  * Resolver & cache untuk jenis_seminar. Menggantikan enum JenisJadwal

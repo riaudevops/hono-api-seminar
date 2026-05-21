@@ -29,6 +29,29 @@ const penilaiSchema = z.object({
   }),
 });
 
+function getJakartaDateTimeParts(date: Date) {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+    .formatToParts(date)
+    .reduce<Record<string, string>>((acc, part) => {
+      if (part.type !== 'literal') acc[part.type] = part.value;
+      return acc;
+    }, {});
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+  };
+}
+
 const baseJadwalSchema = z.object({
   tanggal: dateTimeSchema('tanggal', '2025-10-14T00:00:00.000Z'),
   waktu_mulai: dateTimeSchema('waktu mulai', '2025-10-14T08:00:00.000Z'),
@@ -50,9 +73,9 @@ function validateJadwalTime(data: {
 }) {
   if (!data.tanggal || !data.waktu_mulai || !data.waktu_selesai) return true;
 
-  const tanggal = data.tanggal.toISOString().slice(0, 10);
-  const mulaiTanggal = data.waktu_mulai.toISOString().slice(0, 10);
-  const selesaiTanggal = data.waktu_selesai.toISOString().slice(0, 10);
+  const tanggal = getJakartaDateTimeParts(data.tanggal).date;
+  const mulaiTanggal = getJakartaDateTimeParts(data.waktu_mulai).date;
+  const selesaiTanggal = getJakartaDateTimeParts(data.waktu_selesai).date;
 
   return tanggal === mulaiTanggal && tanggal === selesaiTanggal;
 }
@@ -60,12 +83,10 @@ function validateJadwalTime(data: {
 function validateWorkingHours(data: { waktu_mulai?: Date; waktu_selesai?: Date }) {
   if (!data.waktu_mulai || !data.waktu_selesai) return true;
 
-  const startHour = data.waktu_mulai.getHours();
-  const startMinute = data.waktu_mulai.getMinutes();
-  const endHour = data.waktu_selesai.getHours();
-  const endMinute = data.waktu_selesai.getMinutes();
-  const startMinutes = startHour * 60 + startMinute;
-  const endMinutes = endHour * 60 + endMinute;
+  const start = getJakartaDateTimeParts(data.waktu_mulai);
+  const end = getJakartaDateTimeParts(data.waktu_selesai);
+  const startMinutes = start.hour * 60 + start.minute;
+  const endMinutes = end.hour * 60 + end.minute;
 
   return startMinutes >= 8 * 60 && endMinutes <= 17 * 60;
 }
@@ -80,10 +101,11 @@ function validateFutureSchedule(data: { waktu_mulai?: Date }) {
   return data.waktu_mulai >= new Date();
 }
 
-function validateUniquePenilai(data: { penilai?: Array<{ nip: string }> }) {
+function validateUniquePenilai(data: { penilai?: Array<{ nip: string; role: PenilaiRole }> }) {
   if (!data.penilai) return true;
   const nips = data.penilai.map((item) => item.nip);
-  return new Set(nips).size === nips.length;
+  const roles = data.penilai.map((item) => item.role);
+  return new Set(nips).size === nips.length && new Set(roles).size === roles.length;
 }
 
 const jadwalRules = <T extends z.ZodTypeAny>(schema: T) =>
@@ -113,7 +135,7 @@ const jadwalRules = <T extends z.ZodTypeAny>(schema: T) =>
       path: ['waktu_mulai'],
     })
     .refine(validateUniquePenilai, {
-      message: 'Dosen penilai tidak boleh duplikat',
+      message: 'Dosen penilai dan role penilai tidak boleh duplikat',
       path: ['penilai'],
     });
 
@@ -133,6 +155,8 @@ export const getJadwalQuerySchema = z
     jenis: kodeJenisSchema.optional(),
     tanggal_mulai: z.string().datetime('Format tanggal mulai harus ISO-8601 DateTime').optional(),
     tanggal_selesai: z.string().datetime('Format tanggal selesai harus ISO-8601 DateTime').optional(),
+    start_date: z.string().date('Format start_date harus YYYY-MM-DD').optional(),
+    end_date: z.string().date('Format end_date harus YYYY-MM-DD').optional(),
     kode_ruangan: z.string().max(10, 'Kode ruangan maksimal 10 karakter').optional(),
     nim: z.string().max(11, 'NIM maksimal 11 karakter').optional(),
     nip_dosen: z.string().max(18, 'NIP maksimal 18 karakter').optional(),
@@ -147,8 +171,10 @@ export const getJadwalQuerySchema = z
   })
   .refine(
     (data) => {
-      if (!data.tanggal_mulai || !data.tanggal_selesai) return true;
-      return new Date(data.tanggal_selesai) >= new Date(data.tanggal_mulai);
+      const start = data.tanggal_mulai ?? data.start_date;
+      const end = data.tanggal_selesai ?? data.end_date;
+      if (!start || !end) return true;
+      return new Date(end) >= new Date(start);
     },
     {
       message: 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai',

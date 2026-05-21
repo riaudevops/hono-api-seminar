@@ -4,8 +4,8 @@ export interface JenisSeminarType {
   nama: string;
   deskripsi: string | null;
   is_aktif: boolean;
-  jumlah_pembimbing: number;
-  jumlah_penguji: number;
+  wajib_pembimbing: number;
+  wajib_penguji: number;
   ada_ketua_sidang: boolean;
 }
 
@@ -14,8 +14,8 @@ export interface CreateJenisSeminarType {
   nama: string;
   deskripsi?: string;
   is_aktif?: boolean;
-  jumlah_pembimbing?: number;
-  jumlah_penguji?: number;
+  wajib_pembimbing?: number;
+  wajib_penguji?: number;
   ada_ketua_sidang?: boolean;
 }
 
@@ -24,7 +24,7 @@ export interface UpdateJenisSeminarType {
   nama?: string;
   deskripsi?: string | null;
   is_aktif?: boolean;
-  jumlah_pembimbing?: number;
-  jumlah_penguji?: number;
+  wajib_pembimbing?: number;
+  wajib_penguji?: number;
   ada_ketua_sidang?: boolean;
 }

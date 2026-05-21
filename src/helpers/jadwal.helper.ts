@@ -1,4 +1,4 @@
-import JadwalRepository from '../repositories/jadwal.repository';
+import { JadwalRepository } from '../modules/jadwal';
 import JenisSeminarHelper from './jenis-seminar.helper';
 
 export default class JadwalHelper {

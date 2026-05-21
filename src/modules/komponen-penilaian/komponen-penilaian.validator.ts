@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { PenilaiRole } from '@prisma/client';
 
+export const getAllKomponenPenilaianQuerySchema = z.object({
+  role: z.nativeEnum(PenilaiRole).optional(),
+  is_aktif: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+});
+
 export const createKomponenPenilaianSchema = z.object({
   nama: z
     .string()

@@ -1,5 +1,5 @@
 import { Context } from 'hono';
-import { StatusBerkas } from '@prisma/client';
+import { StatusBerkas, StatusJadwal } from '@prisma/client';
 import PendaftaranService from './pendaftaran.service';
 import {
   CreatePendaftaranByMahasiswaType,
@@ -21,6 +21,7 @@ export default class PendaftaranHandler {
         periode: query.periode as 'last_7_hari' | 'last_30_hari' | 'semua' | undefined,
         jenis_seminar: query.jenis_seminar,
         status_berkas: query.status_berkas as StatusBerkas | undefined,
+        status_jadwal: query.status_jadwal as StatusJadwal | undefined,
         tahun_ajaran: query.tahun_ajaran,
         nim: query.nim,
         q: query.q,

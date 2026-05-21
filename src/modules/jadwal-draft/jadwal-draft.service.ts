@@ -10,18 +10,17 @@ import prisma from '../../infrastructures/db.infrastructure';
 import { GenerateBatchOutputSchema } from '../../prompts/output/schedule-schema';
 import { getScheduleRulesAsText } from '../../prompts/context/schedule-rules';
 import JadwalDraftRepository from './jadwal-draft.repository';
-import JadwalRepository from '../../repositories/jadwal.repository';
+import { JadwalRepository, JadwalService } from '../jadwal';
 import RuanganRepository from '../ruangan/ruangan.repository';
 import ConstraintDosenRepository from '../../repositories/constraint-dosen.repository';
 import PenilaianRepository from '../../repositories/penilaian.repository';
-import JadwalService from '../../services/jadwal.service';
 import { LogService } from '../../modules/log';
 import JadwalHelper from '../../helpers/jadwal.helper';
 import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import RuanganHelper from '../ruangan/ruangan.helper';
 import DosenHelper from '../../helpers/dosen.helper';
-import { LogJadwalContext } from '../../services/jadwal.service';
+import { LogJadwalContext } from '../jadwal';
 import {
   CreateJadwalDraftInput,
   UpdateDraftInput,

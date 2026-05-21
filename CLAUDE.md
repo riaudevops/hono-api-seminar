@@ -9,18 +9,19 @@ Backend API for **ZRAES AI** — Sistem Manajemen Seminar Kerja Praktik dan Tuga
 ## Commands
 
 ```bash
-bun run dev                    # Dev server with hot reload (src/index.ts)
-bun run start                  # Production server
-bun run dev:worker             # Background worker with hot reload (src/worker.ts)
-bun run start:worker           # Production worker
-bunx prisma migrate dev        # Create and apply migration
-bunx prisma migrate deploy     # Apply migrations (production)
-bunx prisma db seed            # Seed database
-bunx prisma studio             # Database GUI
-bunx prisma generate           # Regenerate Prisma client
+bun run dev                         # Dev server with hot reload (src/index.ts)
+bun run start                       # Production server
+bun run dev:worker                  # Background worker with hot reload (src/worker.ts)
+bun run start:worker                # Production worker
+bunx prisma migrate dev             # Create and apply migration
+bunx prisma migrate deploy          # Apply migrations (production)
+bunx prisma db seed                 # Seed database
+bunx prisma studio                  # Database GUI
+bunx prisma generate                # Regenerate Prisma client after schema changes
+bunx tsc --noEmit --skipLibCheck    # Type-check project source
 ```
 
-No test or lint framework is configured.
+No test, lint, or build script is configured in `package.json`. `bunx tsc --noEmit` currently reports dependency declaration errors unless `--skipLibCheck` is used.
 
 ## Architecture
 
@@ -73,13 +74,13 @@ JWT Bearer token extracted in middleware (`AuthMiddleware.JWTBearerTokenExtracti
 
 ### AI Schedule Generation
 
-`JadwalDraftService` gathers context (rooms, existing schedules, dosen constraints), sends to OpenRouter LLM with structured prompts, validates output against Zod schemas, and creates draft schedule records. Supports approve/reject workflow. Prompts are in `src/prompts/`.
+`JadwalDraftService` gathers context (rooms, existing schedules, dosen constraints), sends chunked requests to OpenRouter with structured prompts, validates output against Zod schemas, and creates draft schedule records. Supports approve/reject workflow. Prompts are in `src/prompts/`. `OpenRouterService.chatCompletion()` is the gateway for AI calls and applies bounded timeout/retry handling for transient upstream errors.
 
 ### Database
 
 PostgreSQL via Prisma with `@prisma/adapter-pg`. Connection is a lazy-initialized singleton with a Proxy for backward-compatible imports. Schema in `prisma/schema.prisma`. Seed data in `prisma/seed.ts` and `src/data/*.sql`.
 
-Note: The schema has a known drift issue — `pendaftaran.service.ts` still references legacy flat columns (`nama`, `semester`, `no_wa`, `judul`) that have been migrated to an EAV structure. Treat service/schema mismatches as a likely bug site when editing pendaftaran code.
+`pendaftaran` stores document/form values in the `data_pendaftaran` EAV-style table and tracks both `status_berkas` and `status_jadwal`. `tahun_ajaran` codes use `TahunAjaranHelper` format `YYYY1` for ganjil and `YYYY2` for genap.
 
 ## Conventions
 
@@ -88,5 +89,6 @@ Note: The schema has a known drift issue — `pendaftaran.service.ts` still refe
 - **Zod everywhere**: env validation, request validation, LLM output validation
 - **Custom logger**: use `createLogger('ContextName')` from `src/utils/logger.util.ts`
 - Validators use `.refine()` for cross-field business rules
-- Environment config via `src/core/config.ts` singleton — never read `process.env` directly
+- Mutating module operations generally create audit logs via `LogService.createEntityLog` or `tx.log.create`; preserve this when adding `POST`, `PUT/PATCH`, or `DELETE` flows
+- Environment config via `src/core/config.ts` singleton — avoid reading `process.env` directly outside infrastructure/bootstrap code that intentionally lazy-loads environment values
 - New features go under `src/modules/<feature>/` with a barrel `index.ts`; mount the route in `src/index.ts` under `/api`

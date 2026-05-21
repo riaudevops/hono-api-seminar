@@ -53,6 +53,12 @@ export default class MahasiswaRepository {
     return { mahasiswa, total };
   }
 
+  public static async findByNIM(nim: string) {
+    return prisma.mahasiswa.findUnique({
+      where: { nim },
+    });
+  }
+
   public static async getStatistics() {
     const [total, aktif, nonaktif, perStatus] = (await prisma.$transaction([
       prisma.mahasiswa.count(),

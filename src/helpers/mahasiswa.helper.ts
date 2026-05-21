@@ -1,4 +1,4 @@
-import MahasiswaRepository from '../repositories/mahasiswa.repository';
+import { MahasiswaModuleRepository as MahasiswaRepository } from '../modules/mahasiswa';
 import { APIError } from '../utils/api-error.util';
 
 export default class MahasiswaHelper {

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { StatusBerkas } from '@prisma/client';
+import { StatusBerkas, StatusJadwal } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 import {
   CreatePendaftaranByMahasiswaType,
@@ -331,6 +331,23 @@ export default class PendaftaranRepository {
     });
   }
 
+  public static async updateStatusJadwalByJadwalData(
+    nim: string,
+    id_jenis_seminar: string,
+    tahun_ajaran: string,
+    status_jadwal: StatusJadwal,
+    client: any = prisma
+  ) {
+    return client.pendaftaran.updateMany({
+      where: {
+        nim,
+        id_jenis_seminar,
+        tahun_ajaran,
+      },
+      data: { status_jadwal },
+    });
+  }
+
   public static async updateDosenByKoordinator(
     id: string,
     data: UpdateDosenByKoordinatorType
@@ -484,6 +501,7 @@ export default class PendaftaranRepository {
         ? dosenByNip.get(pendaftaran.nip_ketua_sidang)?.nama ?? null
         : null,
       status_berkas: pendaftaran.status_berkas,
+      status_jadwal: pendaftaran.status_jadwal,
       created_at: pendaftaran.created_at,
       updated_at: pendaftaran.updated_at,
       jenis_seminar: jenisSeminar,

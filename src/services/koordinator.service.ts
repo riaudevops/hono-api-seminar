@@ -1,6 +1,5 @@
 import prisma from '../infrastructures/db.infrastructure';
 import DosenRepository from '../repositories/dosen.repository';
-import JadwalRepository from '../repositories/jadwal.repository';
 import JadwalHelper from '../helpers/jadwal.helper';
 import { APIError } from '../utils/api-error.util';
 import { PenilaiRole, LogEntityType } from '@prisma/client';

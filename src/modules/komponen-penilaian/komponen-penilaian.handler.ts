@@ -1,19 +1,14 @@
 import { Context } from 'hono';
-import KomponenPenilaianService from '../services/komponen-penilaian.service';
+import KomponenPenilaianService from './komponen-penilaian.service';
 import { PenilaiRole } from '@prisma/client';
 
 export default class KomponenPenilaianHandler {
   public static async getAll(c: Context) {
-    const role = c.req.query('role') as PenilaiRole | undefined;
-    const isAktif = c.req.query('is_aktif');
-
-    if (isAktif !== undefined && isAktif !== 'false' && role) {
-      if (isAktif === 'true') {
-        return c.json(await KomponenPenilaianService.getActiveByRole(role));
-      }
-    }
-
-    return c.json(await KomponenPenilaianService.getAll(role));
+    const query = (c.req as any).valid('query') as {
+      role?: PenilaiRole;
+      is_aktif?: boolean;
+    };
+    return c.json(await KomponenPenilaianService.getAll(query));
   }
 
   public static async create(c: Context) {

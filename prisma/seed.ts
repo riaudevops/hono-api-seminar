@@ -182,8 +182,8 @@ async function main() {
   // 5. Seeder Dokumen Template (master dokumen yang dibutuhkan saat pendaftaran)
   // Catatan: NIP pembimbing/penguji/ketua sidang TIDAK disimpan di sini.
   // Field-field tersebut sudah jadi kolom flat di tabel `pendaftaran` dan
-  // jumlahnya ditentukan oleh `jenis_seminar.jumlah_pembimbing` /
-  // `jumlah_penguji` / `ada_ketua_sidang` — frontend render form berdasarkan itu.
+  // jumlahnya ditentukan oleh `jenis_seminar.wajib_pembimbing` /
+  // `wajib_penguji` / `ada_ketua_sidang` — frontend render form berdasarkan itu.
   const resultDokumenTemplate = await prisma.dokumen_template.createMany({
     data: [
       // --- Data umum (TEXT / DATE / URL) ---
@@ -258,7 +258,8 @@ async function main() {
       {
         kode: 'BUKTI_BIMBINGAN',
         nama: 'Kartu / Log Bimbingan',
-        deskripsi: 'Scan kartu kontrol bimbingan (minimal sesuai ketentuan prodi)',
+        deskripsi:
+          'Scan kartu kontrol bimbingan (minimal sesuai ketentuan prodi)',
         tipe_input: 'FILE_UPLOAD',
         format_file: 'pdf',
         max_size_mb: 5,
@@ -356,24 +357,25 @@ async function main() {
         nama: 'Seminar Kerja Praktek',
         deskripsi:
           'Seminar pemaparan hasil kerja praktek mahasiswa di instansi mitra.',
-        jumlah_pembimbing: 1,
-        jumlah_penguji: 1,
+        wajib_pembimbing: 1,
+        wajib_penguji: 1,
         ada_ketua_sidang: false,
       },
       {
         kode: 'SEMPRO',
         nama: 'Seminar Proposal Tugas Akhir',
         deskripsi: 'Seminar pemaparan proposal penelitian tugas akhir.',
-        jumlah_pembimbing: 2,
-        jumlah_penguji: 2,
+        wajib_pembimbing: 2,
+        wajib_penguji: 2,
         ada_ketua_sidang: false,
       },
       {
         kode: 'SEMHAS_LAPORAN',
         nama: 'Seminar Hasil Tugas Akhir (Jalur Laporan)',
-        deskripsi: 'Seminar hasil penelitian tugas akhir melalui jalur laporan.',
-        jumlah_pembimbing: 2,
-        jumlah_penguji: 2,
+        deskripsi:
+          'Seminar hasil penelitian tugas akhir melalui jalur laporan.',
+        wajib_pembimbing: 2,
+        wajib_penguji: 2,
         ada_ketua_sidang: false,
       },
       {
@@ -381,16 +383,16 @@ async function main() {
         nama: 'Seminar Hasil Tugas Akhir (Jalur Paper)',
         deskripsi:
           'Seminar hasil penelitian tugas akhir melalui jalur paper konferensi/jurnal.',
-        jumlah_pembimbing: 2,
-        jumlah_penguji: 2,
+        wajib_pembimbing: 2,
+        wajib_penguji: 2,
         ada_ketua_sidang: false,
       },
       {
         kode: 'SIDANG_LAPORAN',
         nama: 'Sidang Tugas Akhir (Jalur Laporan)',
         deskripsi: 'Sidang akhir pertahanan tugas akhir melalui jalur laporan.',
-        jumlah_pembimbing: 2,
-        jumlah_penguji: 2,
+        wajib_pembimbing: 2,
+        wajib_penguji: 2,
         ada_ketua_sidang: true,
       },
       {
@@ -398,8 +400,8 @@ async function main() {
         nama: 'Sidang Tugas Akhir (Jalur Paper)',
         deskripsi:
           'Sidang akhir pertahanan tugas akhir melalui jalur paper konferensi/jurnal.',
-        jumlah_pembimbing: 2,
-        jumlah_penguji: 2,
+        wajib_pembimbing: 2,
+        wajib_penguji: 2,
         ada_ketua_sidang: true,
       },
     ],
@@ -424,7 +426,12 @@ async function main() {
   const jenisMap = new Map(jenisList.map((j) => [j.kode, j.id]));
   const dokumenMap = new Map(dokumenList.map((d) => [d.kode, d.id]));
 
-  type Req = { jenis: string; dokumen: string; urutan: number; wajib?: boolean };
+  type Req = {
+    jenis: string;
+    dokumen: string;
+    urutan: number;
+    wajib?: boolean;
+  };
   const requirements: Req[] = [
     // --- SEMKP ---
     { jenis: 'SEMKP', dokumen: 'JUDUL_KP', urutan: 1 },
@@ -443,7 +450,12 @@ async function main() {
     { jenis: 'SEMPRO', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
     { jenis: 'SEMPRO', dokumen: 'BERKAS_SYARAT', urutan: 4 },
     { jenis: 'SEMPRO', dokumen: 'UNDANGAN_SEBELUMNYA', urutan: 5 },
-    { jenis: 'SEMPRO', dokumen: 'MATA_KULIAH_PILIHAN', urutan: 6, wajib: false },
+    {
+      jenis: 'SEMPRO',
+      dokumen: 'MATA_KULIAH_PILIHAN',
+      urutan: 6,
+      wajib: false,
+    },
 
     // --- SEMHAS_LAPORAN ---
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
@@ -451,7 +463,12 @@ async function main() {
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'REVISI_SEMPRO', urutan: 4 },
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'BERKAS_SYARAT', urutan: 5 },
-    { jenis: 'SEMHAS_LAPORAN', dokumen: 'LINK_REPOSITORY', urutan: 6, wajib: false },
+    {
+      jenis: 'SEMHAS_LAPORAN',
+      dokumen: 'LINK_REPOSITORY',
+      urutan: 6,
+      wajib: false,
+    },
 
     // --- SEMHAS_PAPERBASED ---
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
@@ -460,7 +477,12 @@ async function main() {
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'BUKTI_BIMBINGAN', urutan: 4 },
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'REVISI_SEMPRO', urutan: 5 },
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'BERKAS_SYARAT', urutan: 6 },
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'LINK_REPOSITORY', urutan: 7, wajib: false },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'LINK_REPOSITORY',
+      urutan: 7,
+      wajib: false,
+    },
 
     // --- SIDANG_LAPORAN ---
     { jenis: 'SIDANG_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
@@ -468,7 +490,12 @@ async function main() {
     { jenis: 'SIDANG_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
     { jenis: 'SIDANG_LAPORAN', dokumen: 'REVISI_SEMHAS', urutan: 4 },
     { jenis: 'SIDANG_LAPORAN', dokumen: 'BERKAS_SYARAT', urutan: 5 },
-    { jenis: 'SIDANG_LAPORAN', dokumen: 'LINK_REPOSITORY', urutan: 6, wajib: false },
+    {
+      jenis: 'SIDANG_LAPORAN',
+      dokumen: 'LINK_REPOSITORY',
+      urutan: 6,
+      wajib: false,
+    },
 
     // --- SIDANG_PAPERBASED ---
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
@@ -477,7 +504,12 @@ async function main() {
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'BUKTI_BIMBINGAN', urutan: 4 },
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'REVISI_SEMHAS', urutan: 5 },
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'BERKAS_SYARAT', urutan: 6 },
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'LINK_REPOSITORY', urutan: 7, wajib: false },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'LINK_REPOSITORY',
+      urutan: 7,
+      wajib: false,
+    },
   ];
 
   const missingRefs = requirements.filter(

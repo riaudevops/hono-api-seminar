@@ -1,9 +1,8 @@
 import PenilaianRepository from '../repositories/penilaian.repository';
-import JadwalRepository from '../repositories/jadwal.repository';
+import { JadwalRepository, LogJadwalContext } from '../modules/jadwal';
 import { APIError } from '../utils/api-error.util';
 import prisma from '../infrastructures/db.infrastructure';
 import { LogActionType } from '@prisma/client';
-import { LogJadwalContext } from './jadwal.service';
 import { LogService } from '../modules/log';
 
 export interface SubmitPenilaianItem {

@@ -55,8 +55,8 @@ export default class JenisSeminarRepository {
         nama: data.nama,
         deskripsi: data.deskripsi,
         is_aktif: data.is_aktif ?? true,
-        jumlah_pembimbing: data.jumlah_pembimbing ?? 1,
-        jumlah_penguji: data.jumlah_penguji ?? 2,
+        wajib_pembimbing: data.wajib_pembimbing ?? 1,
+        wajib_penguji: data.wajib_penguji ?? 2,
         ada_ketua_sidang: data.ada_ketua_sidang ?? false,
       },
     });

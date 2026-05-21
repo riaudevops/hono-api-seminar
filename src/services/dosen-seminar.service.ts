@@ -1,8 +1,8 @@
 import PenilaianRepository from '../repositories/penilaian.repository';
-import KomponenPenilaianRepository from '../repositories/komponen-penilaian.repository';
+import { KomponenPenilaianRepository } from '../modules/komponen-penilaian';
 import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
 import DosenRepository from '../repositories/dosen.repository';
-import JadwalRepository from '../repositories/jadwal.repository';
+import { JadwalRepository } from '../modules/jadwal';
 import { LogRepository, LogService } from '../modules/log';
 import JadwalHelper from '../helpers/jadwal.helper';
 import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';

@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js';
-import { LogActionType, LogActorType, LogEntityType, StatusBerkas } from '@prisma/client';
+import { LogActionType, LogActorType, LogEntityType, StatusBerkas, StatusJadwal } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
@@ -20,6 +20,7 @@ export interface GetAllParams {
   periode?: 'last_7_hari' | 'last_30_hari' | 'semua';
   jenis_seminar?: string;
   status_berkas?: StatusBerkas;
+  status_jadwal?: StatusJadwal;
   tahun_ajaran?: string;
   nim?: string;
   q?: string;
@@ -38,6 +39,7 @@ export default class PendaftaranService {
       periode = 'semua',
       jenis_seminar,
       status_berkas,
+      status_jadwal,
       tahun_ajaran,
       nim,
       q,
@@ -62,6 +64,10 @@ export default class PendaftaranService {
 
     if (status_berkas) {
       pendaftaran = pendaftaran.filter((p) => p.status_berkas === status_berkas);
+    }
+
+    if (status_jadwal) {
+      pendaftaran = pendaftaran.filter((p) => p.status_jadwal === status_jadwal);
     }
 
     if (tahun_ajaran) {

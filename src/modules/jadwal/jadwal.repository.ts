@@ -216,6 +216,29 @@ export default class JadwalRepository {
     });
   }
 
+  public static async findBlockingSchedulesForGeneration(
+    startDate: Date,
+    endDate: Date
+  ) {
+    return prisma.jadwal.findMany({
+      where: {
+        tanggal: { gte: startDate, lte: endDate },
+      },
+      select: {
+        tanggal: true,
+        waktu_mulai: true,
+        waktu_selesai: true,
+        kode_ruangan: true,
+        penilaian: {
+          select: {
+            nip: true,
+          },
+        },
+      },
+      orderBy: { tanggal: 'asc' },
+    });
+  }
+
   public static async checkTimeConflict(
     kode_ruangan: string,
     waktu_mulai: Date,

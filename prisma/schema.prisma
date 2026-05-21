@@ -69,6 +69,11 @@ enum StatusBerkas {
   UPLOAD_ULANG
 }
 
+enum StatusJadwal {
+  BELUM_JADWAL
+  SUDAH_JADWAL
+}
+
 model dosen {
   nip    String @id @db.VarChar(18)
   nama   String @db.VarChar(255)
@@ -276,8 +281,8 @@ model jenis_seminar {
   deskripsi   String? @db.Text
   is_aktif    Boolean @default(true)
 
-  jumlah_pembimbing Int @default(1)
-  jumlah_penguji    Int @default(2)
+  wajib_pembimbing Int @default(1)
+  wajib_penguji    Int @default(2)
   ada_ketua_sidang  Boolean @default(false)
 
   requirement_dokumen requirement_dokumen[]
@@ -350,6 +355,7 @@ model pendaftaran {
   nip_ketua_sidang  String?      @db.VarChar(18)
 
   status_berkas     StatusBerkas @default(PENDING)
+  status_jadwal     StatusJadwal @default(BELUM_JADWAL)
   created_at        DateTime     @default(now()) @db.Timestamptz
   updated_at        DateTime     @updatedAt @db.Timestamptz
 

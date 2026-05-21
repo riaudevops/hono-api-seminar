@@ -1,4 +1,4 @@
-import prisma from '../infrastructures/db.infrastructure';
+import prisma from '../../infrastructures/db.infrastructure';
 import { PenilaiRole } from '@prisma/client';
 
 export interface CreateKomponenPenilaianInput {

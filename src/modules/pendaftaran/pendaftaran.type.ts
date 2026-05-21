@@ -1,4 +1,4 @@
-import { StatusBerkas } from '@prisma/client';
+import { StatusBerkas, StatusJadwal } from '@prisma/client';
 import type { PaginatedResponse } from '../../types/global.type';
 
 export interface PendaftaranType {
@@ -18,6 +18,7 @@ export interface PendaftaranType {
   nip_ketua_sidang: string | null;
   nama_ketua_sidang?: string | null;
   status_berkas: StatusBerkas;
+  status_jadwal: StatusJadwal;
   created_at: Date;
   updated_at: Date;
 }

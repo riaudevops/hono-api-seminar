@@ -32,8 +32,8 @@ export const postJenisSeminarSchema = z.object({
   nama: namaSchema,
   deskripsi: deskripsiSchema,
   is_aktif: z.boolean().optional(),
-  jumlah_pembimbing: jumlahSchema.optional(),
-  jumlah_penguji: jumlahSchema.optional(),
+  wajib_pembimbing: jumlahSchema.optional(),
+  wajib_penguji: jumlahSchema.optional(),
   ada_ketua_sidang: z.boolean().optional(),
 });
 
@@ -42,7 +42,7 @@ export const putJenisSeminarSchema = z.object({
   nama: namaSchema.optional(),
   deskripsi: deskripsiSchema.nullable(),
   is_aktif: z.boolean().optional(),
-  jumlah_pembimbing: jumlahSchema.optional(),
-  jumlah_penguji: jumlahSchema.optional(),
+  wajib_pembimbing: jumlahSchema.optional(),
+  wajib_penguji: jumlahSchema.optional(),
   ada_ketua_sidang: z.boolean().optional(),
 });

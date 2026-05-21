@@ -1,7 +1,7 @@
-import prisma from '../infrastructures/db.infrastructure';
-import { APIError } from '../utils/api-error.util';
+import prisma from '../../infrastructures/db.infrastructure';
+import { APIError } from '../../utils/api-error.util';
 import { LogActionType, LogActorType, LogEntityType, PenilaiRole, Prisma } from '@prisma/client';
-import { LogService } from '../modules/log';
+import { LogService } from '../log';
 
 export interface CreateKomponenInput {
   nama: string;
@@ -64,11 +64,17 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Mengambil semua komponen penilaian, opsional difilter berdasarkan role
+   * Mengambil semua komponen penilaian, opsional difilter berdasarkan role dan status aktif
    */
-  public static async getAll(role?: PenilaiRole) {
+  public static async getAll(filters: {
+    role?: PenilaiRole;
+    is_aktif?: boolean;
+  } = {}) {
     const komponen = await prisma.komponen_penilaian.findMany({
-      where: role ? { role } : undefined,
+      where: {
+        ...(filters.role ? { role: filters.role } : {}),
+        ...(filters.is_aktif !== undefined ? { is_aktif: filters.is_aktif } : {}),
+      },
       orderBy: [{ role: 'asc' }, { is_aktif: 'desc' }, { id: 'asc' }],
     });
 
