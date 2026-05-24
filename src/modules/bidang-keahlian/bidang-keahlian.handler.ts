@@ -1,9 +1,9 @@
-import { Context } from 'hono';
-import BidangKeahlianService from '../services/bidang-keahlian.service';
-import {
+import type { Context } from 'hono';
+import BidangKeahlianService from './bidang-keahlian.service';
+import type {
   CreateBidangKeahlianType,
   UpdateBidangKeahlianType,
-} from '../types/bidang-keahlian.type';
+} from './bidang-keahlian.type';
 
 export default class BidangKeahlianHandler {
   public static async getAll(c: Context) {

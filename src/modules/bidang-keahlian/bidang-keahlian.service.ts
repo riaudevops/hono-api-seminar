@@ -1,12 +1,12 @@
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
-import BidangKeahlianRepository from '../repositories/bidang-keahlian.repository';
-import KeahlianDosenRepository from '../repositories/keahlian-dosen.repository';
-import { LogService } from '../modules/log';
-import { APIError } from '../utils/api-error.util';
-import {
+import BidangKeahlianRepository from './bidang-keahlian.repository';
+import KeahlianDosenRepository from '../keahlian-dosen/keahlian-dosen.repository';
+import { LogService } from '../log';
+import { APIError } from '../../utils/api-error.util';
+import type {
   CreateBidangKeahlianType,
   UpdateBidangKeahlianType,
-} from '../types/bidang-keahlian.type';
+} from './bidang-keahlian.type';
 
 export default class BidangKeahlianService {
   public static async getAll() {
@@ -58,7 +58,7 @@ export default class BidangKeahlianService {
   }
 
   public static async update(id: string, data: UpdateBidangKeahlianType) {
-    const existingData = (await this.get(id)).data;
+    const existingData = (await BidangKeahlianService.get(id)).data;
 
     if (data.nama) {
       const existing = await BidangKeahlianRepository.findByNama(data.nama);
@@ -89,7 +89,7 @@ export default class BidangKeahlianService {
   }
 
   public static async delete(id: string) {
-    const existingData = (await this.get(id)).data;
+    const existingData = (await BidangKeahlianService.get(id)).data;
 
     const used = await KeahlianDosenRepository.existsByBidangKeahlianId(id);
 

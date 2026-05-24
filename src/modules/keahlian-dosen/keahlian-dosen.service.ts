@@ -1,14 +1,14 @@
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
-import DosenRepository from '../repositories/dosen.repository';
-import BidangKeahlianRepository from '../repositories/bidang-keahlian.repository';
-import { LogService } from '../modules/log';
-import KeahlianDosenRepository from '../repositories/keahlian-dosen.repository';
-import { APIError } from '../utils/api-error.util';
-import {
+import DosenRepository from '../../repositories/dosen.repository';
+import BidangKeahlianRepository from '../bidang-keahlian/bidang-keahlian.repository';
+import { LogService } from '../log';
+import KeahlianDosenRepository from './keahlian-dosen.repository';
+import { APIError } from '../../utils/api-error.util';
+import type {
   CreateKeahlianDosenType,
   KeahlianDosenFilterType,
   UpdateKeahlianDosenType,
-} from '../types/keahlian-dosen.type';
+} from './keahlian-dosen.type';
 
 export default class KeahlianDosenService {
   public static async getAll(filters?: KeahlianDosenFilterType) {
@@ -139,7 +139,7 @@ export default class KeahlianDosenService {
   }
 
   public static async delete(id: string) {
-    const existingData = (await this.get(id)).data;
+    const existingData = (await KeahlianDosenService.get(id)).data;
     await KeahlianDosenRepository.destroy(id);
     await LogService.createEntityLog({
       action: LogActionType.DELETE,

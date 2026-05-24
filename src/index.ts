@@ -6,27 +6,9 @@ import { config } from './core';
 import { bootstrap, shutdown } from './core';
 import { createLogger } from './utils/logger.util';
 import GlobalHandler from './handlers/global.handler';
-import globalRoute from './routes/global.route';
 import LogMiddleware from './middlewares/log.middleware';
 import RateLimitMiddleware from './middlewares/rate-limit.middleware';
-import { JadwalRoute } from './modules/jadwal';
-import { RuanganRoute } from './modules/ruangan';
-import dosenRoute from './routes/dosen.route';
-import { KomponenPenilaianRoute } from './modules/komponen-penilaian';
-import penilaianRoute from './routes/penilaian.route';
-import { ConstraintDosenModuleRoute } from './modules/constraint-dosen';
-import { JadwalDraftModuleRoute } from './modules/jadwal-draft';
-import bidangKeahlianRoute from './routes/bidang-keahlian.route';
-import keahlianDosenRoute from './routes/keahlian-dosen.route';
-import dosenSeminarRoute from './routes/dosen-seminar.route';
-import koordinatorRoute from './routes/koordinator.route';
-import { JenisSeminarRoute } from './modules/jenis-seminar';
-import { DokumenTemplateRoute } from './modules/dokumen-template';
-import { RequirementDokumenRoute } from './modules/requirement-dokumen';
-import { PendaftaranModuleRoute } from './modules/pendaftaran';
-import { MahasiswaModuleRoute } from './modules/mahasiswa';
-import { LogModuleRoute } from './modules/log';
-import { DetailPenilaianRoute } from './modules/detail-penilaian';
+import apiRouter from './api';
 
 const logger = createLogger('Server');
 
@@ -81,25 +63,7 @@ app.get(
   })
 );
 
-app.route('/api', globalRoute);
-app.route('/api', JadwalRoute);
-app.route('/api', RuanganRoute);
-app.route('/api', dosenRoute);
-app.route('/api', KomponenPenilaianRoute);
-app.route('/api', penilaianRoute);
-app.route('/api', ConstraintDosenModuleRoute);
-app.route('/api', JadwalDraftModuleRoute);
-app.route('/api', bidangKeahlianRoute);
-app.route('/api', keahlianDosenRoute);
-app.route('/api', LogModuleRoute);
-app.route('/api', dosenSeminarRoute);
-app.route('/api', koordinatorRoute);
-app.route('/api', JenisSeminarRoute);
-app.route('/api', DokumenTemplateRoute);
-app.route('/api', RequirementDokumenRoute);
-app.route('/api', PendaftaranModuleRoute);
-app.route('/api', MahasiswaModuleRoute);
-app.route('/api', DetailPenilaianRoute);
+app.route('/api', apiRouter);
 
 // Graceful shutdown handlers
 process.on('SIGINT', async () => {

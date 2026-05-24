@@ -1,14 +1,14 @@
 import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
-import { zodError } from '../utils/zod-error.util';
-import RateLimitMiddleware from '../middlewares/rate-limit.middleware';
-import KeahlianDosenHandler from '../handlers/keahlian-dosen.handler';
+import { zodError } from '../../utils/zod-error.util';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
+import KeahlianDosenHandler from './keahlian-dosen.handler';
 import {
   createKeahlianDosenSchema,
   getKeahlianDosenQuerySchema,
   updateKeahlianDosenSchema,
-} from '../validators/keahlian-dosen.validator';
+} from './keahlian-dosen.validator';
 
 const keahlianDosenRoute = new Hono({ router: new RegExpRouter() });
 

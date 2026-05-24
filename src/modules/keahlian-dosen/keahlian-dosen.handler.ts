@@ -1,9 +1,9 @@
-import { Context } from 'hono';
-import KeahlianDosenService from '../services/keahlian-dosen.service';
-import {
+import type { Context } from 'hono';
+import KeahlianDosenService from './keahlian-dosen.service';
+import type {
   CreateKeahlianDosenType,
   UpdateKeahlianDosenType,
-} from '../types/keahlian-dosen.type';
+} from './keahlian-dosen.type';
 
 export default class KeahlianDosenHandler {
   public static async getAll(c: Context) {

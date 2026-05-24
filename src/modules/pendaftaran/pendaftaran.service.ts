@@ -233,6 +233,13 @@ export default class PendaftaranService {
       throw new APIError('Pendaftaran tidak ditemukan.', 404);
     }
 
+    if (existing.status_jadwal === 'SUDAH_JADWAL') {
+      throw new APIError(
+        'Status berkas tidak dapat diubah karena jadwal sudah diinput.',
+        409
+      );
+    }
+
     const data = await PendaftaranRepository.updateStatusBerkas(id, payload);
     await LogService.createEntityLog({
       action: LogActionType.UPDATE,
