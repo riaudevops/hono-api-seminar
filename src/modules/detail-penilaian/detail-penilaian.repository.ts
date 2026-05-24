@@ -58,6 +58,14 @@ export default class DetailPenilaianRepository {
     }) as unknown as Promise<PenilaianRekapRecord[]>;
   }
 
+  public static async findPenilaianByDosenNip(nip: string) {
+    return prisma.penilaian.findMany({
+      where: { nip },
+      include: penilaianDetailInclude,
+      orderBy: [{ id_jadwal: 'asc' }, { role: 'asc' }, { id: 'asc' }],
+    }) as unknown as Promise<PenilaianDetailRecord[]>;
+  }
+
   public static async findActiveComponentsByRole(role: PenilaiRole) {
     return prisma.komponen_penilaian.findMany({
       where: { role, is_aktif: true },

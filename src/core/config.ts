@@ -5,7 +5,7 @@ import { z } from 'zod';
 // =============================================================================
 const envSchema = z.object({
   // Application Configuration
-  APP_NAME: z.string().default('ZRAES AI API'),
+  APP_NAME: z.string().default('API SEMINAR TIF'),
   APP_VERSION: z.string().default('1.0.0'),
   APP_ENV: z
     .enum(['development', 'staging', 'production', 'testing'])
@@ -91,11 +91,53 @@ const envSchema = z.object({
   // Webhook Configuration
   WEBHOOK_SECRET: z.string().default('change-this-webhook-secret'),
 
+  // Redis Configuration
+  REDIS_ENABLED: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('true'),
+  REDIS_HOST: z.string().optional(),
+  REDIS_PORT: z.string().transform(Number).default('6379'),
+  REDIS_PASSWORD: z.string().optional(),
+  REDIS_URL: z.string().optional(),
+  REDIS_KEY_PREFIX: z.string().default('seminar-tif'),
+  REDIS_DEFAULT_TTL_SECONDS: z.string().transform(Number).default('300'),
+
+  // Rate Limiter Configuration
+  RATE_LIMIT_ENABLED: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('true'),
+  RATE_LIMIT_GLOBAL_LIMIT: z.string().transform(Number).default('300'),
+  RATE_LIMIT_GLOBAL_WINDOW_MS: z.string().transform(Number).default('60000'),
+  RATE_LIMIT_READ_LIMIT: z.string().transform(Number).default('120'),
+  RATE_LIMIT_READ_WINDOW_MS: z.string().transform(Number).default('60000'),
+  RATE_LIMIT_WRITE_LIMIT: z.string().transform(Number).default('30'),
+  RATE_LIMIT_WRITE_WINDOW_MS: z.string().transform(Number).default('60000'),
+  RATE_LIMIT_AUTH_LIMIT: z.string().transform(Number).default('10'),
+  RATE_LIMIT_AUTH_WINDOW_MS: z.string().transform(Number).default('900000'),
+  RATE_LIMIT_AI_LIMIT: z.string().transform(Number).default('10'),
+  RATE_LIMIT_AI_WINDOW_MS: z.string().transform(Number).default('600000'),
 
   // OpenRouter Configuration
   OPENROUTER_API_KEY: z.string().optional(),
   OPENROUTER_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
   OPENROUTER_MODEL: z.string().default('openai/gpt-4o-mini'),
+  OPENROUTER_MODELS: z
+    .string()
+    .transform((val) =>
+      val
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+    .default(''),
+  OPENROUTER_TIMEOUT_MS: z.string().transform(Number).default('90000'),
+  OPENROUTER_MAX_RETRIES: z.string().transform(Number).default('2'),
+  OPENROUTER_USE_LOW_LATENCY_ROUTING: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('true'),
 });
 
 // =============================================================================
@@ -218,12 +260,64 @@ class Config {
     };
   }
 
+  // Rate limiter getters
+  public get rateLimit() {
+    return {
+      enabled: this.config.RATE_LIMIT_ENABLED,
+      tiers: {
+        global: {
+          limit: this.config.RATE_LIMIT_GLOBAL_LIMIT,
+          windowMs: this.config.RATE_LIMIT_GLOBAL_WINDOW_MS,
+        },
+        read: {
+          limit: this.config.RATE_LIMIT_READ_LIMIT,
+          windowMs: this.config.RATE_LIMIT_READ_WINDOW_MS,
+        },
+        write: {
+          limit: this.config.RATE_LIMIT_WRITE_LIMIT,
+          windowMs: this.config.RATE_LIMIT_WRITE_WINDOW_MS,
+        },
+        authStrict: {
+          limit: this.config.RATE_LIMIT_AUTH_LIMIT,
+          windowMs: this.config.RATE_LIMIT_AUTH_WINDOW_MS,
+        },
+        aiExpensive: {
+          limit: this.config.RATE_LIMIT_AI_LIMIT,
+          windowMs: this.config.RATE_LIMIT_AI_WINDOW_MS,
+        },
+      },
+    };
+  }
+
+  // Redis getters
+  public get redis() {
+    const url =
+      this.config.REDIS_URL ||
+      (this.config.REDIS_HOST
+        ? `redis://${this.config.REDIS_HOST}:${this.config.REDIS_PORT}`
+        : undefined);
+
+    return {
+      enabled: this.config.REDIS_ENABLED,
+      host: this.config.REDIS_HOST,
+      port: this.config.REDIS_PORT,
+      password: this.config.REDIS_PASSWORD,
+      url,
+      keyPrefix: this.config.REDIS_KEY_PREFIX,
+      defaultTtlSeconds: this.config.REDIS_DEFAULT_TTL_SECONDS,
+    };
+  }
+
   // OpenRouter getters
   public get openrouter() {
     return {
       apiKey: this.config.OPENROUTER_API_KEY,
       baseUrl: this.config.OPENROUTER_BASE_URL,
       model: this.config.OPENROUTER_MODEL,
+      models: this.config.OPENROUTER_MODELS,
+      timeoutMs: this.config.OPENROUTER_TIMEOUT_MS,
+      maxRetries: this.config.OPENROUTER_MAX_RETRIES,
+      useLowLatencyRouting: this.config.OPENROUTER_USE_LOW_LATENCY_ROUTING,
     };
   }
 

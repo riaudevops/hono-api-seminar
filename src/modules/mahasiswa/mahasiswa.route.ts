@@ -3,6 +3,7 @@ import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
 import MahasiswaHandler from './mahasiswa.handler';
 import {
   getAllMahasiswaQuerySchema,
@@ -33,6 +34,7 @@ mahasiswaModuleRoute.get(
 mahasiswaModuleRoute.put(
   '/mahasiswa/data-saya',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', putDataSayaSchema, zodError),
   MahasiswaHandler.updateDataSaya
 );

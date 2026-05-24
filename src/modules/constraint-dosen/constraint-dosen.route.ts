@@ -1,14 +1,15 @@
 import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
-import { zodError } from '../utils/zod-error.util';
 import { zValidator } from '@hono/zod-validator';
-import AuthMiddleware from '../middlewares/auth.middleware';
-import ConstraintDosenHandler from '../handlers/constraint-dosen.handler';
+import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
+import { zodError } from '../../utils/zod-error.util';
+import ConstraintDosenHandler from './constraint-dosen.handler';
 import {
+  chatConstraintSchema,
   postConstraintSchema,
   putConstraintSchema,
-  chatConstraintSchema,
-} from '../validators/constraint-dosen.validator';
+} from './constraint-dosen.validator';
 
 const constraintDosenRoute = new Hono({ router: new RegExpRouter() });
 
@@ -17,33 +18,42 @@ constraintDosenRoute.get(
   AuthMiddleware.JWTBearerTokenExtraction,
   ConstraintDosenHandler.getAll
 );
+
+constraintDosenRoute.post(
+  '/constraint-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  zValidator('json', postConstraintSchema, zodError),
+  ConstraintDosenHandler.create
+);
+
+constraintDosenRoute.post(
+  '/constraint-saya/chat',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.aiExpensive(),
+  zValidator('json', chatConstraintSchema, zodError),
+  ConstraintDosenHandler.chat
+);
+
 constraintDosenRoute.get(
   '/constraint-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   ConstraintDosenHandler.get
 );
-constraintDosenRoute.post(
-  '/constraint-saya',
-  AuthMiddleware.JWTBearerTokenExtraction,
-  zValidator('json', postConstraintSchema, zodError),
-  ConstraintDosenHandler.create
-);
+
 constraintDosenRoute.put(
   '/constraint-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', putConstraintSchema, zodError),
   ConstraintDosenHandler.update
 );
+
 constraintDosenRoute.delete(
   '/constraint-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   ConstraintDosenHandler.delete
-);
-constraintDosenRoute.post(
-  '/constraint-saya/chat',
-  AuthMiddleware.JWTBearerTokenExtraction,
-  zValidator('json', chatConstraintSchema, zodError),
-  ConstraintDosenHandler.chat
 );
 
 export default constraintDosenRoute;

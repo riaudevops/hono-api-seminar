@@ -1,6 +1,6 @@
 import { Context } from 'hono';
-import ConstraintDosenService from '../services/constraint-dosen.service';
-import { APIError } from '../utils/api-error.util';
+import ConstraintDosenService from './constraint-dosen.service';
+import { APIError } from '../../utils/api-error.util';
 
 function extractEmail(c: Context): string {
   const userPayload = c.get('user');

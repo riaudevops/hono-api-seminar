@@ -6,6 +6,7 @@ import {
   getTransporter,
 } from '../infrastructures/mail.infrastructure';
 import openRouterService from '../infrastructures/openrouter.infrastructure';
+import redisService from '../infrastructures/redis.infrastructure';
 
 // =============================================================================
 // Bootstrap: Register all services in the DI Container
@@ -36,6 +37,21 @@ export async function bootstrap(): Promise<void> {
   container.registerSingleton(ServiceTokens.MAILER, () => getTransporter());
   bootstrapLogger.debug('Mailer registered');
 
+  container.registerInstance(ServiceTokens.REDIS, redisService);
+  bootstrapLogger.debug('Redis registered');
+
+  try {
+    await redisService.connect();
+    bootstrapLogger.debug('Redis initialized', {
+      enabled: config.redis.enabled,
+      healthy: redisService.isHealthy(),
+    });
+  } catch (error) {
+    bootstrapLogger.error('Redis initialization failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   try {
     await openRouterService.initialize();
     bootstrapLogger.debug('OpenRouter initialized');
@@ -62,6 +78,9 @@ export async function shutdown(): Promise<void> {
 
     // Close mail transporter
     await mailService.close();
+
+    // Disconnect Redis
+    await redisService.disconnect();
 
     bootstrapLogger.info('Graceful shutdown completed');
   } catch (error) {

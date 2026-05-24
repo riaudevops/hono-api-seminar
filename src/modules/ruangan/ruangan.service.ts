@@ -1,17 +1,21 @@
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import RuanganRepository from './ruangan.repository';
+import redisService from '../../infrastructures/redis.infrastructure';
 import { APIError } from '../../utils/api-error.util';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
 import { LogService } from '../log';
-import { CreateRuanganType, UpdateRuanganType } from './ruangan.type';
+import type { CreateRuanganType, UpdateRuanganType } from './ruangan.type';
 
 export default class RuanganService {
   public static async getAll() {
-    const ruangan = await RuanganRepository.findAll();
-    return {
-      response: true,
-      message: 'Data semua ruangan berhasil diambil',
-      data: ruangan,
-    };
+    return redisService.remember('ruangan:all', 3_600, async () => {
+      const ruangan = await RuanganRepository.findAll();
+      return {
+        response: true,
+        message: 'Data semua ruangan berhasil diambil',
+        data: ruangan,
+      };
+    });
   }
 
   public static async get(kode: string) {
@@ -41,6 +45,7 @@ export default class RuanganService {
       entity_id: ruangan.kode,
       new_values: ruangan,
     });
+    await CacheInvalidation.invalidateRuangan();
 
     return {
       response: true,
@@ -50,7 +55,7 @@ export default class RuanganService {
   }
 
   public static async put(kode: string, data: UpdateRuanganType) {
-    const existing = (await this.get(kode)).data;
+    const existing = (await RuanganService.get(kode)).data;
     const ruangan = await RuanganRepository.update(kode, data);
     await LogService.createEntityLog({
       action: LogActionType.UPDATE,
@@ -61,6 +66,7 @@ export default class RuanganService {
       old_values: existing,
       new_values: ruangan,
     });
+    await CacheInvalidation.invalidateRuangan();
 
     return {
       response: true,
@@ -70,7 +76,7 @@ export default class RuanganService {
   }
 
   public static async delete(kode: string) {
-    const existing = (await this.get(kode)).data;
+    const existing = (await RuanganService.get(kode)).data;
     await RuanganRepository.destroy(kode);
     await LogService.createEntityLog({
       action: LogActionType.DELETE,
@@ -80,6 +86,7 @@ export default class RuanganService {
       entity_id: kode,
       old_values: existing,
     });
+    await CacheInvalidation.invalidateRuangan();
 
     return {
       response: true,

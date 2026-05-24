@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Backend API for **ZRAES AI** — Sistem Manajemen Seminar Kerja Praktik dan Tugas Akhir at TIF UIN Suska Riau. Built with **Hono v4** (OpenAPIHono) on **Bun** runtime with **Prisma** (PostgreSQL) and **OpenRouter** for AI-powered schedule generation.
+Backend API for **API SEMINAR TIF** — Sistem Manajemen Seminar Kerja Praktik dan Tugas Akhir at TIF UIN Suska Riau. Built with **Hono v4** (OpenAPIHono) on **Bun** runtime with **Prisma** (PostgreSQL) and **OpenRouter** for AI-powered schedule generation.
 
 ## Commands
 

@@ -3,6 +3,7 @@ import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
 import DokumenTemplateHandler from './dokumen-template.handler';
 import {
   getAllDokumenTemplateQuerySchema,
@@ -28,6 +29,7 @@ dokumenTemplateRoute.get(
 dokumenTemplateRoute.post(
   '/koordinator/dokumen-template',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', postDokumenTemplateSchema, zodError),
   DokumenTemplateHandler.create
 );
@@ -35,6 +37,7 @@ dokumenTemplateRoute.post(
 dokumenTemplateRoute.put(
   '/koordinator/dokumen-template/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', putDokumenTemplateSchema, zodError),
   DokumenTemplateHandler.update
 );
@@ -42,6 +45,7 @@ dokumenTemplateRoute.put(
 dokumenTemplateRoute.delete(
   '/koordinator/dokumen-template/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   DokumenTemplateHandler.delete
 );
 

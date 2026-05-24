@@ -1,35 +1,28 @@
-import DosenRepository from '../repositories/dosen.repository';
-import ConstraintDosenRepository from '../repositories/constraint-dosen.repository';
-import { APIError } from '../utils/api-error.util';
-import { ConstraintType, LogActionType, LogActorType, LogEntityType, Prisma } from '@prisma/client';
-import { LogService } from '../modules/log';
-import openRouterService from '../infrastructures/openrouter.infrastructure';
-import { textMessage } from '../utils/openrouter.util';
-import { ParseConstraintOutputSchema, ParsedConstraint } from '../prompts/output/constraint-schema';
-import { createLogger } from '../utils/logger.util';
+import DosenRepository from '../../repositories/dosen.repository';
+import ConstraintDosenRepository from './constraint-dosen.repository';
+import { APIError } from '../../utils/api-error.util';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import {
+  type ConstraintType,
+  LogActionType,
+  LogActorType,
+  LogEntityType,
+  type Prisma,
+} from '@prisma/client';
+import { LogService } from '../log';
+import openRouterService from '../../infrastructures/openrouter.infrastructure';
+import { textMessage } from '../../utils/openrouter.util';
+import {
+  ParseConstraintOutputSchema,
+  type ParsedConstraint,
+} from '../../prompts/output/constraint-schema';
+import { createLogger } from '../../utils/logger.util';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-
-export interface CreateConstraintType {
-  type: ConstraintType;
-  hari?: number;
-  waktu_mulai?: string;
-  waktu_selesai?: string;
-  keterangan?: string;
-  priority?: number;
-  raw_data?: Record<string, unknown>;
-}
-
-export interface UpdateConstraintType {
-  type?: ConstraintType;
-  hari?: number | null;
-  waktu_mulai?: string | null;
-  waktu_selesai?: string | null;
-  keterangan?: string | null;
-  priority?: number;
-  is_active?: boolean;
-  raw_data?: Record<string, unknown> | null;
-}
+import type {
+  CreateConstraintType,
+  UpdateConstraintType,
+} from './constraint-dosen.type';
 
 const logger = createLogger('ConstraintDosenService');
 
@@ -48,7 +41,7 @@ export default class ConstraintDosenService {
   }
 
   public static async getAll(email: string) {
-    const nip = await this.getNipFromEmail(email);
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
     const constraints = await ConstraintDosenRepository.findByNip(nip);
 
     return {
@@ -59,7 +52,7 @@ export default class ConstraintDosenService {
   }
 
   public static async get(email: string, id: string) {
-    const nip = await this.getNipFromEmail(email);
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
     const constraint = await ConstraintDosenRepository.findById(id);
     if (!constraint) {
       throw new APIError('Constraint tidak ditemukan', 404);
@@ -76,7 +69,7 @@ export default class ConstraintDosenService {
   }
 
   public static async create(email: string, data: CreateConstraintType) {
-    const nip = await this.getNipFromEmail(email);
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
 
     const createInput: Prisma.constraint_dosenCreateInput = {
       type: data.type,
@@ -100,6 +93,7 @@ export default class ConstraintDosenService {
       entity_id: constraint.id,
       new_values: constraint,
     });
+    await CacheInvalidation.invalidateConstraint();
 
     return {
       response: true,
@@ -113,7 +107,7 @@ export default class ConstraintDosenService {
     id: string,
     data: UpdateConstraintType
   ) {
-    const nip = await this.getNipFromEmail(email);
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
 
     const existing = await ConstraintDosenRepository.findById(id);
     if (!existing) {
@@ -143,8 +137,9 @@ export default class ConstraintDosenService {
     if (data.keterangan !== undefined) updateInput.keterangan = data.keterangan;
     if (data.priority !== undefined) updateInput.priority = data.priority;
     if (data.is_active !== undefined) updateInput.is_active = data.is_active;
-    if (data.raw_data !== undefined)
+    if (data.raw_data !== undefined) {
       updateInput.raw_data = data.raw_data as Prisma.InputJsonValue;
+    }
 
     const constraint = await ConstraintDosenRepository.update(id, updateInput);
     await LogService.createEntityLog({
@@ -156,6 +151,7 @@ export default class ConstraintDosenService {
       old_values: existing,
       new_values: constraint,
     });
+    await CacheInvalidation.invalidateConstraint();
 
     return {
       response: true,
@@ -165,7 +161,7 @@ export default class ConstraintDosenService {
   }
 
   public static async delete(email: string, id: string) {
-    const nip = await this.getNipFromEmail(email);
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
 
     const existing = await ConstraintDosenRepository.findById(id);
     if (!existing) {
@@ -187,6 +183,7 @@ export default class ConstraintDosenService {
       entity_id: id,
       old_values: existing,
     });
+    await CacheInvalidation.invalidateConstraint();
 
     return {
       response: true,
@@ -195,7 +192,7 @@ export default class ConstraintDosenService {
   }
 
   public static async chat(email: string, message: string) {
-    const nip = await this.getNipFromEmail(email);
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
 
     logger.info('Parsing constraint from chat', { nip, message });
 
@@ -206,15 +203,21 @@ export default class ConstraintDosenService {
       ],
       temperature: 0.3,
       maxTokens: 2048,
+      provider: { sort: 'latency' },
     });
 
     const rawContent = response.choices?.[0]?.message?.content;
     if (!rawContent || typeof rawContent !== 'string') {
-      throw new APIError('AI tidak dapat memproses pesan Anda. Silakan coba lagi.', 502);
+      throw new APIError(
+        'AI tidak dapat memproses pesan Anda. Silakan coba lagi.',
+        502
+      );
     }
 
-    // Extract JSON from AI response (handle markdown code blocks)
-    const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawContent];
+    const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [
+      null,
+      rawContent,
+    ];
     const jsonStr = jsonMatch[1].trim();
 
     let parsed: unknown;
@@ -222,29 +225,39 @@ export default class ConstraintDosenService {
       parsed = JSON.parse(jsonStr);
     } catch {
       logger.error('Failed to parse AI JSON output', { rawContent });
-      throw new APIError('AI mengembalikan format yang tidak valid. Silakan coba lagi.', 502);
+      throw new APIError(
+        'AI mengembalikan format yang tidak valid. Silakan coba lagi.',
+        502
+      );
     }
 
-    // Validate with Zod — support both { constraints: [...] } and direct [...]
     const wrapped = Array.isArray(parsed) ? { constraints: parsed } : parsed;
     const result = ParseConstraintOutputSchema.safeParse(wrapped);
 
     if (!result.success) {
-      logger.error('AI output validation failed', { errors: result.error.issues });
-      throw new APIError('AI mengembalikan data yang tidak valid. Silakan coba lagi.', 502);
+      logger.error('AI output validation failed', {
+        errors: result.error.issues,
+      });
+      throw new APIError(
+        'AI mengembalikan data yang tidak valid. Silakan coba lagi.',
+        502
+      );
     }
 
-    // Create all parsed constraints in the database
     const created = await Promise.all(
       result.data.constraints.map((c: ParsedConstraint) =>
         ConstraintDosenRepository.create({
           type: c.type as ConstraintType,
           hari: c.hari ?? undefined,
           waktu_mulai: c.waktu_mulai ? new Date(c.waktu_mulai) : undefined,
-          waktu_selesai: c.waktu_selesai ? new Date(c.waktu_selesai) : undefined,
+          waktu_selesai: c.waktu_selesai
+            ? new Date(c.waktu_selesai)
+            : undefined,
           keterangan: c.keterangan ?? undefined,
           priority: c.priority ?? 1,
-          raw_data: { original_message: message } as unknown as Prisma.InputJsonValue,
+          raw_data: {
+            original_message: message,
+          } as unknown as Prisma.InputJsonValue,
           dosen: { connect: { nip } },
         })
       )
@@ -262,6 +275,7 @@ export default class ConstraintDosenService {
         })
       )
     );
+    await CacheInvalidation.invalidateConstraint();
 
     return {
       response: true,

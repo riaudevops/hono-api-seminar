@@ -3,6 +3,7 @@ import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zodError } from '../../utils/zod-error.util';
 import { zValidator } from '@hono/zod-validator';
 import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
 import JadwalDraftHandler from './jadwal-draft.handler';
 import {
   generateJadwalSchema,
@@ -22,6 +23,7 @@ jadwalDraftRoute.get(
 jadwalDraftRoute.post(
   '/koordinator/jadwal-draft/generate',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.aiExpensive(),
   zValidator('json', generateJadwalSchema, zodError),
   JadwalDraftHandler.generate
 );
@@ -29,6 +31,7 @@ jadwalDraftRoute.post(
 jadwalDraftRoute.post(
   '/koordinator/jadwal-draft/generate/stream',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.aiExpensive(),
   zValidator('json', generateJadwalSchema, zodError),
   JadwalDraftHandler.generateStream
 );

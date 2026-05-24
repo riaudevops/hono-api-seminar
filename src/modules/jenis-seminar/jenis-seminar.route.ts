@@ -3,6 +3,7 @@ import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
 import JenisSeminarHandler from './jenis-seminar.handler';
 import {
   postJenisSeminarSchema,
@@ -27,6 +28,7 @@ jenisSeminarRoute.get(
 jenisSeminarRoute.post(
   '/koordinator/jenis-seminar',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', postJenisSeminarSchema, zodError),
   JenisSeminarHandler.create
 );
@@ -34,6 +36,7 @@ jenisSeminarRoute.post(
 jenisSeminarRoute.put(
   '/koordinator/jenis-seminar/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', putJenisSeminarSchema, zodError),
   JenisSeminarHandler.update
 );
@@ -41,6 +44,7 @@ jenisSeminarRoute.put(
 jenisSeminarRoute.delete(
   '/koordinator/jenis-seminar/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   JenisSeminarHandler.delete
 );
 

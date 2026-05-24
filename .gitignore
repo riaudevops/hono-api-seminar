@@ -139,3 +139,8 @@ src/generated
 
 .claude
 .agents
+
+# pi code
+plans
+.pi
+.pi-lens

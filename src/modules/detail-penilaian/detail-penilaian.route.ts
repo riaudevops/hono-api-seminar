@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
 import { zodError } from '../../utils/zod-error.util';
 import DetailPenilaianHandler from './detail-penilaian.handler';
 import {
@@ -13,6 +14,34 @@ import {
 const detailPenilaianRoute = new Hono({ router: new RegExpRouter() });
 
 detailPenilaianRoute.get(
+  '/dosen/detail-penilaian-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DetailPenilaianHandler.getDetailPenilaianSaya
+);
+
+detailPenilaianRoute.get(
+  '/dosen/penilaian-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  DetailPenilaianHandler.getPenilaianSaya
+);
+
+detailPenilaianRoute.post(
+  '/dosen/detail-penilaian-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  zValidator('json', upsertDetailPenilaianSchema, zodError),
+  DetailPenilaianHandler.postPenilaianSaya
+);
+
+detailPenilaianRoute.put(
+  '/dosen/detail-penilaian-saya/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  zValidator('json', upsertDetailPenilaianSchema, zodError),
+  DetailPenilaianHandler.putPenilaianSaya
+);
+
+detailPenilaianRoute.get(
   '/detail-penilaian/penilaian/:id_penilaian',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('param', idPenilaianParamSchema, zodError),
@@ -22,6 +51,7 @@ detailPenilaianRoute.get(
 detailPenilaianRoute.put(
   '/detail-penilaian/penilaian/:id_penilaian',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('param', idPenilaianParamSchema, zodError),
   zValidator('json', upsertDetailPenilaianSchema, zodError),
   DetailPenilaianHandler.upsertByPenilaianId

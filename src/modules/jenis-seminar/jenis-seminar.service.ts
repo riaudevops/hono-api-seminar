@@ -1,32 +1,42 @@
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
+import redisService from '../../infrastructures/redis.infrastructure';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { normalizeCachePart } from '../../utils/cache-key.util';
 import JenisSeminarRepository from './jenis-seminar.repository';
-import {
+import type {
   CreateJenisSeminarType,
   UpdateJenisSeminarType,
 } from './jenis-seminar.type';
 
 export default class JenisSeminarService {
   public static async getAll(onlyAktif: boolean = false) {
-    const data = await JenisSeminarRepository.findAll(onlyAktif);
-    return {
-      response: true,
-      message: 'Data jenis seminar berhasil diambil.',
-      data,
-    };
+    const cacheKey = `jenis-seminar:list:${onlyAktif ? 'aktif' : 'all'}`;
+    return redisService.remember(cacheKey, 1_800, async () => {
+      const data = await JenisSeminarRepository.findAll(onlyAktif);
+      return {
+        response: true,
+        message: 'Data jenis seminar berhasil diambil.',
+        data,
+      };
+    });
   }
 
   public static async getByKode(kode: string) {
-    const data = await JenisSeminarRepository.findByKodeWithRequirements(kode);
-    if (!data) {
-      throw new APIError('Jenis seminar tidak ditemukan.', 404);
-    }
-    return {
-      response: true,
-      message: 'Detail jenis seminar berhasil diambil.',
-      data,
-    };
+    const cacheKey = `jenis-seminar:kode:${normalizeCachePart(kode)}`;
+    return redisService.remember(cacheKey, 1_800, async () => {
+      const data =
+        await JenisSeminarRepository.findByKodeWithRequirements(kode);
+      if (!data) {
+        throw new APIError('Jenis seminar tidak ditemukan.', 404);
+      }
+      return {
+        response: true,
+        message: 'Detail jenis seminar berhasil diambil.',
+        data,
+      };
+    });
   }
 
   public static async create(payload: CreateJenisSeminarType) {
@@ -47,6 +57,7 @@ export default class JenisSeminarService {
       entity_id: data.id,
       new_values: data,
     });
+    await CacheInvalidation.invalidateJenisSeminar();
     return {
       response: true,
       message: 'Jenis seminar berhasil ditambahkan.',
@@ -80,6 +91,7 @@ export default class JenisSeminarService {
       old_values: existing,
       new_values: data,
     });
+    await CacheInvalidation.invalidateJenisSeminar();
     return {
       response: true,
       message: 'Jenis seminar berhasil diperbarui.',
@@ -110,6 +122,7 @@ export default class JenisSeminarService {
       entity_id: existing.id,
       old_values: existing,
     });
+    await CacheInvalidation.invalidateJenisSeminar();
     return {
       response: true,
       message: 'Jenis seminar berhasil dihapus.',

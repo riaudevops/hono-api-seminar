@@ -2,14 +2,20 @@ import { z } from 'zod';
 import { PenilaiRole, StatusJadwalDraft } from '@prisma/client';
 
 const dosenAssignmentSchema = z.object({
-  nip: z.string().min(1, 'NIP tidak boleh kosong').max(18, 'NIP maksimal 18 karakter'),
+  nip: z
+    .string()
+    .min(1, 'NIP tidak boleh kosong')
+    .max(18, 'NIP maksimal 18 karakter'),
   role: z.nativeEnum(PenilaiRole, {
     errorMap: () => ({ message: 'Role penilai tidak valid' }),
   }),
 });
 
 const mahasiswaScheduleSchema = z.object({
-  nim: z.string().min(1, 'NIM tidak boleh kosong').max(11, 'NIM maksimal 11 karakter'),
+  nim: z
+    .string()
+    .min(1, 'NIM tidak boleh kosong')
+    .max(11, 'NIM maksimal 11 karakter'),
   kode_jenis: z
     .string()
     .min(1, 'Kode jenis seminar tidak boleh kosong')
@@ -38,7 +44,10 @@ export const generateJadwalSchema = z
       .array(
         z
           .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, 'Format tanggal dikecualikan harus YYYY-MM-DD')
+          .regex(
+            /^\d{4}-\d{2}-\d{2}$/,
+            'Format tanggal dikecualikan harus YYYY-MM-DD'
+          )
       )
       .optional(),
     catatan_tambahan: z
@@ -104,19 +113,6 @@ export const updateDraftSchema = z
     {
       message: 'Waktu selesai tidak boleh lebih awal dari waktu mulai',
       path: ['waktu_selesai'],
-    }
-  )
-  .refine(
-    (data) => {
-      if (data.waktu_mulai) {
-        const hour = new Date(data.waktu_mulai).getHours();
-        return hour >= 8 && hour <= 17;
-      }
-      return true;
-    },
-    {
-      message: 'Jadwal hanya bisa pada jam kerja (08:00-17:00)',
-      path: ['waktu_mulai'],
     }
   );
 

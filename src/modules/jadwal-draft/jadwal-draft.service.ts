@@ -1,18 +1,26 @@
 import crypto from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { LogActionType, LogActorType, LogEntityType, StatusJadwalDraft } from '@prisma/client';
+import {
+  LogActionType,
+  LogActorType,
+  LogEntityType,
+  StatusJadwalDraft,
+} from '@prisma/client';
 import { APIError } from '../../utils/api-error.util';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { hashCacheKey } from '../../utils/cache-key.util';
 import { createLogger } from '../../utils/logger.util';
 import { textMessage } from '../../utils/openrouter.util';
 import openRouterService from '../../infrastructures/openrouter.infrastructure';
 import prisma from '../../infrastructures/db.infrastructure';
+import redisService from '../../infrastructures/redis.infrastructure';
 import { GenerateBatchOutputSchema } from '../../prompts/output/schedule-schema';
 import { getScheduleRulesAsText } from '../../prompts/context/schedule-rules';
 import JadwalDraftRepository from './jadwal-draft.repository';
 import { JadwalRepository, JadwalService } from '../jadwal';
 import RuanganRepository from '../ruangan/ruangan.repository';
-import ConstraintDosenRepository from '../../repositories/constraint-dosen.repository';
+import { ConstraintDosenRepository } from '../constraint-dosen';
 import PenilaianRepository from '../../repositories/penilaian.repository';
 import { LogService } from '../../modules/log';
 import JadwalHelper from '../../helpers/jadwal.helper';
@@ -20,8 +28,8 @@ import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import RuanganHelper from '../ruangan/ruangan.helper';
 import DosenHelper from '../../helpers/dosen.helper';
-import { LogJadwalContext } from '../jadwal';
-import {
+import type { LogJadwalContext } from '../jadwal';
+import type {
   CreateJadwalDraftInput,
   UpdateDraftInput,
 } from './jadwal-draft.type';
@@ -140,8 +148,18 @@ export default class JadwalDraftService {
     });
 
     const [ruanganList, existingJadwal] = await Promise.all([
-      RuanganRepository.findAktif(),
-      JadwalRepository.findBlockingSchedulesForGeneration(tanggalMulai, endDate),
+      redisService.remember('ai:jadwal-context:ruangan', 3_600, () =>
+        RuanganRepository.findAktif()
+      ),
+      redisService.remember(
+        `ai:jadwal-context:blocking:${JadwalHelper.formatDateInJakarta(tanggalMulai)}:${JadwalHelper.formatDateInJakarta(endDate)}`,
+        120,
+        () =>
+          JadwalRepository.findBlockingSchedulesForGeneration(
+            tanggalMulai,
+            endDate
+          )
+      ),
     ]);
 
     logger.info('Generating batch schedule', {
@@ -149,11 +167,13 @@ export default class JadwalDraftService {
       mahasiswaCount: data.list_mahasiswa.length,
     });
 
-    const baseBlockingSchedules = this.formatExistingJadwalForAi(
+    const baseBlockingSchedules = JadwalDraftService.formatExistingJadwalForAi(
       existingJadwal as any[]
     );
-    const sortedMahasiswa = this.sortMahasiswaForScheduling(data.list_mahasiswa);
-    const mahasiswaChunks = this.chunkMahasiswa(
+    const sortedMahasiswa = JadwalDraftService.sortMahasiswaForScheduling(
+      data.list_mahasiswa
+    );
+    const mahasiswaChunks = JadwalDraftService.chunkMahasiswa(
       sortedMahasiswa,
       GENERATE_CHUNK_SIZE
     );
@@ -182,8 +202,9 @@ export default class JadwalDraftService {
       for (const mhs of mahasiswaChunk) {
         for (const dosen of mhs.list_dosen) chunkNips.add(dosen.nip);
       }
-      const constraintList = await this.getConstraintsForNips([...chunkNips]);
-      const contextData = this.buildChunkContextData({
+      const constraintList =
+        await JadwalDraftService.getConstraintsForNipsCached([...chunkNips]);
+      const contextData = JadwalDraftService.buildChunkContextData({
         tanggalMulai,
         mahasiswaChunk,
         ruanganList,
@@ -207,7 +228,7 @@ export default class JadwalDraftService {
         totalChunks: mahasiswaChunks.length,
       });
 
-      const result = await this.generateChunkSuggestions(
+      const result = await JadwalDraftService.generateChunkSuggestions(
         contextData,
         {
           batchId,
@@ -232,23 +253,23 @@ export default class JadwalDraftService {
         message: `Memproses hasil generate AI chunk ${currentChunk}/${mahasiswaChunks.length}`,
       });
 
-      this.validateChunkSuggestionsCoverage(
+      JadwalDraftService.validateChunkSuggestionsCoverage(
         result.suggestions,
         mahasiswaChunk
       );
-      this.validateExcludedDates(
+      JadwalDraftService.validateExcludedDates(
         result.suggestions,
         data.tanggal_dikecualikan || []
       );
 
-      const chunkDrafts = await this.mapSuggestionsToDrafts({
+      const chunkDrafts = await JadwalDraftService.mapSuggestionsToDrafts({
         suggestions: result.suggestions,
         mahasiswaChunk,
         kodeToId,
         batchId,
       });
 
-      this.validateGeneratedDraftsHardConstraints({
+      JadwalDraftService.validateGeneratedDraftsHardConstraints({
         drafts: chunkDrafts,
         existingBlockingSchedules: [
           ...baseBlockingSchedules,
@@ -262,7 +283,9 @@ export default class JadwalDraftService {
 
       drafts.push(...chunkDrafts);
       generatedBlockingSchedules.push(
-        ...chunkDrafts.map((draft) => this.formatGeneratedDraftForAi(draft))
+        ...chunkDrafts.map((draft) =>
+          JadwalDraftService.formatGeneratedDraftForAi(draft)
+        )
       );
 
       await sendProgress('chunk:done', {
@@ -284,7 +307,7 @@ export default class JadwalDraftService {
       );
     }
 
-    this.validateGeneratedDraftsNoObviousConflicts(drafts);
+    JadwalDraftService.validateGeneratedDraftsNoObviousConflicts(drafts);
 
     await sendProgress('saving', {
       count: drafts.length,
@@ -324,7 +347,9 @@ export default class JadwalDraftService {
       message: `${savedDrafts.length} jadwal draft berhasil di-generate`,
       data: {
         batch_id: batchId,
-        drafts: savedDrafts.map((d) => this.formatDraftResponse(d)),
+        drafts: savedDrafts.map((d) =>
+          JadwalDraftService.formatDraftResponse(d)
+        ),
       },
     };
 
@@ -342,7 +367,7 @@ export default class JadwalDraftService {
     return {
       response: true,
       message: 'Data draft jadwal berhasil diambil',
-      data: drafts.map((d) => this.formatDraftResponse(d)),
+      data: drafts.map((d) => JadwalDraftService.formatDraftResponse(d)),
     };
   }
 
@@ -365,7 +390,7 @@ export default class JadwalDraftService {
       message: 'Data draft jadwal berhasil diambil',
       data: drafts.map((d) => {
         const mahasiswa = mahasiswaByNim.get(d.nim) ?? null;
-        return this.formatDraftResponse({
+        return JadwalDraftService.formatDraftResponse({
           ...d,
           nama: mahasiswa?.nama ?? null,
         });
@@ -439,7 +464,7 @@ export default class JadwalDraftService {
     return {
       response: true,
       message: 'Draft berhasil diperbarui',
-      data: this.formatDraftResponse(updated),
+      data: JadwalDraftService.formatDraftResponse(updated),
     };
   }
 
@@ -584,6 +609,11 @@ export default class JadwalDraftService {
       }
     });
 
+    if (approved.length > 0) {
+      await CacheInvalidation.invalidateJadwal();
+      await CacheInvalidation.invalidatePendaftaran();
+    }
+
     return {
       response: true,
       message: `${approved.length} jadwal berhasil di-approve, ${errors.length} gagal`,
@@ -591,10 +621,7 @@ export default class JadwalDraftService {
     };
   }
 
-  public static async rejectBatch(
-    batch_id: string,
-    context: LogJadwalContext
-  ) {
+  public static async rejectBatch(batch_id: string, context: LogJadwalContext) {
     const drafts = await JadwalDraftRepository.findByBatchId(
       batch_id,
       StatusJadwalDraft.DRAFT
@@ -614,7 +641,9 @@ export default class JadwalDraftService {
     const rejectedDrafts = await JadwalDraftRepository.findByBatchId(batch_id);
     await Promise.all(
       drafts.map((draft) => {
-        const rejectedDraft = rejectedDrafts.find((item) => item.id === draft.id);
+        const rejectedDraft = rejectedDrafts.find(
+          (item) => item.id === draft.id
+        );
         return LogService.createEntityLog({
           action: LogActionType.UPDATE,
           actor_type: context.actor_type,
@@ -622,7 +651,10 @@ export default class JadwalDraftService {
           entity_type: LogEntityType.JADWAL_DRAFT,
           entity_id: draft.id,
           old_values: draft,
-          new_values: rejectedDraft ?? { ...draft, status: StatusJadwalDraft.REJECTED },
+          new_values: rejectedDraft ?? {
+            ...draft,
+            status: StatusJadwalDraft.REJECTED,
+          },
         });
       })
     );
@@ -633,9 +665,11 @@ export default class JadwalDraftService {
     };
   }
 
-  private static sortMahasiswaForScheduling<T extends {
-    list_dosen: { nip: string }[];
-  }>(items: T[]): T[] {
+  private static sortMahasiswaForScheduling<
+    T extends {
+      list_dosen: { nip: string }[];
+    },
+  >(items: T[]): T[] {
     const nipFrequency = new Map<string, number>();
     for (const item of items) {
       for (const dosen of item.list_dosen) {
@@ -654,8 +688,7 @@ export default class JadwalDraftService {
       );
 
       return (
-        b.list_dosen.length - a.list_dosen.length ||
-        bSharedScore - aSharedScore
+        b.list_dosen.length - a.list_dosen.length || bSharedScore - aSharedScore
       );
     });
   }
@@ -740,6 +773,7 @@ export default class JadwalDraftService {
       ],
       temperature: 0.3,
       maxTokens: 8192,
+      provider: { sort: 'latency' },
       signal,
     });
 
@@ -751,7 +785,7 @@ export default class JadwalDraftService {
       );
     }
 
-    const jsonStr = this.extractJsonFromAiContent(rawContent);
+    const jsonStr = JadwalDraftService.extractJsonFromAiContent(rawContent);
 
     let parsed: unknown;
     try {
@@ -793,7 +827,8 @@ export default class JadwalDraftService {
     const fencedBlocks = [...content.matchAll(/```(?:\w+)?\s*([\s\S]*?)```/g)];
     for (const block of fencedBlocks) {
       const candidate = block[1]?.trim();
-      if (candidate?.startsWith('{') || candidate?.startsWith('[')) return candidate;
+      if (candidate?.startsWith('{') || candidate?.startsWith('['))
+        return candidate;
     }
 
     const firstBrace = content.indexOf('{');
@@ -922,7 +957,9 @@ export default class JadwalDraftService {
     for (const draft of params.drafts) {
       const tanggal = JadwalHelper.formatDateInJakarta(draft.tanggal);
       const waktuMulai = JadwalHelper.formatTimeInJakarta(draft.waktu_mulai);
-      const waktuSelesai = JadwalHelper.formatTimeInJakarta(draft.waktu_selesai);
+      const waktuSelesai = JadwalHelper.formatTimeInJakarta(
+        draft.waktu_selesai
+      );
 
       if (!params.activeRoomCodes.has(draft.kode_ruangan)) {
         throw new APIError(
@@ -965,12 +1002,14 @@ export default class JadwalDraftService {
 
       for (const schedule of params.existingBlockingSchedules) {
         if (schedule.tanggal !== tanggal) continue;
-        if (!this.timeStringsOverlap(
-          waktuMulai,
-          waktuSelesai,
-          schedule.waktu_mulai,
-          schedule.waktu_selesai
-        )) {
+        if (
+          !JadwalDraftService.timeStringsOverlap(
+            waktuMulai,
+            waktuSelesai,
+            schedule.waktu_mulai,
+            schedule.waktu_selesai
+          )
+        ) {
           continue;
         }
 
@@ -1012,7 +1051,7 @@ export default class JadwalDraftService {
         const first = drafts[i];
         const second = drafts[j];
         if (
-          !this.timeRangesOverlap(
+          !JadwalDraftService.timeRangesOverlap(
             first.waktu_mulai,
             first.waktu_selesai,
             second.waktu_mulai,
@@ -1030,7 +1069,9 @@ export default class JadwalDraftService {
         }
 
         const firstNips = new Set(first.list_dosen.map((d) => d.nip));
-        const hasSameDosen = second.list_dosen.some((d) => firstNips.has(d.nip));
+        const hasSameDosen = second.list_dosen.some((d) =>
+          firstNips.has(d.nip)
+        );
         if (hasSameDosen) {
           throw new APIError(
             'AI menghasilkan jadwal dengan konflik dosen. Silakan coba lagi.',
@@ -1059,6 +1100,15 @@ export default class JadwalDraftService {
     return startA < endB && startB < endA;
   }
 
+  private static async getConstraintsForNipsCached(nips: string[]) {
+    const uniqueNips = [...new Set(nips)].sort();
+    return redisService.remember(
+      `ai:constraints:${hashCacheKey(uniqueNips)}`,
+      300,
+      () => JadwalDraftService.getConstraintsForNips(uniqueNips)
+    );
+  }
+
   private static async getConstraintsForNips(nips: string[]) {
     const uniqueNips = [...new Set(nips)];
     const constraints = await ConstraintDosenRepository.findByNips(uniqueNips);
@@ -1075,6 +1125,7 @@ export default class JadwalDraftService {
         waktu_selesai: constraint.waktu_selesai
           ? JadwalHelper.formatTimeInJakarta(constraint.waktu_selesai)
           : null,
+        keterangan: constraint.keterangan,
         priority: constraint.priority,
       });
       grouped.set(constraint.nip, list);

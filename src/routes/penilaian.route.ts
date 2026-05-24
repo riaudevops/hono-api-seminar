@@ -3,6 +3,7 @@ import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../utils/zod-error.util';
 import AuthMiddleware from '../middlewares/auth.middleware';
+import RateLimitMiddleware from '../middlewares/rate-limit.middleware';
 import PenilaianHandler from '../handlers/penilaian.handler';
 import { submitPenilaianSchema } from '../validators/penilaian.validator';
 
@@ -17,6 +18,7 @@ penilaianRoute.get(
 penilaianRoute.post(
   '/penilaian/:id/submit',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', submitPenilaianSchema, zodError),
   PenilaianHandler.submitPenilaian
 );

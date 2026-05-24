@@ -153,6 +153,7 @@ export const ServiceTokens = {
   // Infrastructure
   DATABASE: 'Database',
   MAILER: 'Mailer',
+  REDIS: 'Redis',
   CONFIG: 'Config',
   LOGGER: 'Logger',
 

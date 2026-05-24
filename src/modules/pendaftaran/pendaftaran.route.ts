@@ -3,6 +3,7 @@ import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
+import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
 import PendaftaranHandler from './pendaftaran.handler';
 import {
   dashboardQuerySchema,
@@ -33,6 +34,7 @@ pendaftaranRoute.get(
 pendaftaranRoute.post(
   '/mahasiswa/pendaftaran-saya',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', postPendaftaranMahasiswaSchema, zodError),
   PendaftaranHandler.createByMahasiswa
 );
@@ -40,6 +42,7 @@ pendaftaranRoute.post(
 pendaftaranRoute.put(
   '/mahasiswa/pendaftaran-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', putPendaftaranMahasiswaSchema, zodError),
   PendaftaranHandler.updateByMahasiswa
 );
@@ -76,6 +79,7 @@ pendaftaranRoute.get(
 pendaftaranRoute.patch(
   '/koordinator/pendaftaran/:id/validasi',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', patchStatusBerkasSchema, zodError),
   PendaftaranHandler.validateBerkas
 );
@@ -83,6 +87,7 @@ pendaftaranRoute.patch(
 pendaftaranRoute.put(
   '/koordinator/pendaftaran/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   zValidator('json', putDosenPenggantiSchema, zodError),
   PendaftaranHandler.updateDosenByKoordinator
 );
@@ -90,6 +95,7 @@ pendaftaranRoute.put(
 pendaftaranRoute.delete(
   '/koordinator/pendaftaran/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
   PendaftaranHandler.delete
 );
 

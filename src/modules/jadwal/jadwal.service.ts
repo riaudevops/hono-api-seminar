@@ -1,12 +1,13 @@
+import Fuse from 'fuse.js';
 import {
   LogActionType,
   LogEntityType,
   PenilaiRole,
   StatusJadwal,
 } from '@prisma/client';
-import JadwalRepository, { JadwalFilter } from './jadwal.repository';
+import JadwalRepository, { type JadwalFilter } from './jadwal.repository';
 import { APIError } from '../../utils/api-error.util';
-import { DosenAssignment, LogJadwalContext } from './jadwal.type';
+import type { DosenAssignment, LogJadwalContext } from './jadwal.type';
 import JadwalHelper from '../../helpers/jadwal.helper';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import RuanganHelper from '../ruangan/ruangan.helper';
@@ -17,6 +18,9 @@ import PenilaianRepository from '../../repositories/penilaian.repository';
 import RuanganRepository from '../ruangan/ruangan.repository';
 import PendaftaranRepository from '../pendaftaran/pendaftaran.repository';
 import prisma from '../../infrastructures/db.infrastructure';
+import redisService from '../../infrastructures/redis.infrastructure';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { hashCacheKey } from '../../utils/cache-key.util';
 
 type JenisSeminarConfig = {
   id: string;
@@ -53,6 +57,12 @@ type GetAllJadwalParams = {
   limit?: number;
 };
 
+type GetJadwalDosenSayaParams = {
+  search?: string;
+  jenis?: string;
+  tahun_ajaran?: string;
+};
+
 const BIMBINGAN_ROLES: PenilaiRole[] = [
   PenilaiRole.KP_PEMBIMBING,
   PenilaiRole.TA_PEMBIMBING_1,
@@ -77,15 +87,17 @@ const KODE_TO_FRONTEND: Record<string, string> = {
 
 export default class JadwalService {
   public static async getJadwalMahasiswaSaya(email: string) {
-    const jadwal = await JadwalRepository.findByMahasiswaEmail(email);
+    return redisService.remember(`jadwal:mahasiswa:${email}`, 300, async () => {
+      const jadwal = await JadwalRepository.findByMahasiswaEmail(email);
 
-    return {
-      response: true,
-      message: jadwal.length
-        ? 'Data jadwal mahasiswa berhasil diambil'
-        : 'Data jadwal mahasiswa masih kosong',
-      data: this.formatJadwalListRingkas(jadwal),
-    };
+      return {
+        response: true,
+        message: jadwal.length
+          ? 'Data jadwal mahasiswa berhasil diambil'
+          : 'Data jadwal mahasiswa masih kosong',
+        data: JadwalService.formatJadwalListRingkas(jadwal),
+      };
+    });
   }
 
   public static async getJadwalMahasiswaSayaById(email: string, id: string) {
@@ -102,82 +114,131 @@ export default class JadwalService {
     return {
       response: true,
       message: 'Detail jadwal mahasiswa berhasil diambil',
-      data: this.formatJadwalDetailTimezone(jadwal),
+      data: JadwalService.formatJadwalDetailTimezone(jadwal),
     };
   }
 
-  public static async getJadwalDosenSaya(email: string) {
-    const jadwal = await JadwalRepository.findByDosenEmail(email);
+  public static async getJadwalDosenSaya(
+    email: string,
+    params: GetJadwalDosenSayaParams = {}
+  ) {
+    return redisService.remember(
+      `jadwal:dosen:${email}:${hashCacheKey(params)}`,
+      300,
+      async () => {
+        const jadwal = await JadwalRepository.findByDosenEmail(email);
+        let data = JadwalService.formatJadwalListTimezone(jadwal);
 
-    return {
-      response: true,
-      message: jadwal.length
-        ? 'Data jadwal dosen berhasil diambil'
-        : 'Data jadwal dosen masih kosong',
-      data: this.formatJadwalListTimezone(jadwal),
-    };
+        if (params.jenis) {
+          data = data.filter(
+            (item: any) => item.jenis_seminar?.kode === params.jenis
+          );
+        }
+
+        if (params.tahun_ajaran) {
+          data = data.filter(
+            (item: any) => item.kode_tahun_ajaran === params.tahun_ajaran
+          );
+        }
+
+        if (params.search) {
+          const fuse = new Fuse(data, {
+            threshold: 0.3,
+            ignoreLocation: true,
+            keys: ['nim', 'mahasiswa.nim', 'mahasiswa.nama', 'mahasiswa.email'],
+          });
+          data = fuse.search(params.search).map((result) => result.item);
+        }
+
+        return {
+          response: true,
+          message: data.length
+            ? 'Data jadwal dosen berhasil diambil'
+            : 'Data jadwal dosen masih kosong',
+          data,
+        };
+      }
+    );
   }
 
   public static async getStatistikDosenSaya(email: string) {
-    const dosen = await DosenRepository.findByEmail(email);
-    if (!dosen) {
-      throw new APIError('Data dosen tidak ditemukan untuk email ini.', 404);
-    }
-
-    const penilaianList = await PenilaianRepository.findByDosenNip(dosen.nip);
-    const now = JadwalHelper.getCurrentJakartaTime();
-    const mahasiswaBimbingan = new Set<string>();
-    const mahasiswaUji = new Set<string>();
-    let mahasiswaTerdekat: any = null;
-
-    for (const p of penilaianList) {
-      const role = p.role as PenilaiRole;
-      const j: any = p.jadwal;
-      const nim = j.mahasiswa?.nim ?? j.nim;
-
-      if (BIMBINGAN_ROLES.includes(role)) {
-        mahasiswaBimbingan.add(nim);
-      }
-
-      if (MENGUJI_ROLES.includes(role)) {
-        mahasiswaUji.add(nim);
-      }
-
-      const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
-      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(j.waktu_selesai);
-
-      if (waktuMulai > now) {
-        if (!mahasiswaTerdekat || waktuMulai < mahasiswaTerdekat.waktu_mulai_raw) {
-          const kode = j.jenis_seminar?.kode || '';
-          mahasiswaTerdekat = {
-            nim,
-            nama: j.mahasiswa?.nama ?? null,
-            jenis_seminar: KODE_TO_FRONTEND[kode] || kode,
-            tanggal: waktuMulai.toISOString().slice(0, 10),
-            jam_mulai: waktuMulai.toISOString().slice(11, 16),
-            jam_selesai: waktuSelesai.toISOString().slice(11, 16),
-            ruangan: j.ruangan?.nama ?? null,
-            role,
-            waktu_mulai_raw: waktuMulai,
-          };
+    return redisService.remember(
+      `jadwal:dosen-statistik:${email}`,
+      300,
+      async () => {
+        const dosen = await DosenRepository.findByEmail(email);
+        if (!dosen) {
+          throw new APIError(
+            'Data dosen tidak ditemukan untuk email ini.',
+            404
+          );
         }
+
+        const penilaianList = await PenilaianRepository.findByDosenNip(
+          dosen.nip
+        );
+        const now = JadwalHelper.getCurrentJakartaTime();
+        const mahasiswaBimbingan = new Set<string>();
+        const mahasiswaUji = new Set<string>();
+        let mahasiswaTerdekat: any = null;
+
+        for (const p of penilaianList) {
+          const role = p.role as PenilaiRole;
+          const j: any = p.jadwal;
+          const nim = j.mahasiswa?.nim ?? j.nim;
+
+          if (BIMBINGAN_ROLES.includes(role)) {
+            mahasiswaBimbingan.add(nim);
+          }
+
+          if (MENGUJI_ROLES.includes(role)) {
+            mahasiswaUji.add(nim);
+          }
+
+          const waktuMulai = JadwalHelper.convertToJakartaTimezone(
+            j.waktu_mulai
+          );
+          const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
+            j.waktu_selesai
+          );
+
+          if (waktuMulai > now) {
+            if (
+              !mahasiswaTerdekat ||
+              waktuMulai < mahasiswaTerdekat.waktu_mulai_raw
+            ) {
+              const kode = j.jenis_seminar?.kode || '';
+              mahasiswaTerdekat = {
+                nim,
+                nama: j.mahasiswa?.nama ?? null,
+                jenis_seminar: KODE_TO_FRONTEND[kode] || kode,
+                tanggal: waktuMulai.toISOString().slice(0, 10),
+                jam_mulai: waktuMulai.toISOString().slice(11, 16),
+                jam_selesai: waktuSelesai.toISOString().slice(11, 16),
+                ruangan: j.ruangan?.nama ?? null,
+                role,
+                waktu_mulai_raw: waktuMulai,
+              };
+            }
+          }
+        }
+
+        if (mahasiswaTerdekat) {
+          delete mahasiswaTerdekat.waktu_mulai_raw;
+        }
+
+        return {
+          response: true,
+          message: 'Berhasil mengambil statistik jadwal dosen',
+          data: {
+            total_seminar: penilaianList.length,
+            total_mahasiswa_bimbingan: mahasiswaBimbingan.size,
+            total_mahasiswa_uji: mahasiswaUji.size,
+            mahasiswa_terdekat: mahasiswaTerdekat,
+          },
+        };
       }
-    }
-
-    if (mahasiswaTerdekat) {
-      delete mahasiswaTerdekat.waktu_mulai_raw;
-    }
-
-    return {
-      response: true,
-      message: 'Berhasil mengambil statistik jadwal dosen',
-      data: {
-        total_seminar: penilaianList.length,
-        total_mahasiswa_bimbingan: mahasiswaBimbingan.size,
-        total_mahasiswa_uji: mahasiswaUji.size,
-        mahasiswa_terdekat: mahasiswaTerdekat,
-      },
-    };
+    );
   }
 
   public static async getAllTahunAjaran() {
@@ -194,61 +255,73 @@ export default class JadwalService {
   }
 
   public static async getAll(params: GetAllJadwalParams = {}) {
-    const page = Number(params.page ?? 1);
-    const limit = Number(params.limit ?? 20);
-    const offset = (page - 1) * limit;
-    const tanggalMulai = params.tanggal_mulai
-      ? new Date(params.tanggal_mulai)
-      : params.start_date
-        ? JadwalHelper.createDateFromJakartaDateTime(params.start_date, '00:00')
-        : undefined;
-    const tanggalSelesai = params.tanggal_selesai
-      ? new Date(params.tanggal_selesai)
-      : params.end_date
-        ? JadwalHelper.createDateFromJakartaDateTime(params.end_date, '23:59')
-        : undefined;
-    const filters: JadwalFilter = {
-      kode_ruangan: params.kode_ruangan,
-      nim: params.nim,
-      nip_dosen: params.nip_dosen,
-      kode_tahun_ajaran: params.tahun_ajaran,
-      tanggal_mulai: tanggalMulai,
-      tanggal_selesai: tanggalSelesai,
-    };
+    return redisService.remember(
+      `jadwal:list:${hashCacheKey(params)}`,
+      120,
+      async () => {
+        const page = Number(params.page ?? 1);
+        const limit = Number(params.limit ?? 20);
+        const offset = (page - 1) * limit;
+        const tanggalMulai = params.tanggal_mulai
+          ? new Date(params.tanggal_mulai)
+          : params.start_date
+            ? JadwalHelper.createDateFromJakartaDateTime(
+                params.start_date,
+                '00:00'
+              )
+            : undefined;
+        const tanggalSelesai = params.tanggal_selesai
+          ? new Date(params.tanggal_selesai)
+          : params.end_date
+            ? JadwalHelper.createDateFromJakartaDateTime(
+                params.end_date,
+                '23:59'
+              )
+            : undefined;
+        const filters: JadwalFilter = {
+          kode_ruangan: params.kode_ruangan,
+          nim: params.nim,
+          nip_dosen: params.nip_dosen,
+          kode_tahun_ajaran: params.tahun_ajaran,
+          tanggal_mulai: tanggalMulai,
+          tanggal_selesai: tanggalSelesai,
+        };
 
-    if (params.jenis) {
-      const jenis = await this.getJenisByKode(params.jenis);
-      filters.id_jenis_seminar = jenis.id;
-    }
+        if (params.jenis) {
+          const jenis = await JadwalService.getJenisByKode(params.jenis);
+          filters.id_jenis_seminar = jenis.id;
+        }
 
-    const [jadwal, total] = await Promise.all([
-      JadwalRepository.findAll(filters, limit, offset),
-      JadwalRepository.count(filters),
-    ]);
+        const [jadwal, total] = await Promise.all([
+          JadwalRepository.findAll(filters, limit, offset),
+          JadwalRepository.count(filters),
+        ]);
 
-    const dataWithTimezone = jadwal.map((j: any) => {
-      return {
-        ...this.formatJadwalTimezone(j),
-        semester: this.calculateSemesterFromNimAndTahunAjaran(
-          j.mahasiswa?.nim ?? j.nim,
-          j.kode_tahun_ajaran
-        ),
-      };
-    });
+        const dataWithTimezone = jadwal.map((j: any) => {
+          return {
+            ...JadwalService.formatJadwalTimezone(j),
+            semester: JadwalService.calculateSemesterFromNimAndTahunAjaran(
+              j.mahasiswa?.nim ?? j.nim,
+              j.kode_tahun_ajaran
+            ),
+          };
+        });
 
-    return {
-      response: true,
-      message: dataWithTimezone.length
-        ? 'Data semua jadwal berhasil diambil'
-        : 'Data jadwal masih kosong',
-      data: dataWithTimezone,
-      meta: {
-        page,
-        limit,
-        total,
-        total_pages: Math.ceil(total / limit),
-      },
-    };
+        return {
+          response: true,
+          message: dataWithTimezone.length
+            ? 'Data semua jadwal berhasil diambil'
+            : 'Data jadwal masih kosong',
+          data: dataWithTimezone,
+          meta: {
+            page,
+            limit,
+            total,
+            total_pages: Math.ceil(total / limit),
+          },
+        };
+      }
+    );
   }
 
   public static async get(id: string) {
@@ -260,7 +333,7 @@ export default class JadwalService {
     return {
       response: true,
       message: 'Data jadwal berhasil diambil',
-      data: this.formatJadwalTimezone(jadwal),
+      data: JadwalService.formatJadwalTimezone(jadwal),
     };
   }
 
@@ -279,12 +352,12 @@ export default class JadwalService {
       JadwalMutationInput,
     context: LogJadwalContext
   ) {
-    await this.validateMahasiswa(data.nim);
-    await this.validateRuangan(data.kode_ruangan);
+    await JadwalService.validateMahasiswa(data.nim);
+    await JadwalService.validateRuangan(data.kode_ruangan);
 
-    const jenis = await this.validateJenisSeminar(data);
-    this.validateUniquePenilaiAssignments(data.penilai);
-    await this.validatePenilai(data.penilai, jenis);
+    const jenis = await JadwalService.validateJenisSeminar(data);
+    JadwalService.validateUniquePenilaiAssignments(data.penilai);
+    await JadwalService.validatePenilai(data.penilai, jenis);
 
     const waktuMulaiServer = JadwalHelper.convertFromJakartaTimezone(
       new Date(data.waktu_mulai)
@@ -296,7 +369,7 @@ export default class JadwalService {
       new Date(data.tanggal)
     );
 
-    await this.validateScheduleConflicts({
+    await JadwalService.validateScheduleConflicts({
       nim: data.nim,
       kodeRuangan: data.kode_ruangan,
       waktuMulai: waktuMulaiServer,
@@ -334,7 +407,7 @@ export default class JadwalService {
         tx
       );
 
-      await this.createPenilaianTx(tx, id, data.penilai);
+      await JadwalService.createPenilaianTx(tx, id, data.penilai);
       await PendaftaranRepository.updateStatusJadwalByJadwalData(
         data.nim,
         jenis.id,
@@ -343,7 +416,7 @@ export default class JadwalService {
         tx
       );
       const completeJadwal = await JadwalRepository.findById(id, tx);
-      const formatted = this.formatJadwalTimezone(completeJadwal);
+      const formatted = JadwalService.formatJadwalTimezone(completeJadwal);
 
       await tx.log.create({
         data: {
@@ -358,6 +431,9 @@ export default class JadwalService {
 
       return formatted;
     });
+
+    await CacheInvalidation.invalidateJadwal();
+    await CacheInvalidation.invalidatePendaftaran();
 
     return {
       response: true,
@@ -376,12 +452,13 @@ export default class JadwalService {
       throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
-    if (data.nim) await this.validateMahasiswa(data.nim);
-    if (data.kode_ruangan) await this.validateRuangan(data.kode_ruangan);
+    if (data.nim) await JadwalService.validateMahasiswa(data.nim);
+    if (data.kode_ruangan)
+      await JadwalService.validateRuangan(data.kode_ruangan);
 
     const jenis =
       data.kode_jenis || data.id_jenis_seminar
-        ? await this.validateJenisSeminar(data)
+        ? await JadwalService.validateJenisSeminar(data)
         : (existingJadwal.jenis_seminar as JenisSeminarConfig);
 
     const finalPenilai =
@@ -390,8 +467,8 @@ export default class JadwalService {
         nip: item.nip,
         role: item.role,
       }));
-    this.validateUniquePenilaiAssignments(finalPenilai);
-    await this.validatePenilai(finalPenilai, jenis);
+    JadwalService.validateUniquePenilaiAssignments(finalPenilai);
+    await JadwalService.validatePenilai(finalPenilai, jenis);
 
     const waktuMulaiServer = data.waktu_mulai
       ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_mulai))
@@ -405,7 +482,7 @@ export default class JadwalService {
     const finalNim = data.nim ?? existingJadwal.nim;
     const finalKodeRuangan = data.kode_ruangan ?? existingJadwal.kode_ruangan;
 
-    await this.validateScheduleConflicts({
+    await JadwalService.validateScheduleConflicts({
       nim: finalNim,
       kodeRuangan: finalKodeRuangan,
       waktuMulai: waktuMulaiServer,
@@ -443,11 +520,11 @@ export default class JadwalService {
 
       if (data.penilai) {
         await tx.penilaian.deleteMany({ where: { id_jadwal: id } });
-        await this.createPenilaianTx(tx, id, data.penilai);
+        await JadwalService.createPenilaianTx(tx, id, data.penilai);
       }
 
       const completeJadwal = await JadwalRepository.findById(id, tx);
-      const formatted = this.formatJadwalTimezone(completeJadwal);
+      const formatted = JadwalService.formatJadwalTimezone(completeJadwal);
 
       await tx.log.create({
         data: {
@@ -463,6 +540,9 @@ export default class JadwalService {
 
       return formatted;
     });
+
+    await CacheInvalidation.invalidateJadwal();
+    await CacheInvalidation.invalidatePendaftaran();
 
     return {
       response: true,
@@ -509,6 +589,9 @@ export default class JadwalService {
       });
     });
 
+    await CacheInvalidation.invalidateJadwal();
+    await CacheInvalidation.invalidatePendaftaran();
+
     return {
       response: true,
       message: 'Jadwal berhasil dihapus',
@@ -519,8 +602,8 @@ export default class JadwalService {
     data: Pick<JadwalMutationInput, 'kode_jenis' | 'id_jenis_seminar'>
   ): Promise<JenisSeminarConfig> {
     const jenis = data.kode_jenis
-      ? await this.getJenisByKode(data.kode_jenis)
-      : await this.getJenisById(data.id_jenis_seminar as string);
+      ? await JadwalService.getJenisByKode(data.kode_jenis)
+      : await JadwalService.getJenisById(data.id_jenis_seminar as string);
 
     if (!jenis.is_aktif) {
       throw new APIError(`Jenis seminar ${jenis.kode} sedang tidak aktif`, 400);
@@ -555,17 +638,25 @@ export default class JadwalService {
 
   private static validateUniquePenilaiAssignments(penilai: DosenAssignment[]) {
     const duplicatedNip = penilai.find(
-      (item, index) => penilai.findIndex((other) => other.nip === item.nip) !== index
+      (item, index) =>
+        penilai.findIndex((other) => other.nip === item.nip) !== index
     );
     if (duplicatedNip) {
-      throw new APIError(`Dosen penilai ${duplicatedNip.nip} tidak boleh duplikat`, 400);
+      throw new APIError(
+        `Dosen penilai ${duplicatedNip.nip} tidak boleh duplikat`,
+        400
+      );
     }
 
     const duplicatedRole = penilai.find(
-      (item, index) => penilai.findIndex((other) => other.role === item.role) !== index
+      (item, index) =>
+        penilai.findIndex((other) => other.role === item.role) !== index
     );
     if (duplicatedRole) {
-      throw new APIError(`Role penilai ${duplicatedRole.role} tidak boleh duplikat`, 400);
+      throw new APIError(
+        `Role penilai ${duplicatedRole.role} tidak boleh duplikat`,
+        400
+      );
     }
   }
 
@@ -650,9 +741,9 @@ export default class JadwalService {
     penilai: DosenAssignment[],
     jenis: JenisSeminarConfig
   ) {
-    this.validatePenilaiComposition(penilai, jenis);
+    JadwalService.validatePenilaiComposition(penilai, jenis);
     await Promise.all(
-      penilai.map((item) => this.validateDosen(item.nip, item.role))
+      penilai.map((item) => JadwalService.validateDosen(item.nip, item.role))
     );
   }
 
@@ -743,15 +834,18 @@ export default class JadwalService {
   }
 
   private static formatJadwalListTimezone(jadwal: any[]) {
-    return jadwal.map((item) => this.formatJadwalTimezone(item));
+    return jadwal.map((item) => JadwalService.formatJadwalTimezone(item));
   }
 
   private static formatJadwalListRingkas(jadwal: any[]) {
     return jadwal.map((item) => {
-      const formatted = this.formatJadwalTimezone(item);
+      const formatted = JadwalService.formatJadwalTimezone(item);
       const { penilai, ...ringkas } = formatted;
       return {
         ...ringkas,
+        tahun_ajaran_nama: item?.kode_tahun_ajaran
+          ? TahunAjaranHelper.parseStringNameByCode(item.kode_tahun_ajaran)
+          : null,
         penilaian: Array.isArray(item?.penilaian)
           ? item.penilaian.map((penilaian: any) => {
               const { detail_penilaian, ...penilaianRingkas } = penilaian;
@@ -787,7 +881,7 @@ export default class JadwalService {
   private static formatJadwalTimezone(jadwal: any) {
     return {
       ...jadwal,
-      penilai: this.formatPenilai(jadwal?.penilaian, false),
+      penilai: JadwalService.formatPenilai(jadwal?.penilaian, false),
       waktu_mulai: jadwal?.waktu_mulai
         ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
         : null,
@@ -800,6 +894,9 @@ export default class JadwalService {
   private static formatJadwalDetailTimezone(jadwal: any) {
     return {
       ...jadwal,
+      tahun_ajaran_nama: jadwal?.kode_tahun_ajaran
+        ? TahunAjaranHelper.parseStringNameByCode(jadwal.kode_tahun_ajaran)
+        : null,
       penilaian: Array.isArray(jadwal?.penilaian) ? jadwal.penilaian : [],
       waktu_mulai: jadwal?.waktu_mulai
         ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
@@ -810,7 +907,10 @@ export default class JadwalService {
     };
   }
 
-  private static formatPenilai(penilaian: any, includeDetailPenilaian: boolean) {
+  private static formatPenilai(
+    penilaian: any,
+    includeDetailPenilaian: boolean
+  ) {
     if (!Array.isArray(penilaian)) {
       return [];
     }

@@ -1,45 +1,56 @@
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import { LogService } from '../log';
+import redisService from '../../infrastructures/redis.infrastructure';
 import { APIError } from '../../utils/api-error.util';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { hashCacheKey } from '../../utils/cache-key.util';
 import MahasiswaRepository from './mahasiswa.repository';
-import { GetAllMahasiswaQuery, UpdateDataSayaType } from './mahasiswa.type';
+import type {
+  GetAllMahasiswaQuery,
+  UpdateDataSayaType,
+} from './mahasiswa.type';
 
 export default class MahasiswaService {
   public static async getAll(query: GetAllMahasiswaQuery) {
-    const { mahasiswa, total } = await MahasiswaRepository.findAll(query);
-    return {
-      response: true,
-      message: 'Data semua mahasiswa berhasil diambil.',
-      data: {
-        mahasiswa,
-        pagination: {
-          total,
-          page: query.page,
-          limit: query.limit,
-          totalPages: Math.ceil(total / query.limit),
+    const cacheKey = `mahasiswa:list:${hashCacheKey(query)}`;
+    return redisService.remember(cacheKey, 300, async () => {
+      const { mahasiswa, total } = await MahasiswaRepository.findAll(query);
+      return {
+        response: true,
+        message: 'Data semua mahasiswa berhasil diambil.',
+        data: {
+          mahasiswa,
+          pagination: {
+            total,
+            page: query.page,
+            limit: query.limit,
+            totalPages: Math.ceil(total / query.limit),
+          },
+          filters: {
+            search: query.search,
+            nim: query.nim,
+            nama: query.nama,
+            email: query.email,
+            no_hp: query.no_hp,
+            aktif: query.aktif,
+            angkatan: query.angkatan,
+            sortBy: query.sortBy,
+            sortOrder: query.sortOrder,
+          },
         },
-        filters: {
-          search: query.search,
-          nim: query.nim,
-          nama: query.nama,
-          email: query.email,
-          no_hp: query.no_hp,
-          aktif: query.aktif,
-          angkatan: query.angkatan,
-          sortBy: query.sortBy,
-          sortOrder: query.sortOrder,
-        },
-      },
-    };
+      };
+    });
   }
 
   public static async getStatistics() {
-    const data = await MahasiswaRepository.getStatistics();
-    return {
-      response: true,
-      message: 'Statistik mahasiswa berhasil diambil.',
-      data,
-    };
+    return redisService.remember('mahasiswa:stats', 900, async () => {
+      const data = await MahasiswaRepository.getStatistics();
+      return {
+        response: true,
+        message: 'Statistik mahasiswa berhasil diambil.',
+        data,
+      };
+    });
   }
 
   public static async getDataSaya(email: string) {
@@ -83,6 +94,7 @@ export default class MahasiswaService {
       old_values: mahasiswa,
       new_values: data,
     });
+    await CacheInvalidation.invalidateMahasiswa();
     return {
       response: true,
       message: 'Data mahasiswa berhasil diperbarui.',

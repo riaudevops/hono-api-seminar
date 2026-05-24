@@ -1,6 +1,7 @@
+import { config as appConfig } from '../core/config';
 import { createLogger } from '../utils/logger.util';
 import { APIError } from '../utils/api-error.util';
-import {
+import type {
   ChatCompletionOptions,
   ChatCompletionResponse,
   ChatMessage,
@@ -10,9 +11,9 @@ import {
 } from '../utils/openrouter.util';
 
 const logger = createLogger('OpenRouter');
-const DEFAULT_CHAT_TIMEOUT_MS = 90_000;
-const DEFAULT_MAX_RETRIES = 2;
-const RETRYABLE_STATUS_CODES = new Set([408, 409, 425, 429, 500, 502, 503, 504, 520, 522, 524]);
+const RETRYABLE_STATUS_CODES = new Set([
+  408, 409, 425, 429, 500, 502, 503, 504, 520, 522, 524,
+]);
 
 class OpenRouterUpstreamError extends Error {
   constructor(
@@ -40,7 +41,8 @@ function isTimeoutError(error: unknown) {
 function isRetryableError(error: unknown) {
   if (error instanceof OpenRouterUpstreamError) {
     return (
-      error.statusCode === undefined || RETRYABLE_STATUS_CODES.has(error.statusCode)
+      error.statusCode === undefined ||
+      RETRYABLE_STATUS_CODES.has(error.statusCode)
     );
   }
 
@@ -85,11 +87,15 @@ function mapOpenRouterError(error: unknown): APIError {
 // Get OpenRouter config from environment directly (lazy loading)
 // =============================================================================
 function getOpenRouterConfig() {
+  const config = appConfig.openrouter;
   return {
-    apiKey: process.env.OPENROUTER_API_KEY || '',
-    baseUrl:
-      process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-    model: process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini',
+    apiKey: config.apiKey || '',
+    baseUrl: config.baseUrl,
+    model: config.model,
+    models: config.models,
+    timeoutMs: config.timeoutMs,
+    maxRetries: config.maxRetries,
+    useLowLatencyRouting: config.useLowLatencyRouting,
   };
 }
 
@@ -151,7 +157,7 @@ class OpenRouterService {
     this.validateConfig();
     const config = getOpenRouterConfig();
     const model = options.model || config.model;
-    const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    const maxRetries = options.maxRetries ?? config.maxRetries;
 
     try {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -198,8 +204,12 @@ class OpenRouterService {
       max_tokens: options.maxTokens ?? 1024,
     };
 
-    if (options.models && options.models.length > 0) {
-      body.models = options.models.slice(0, 3);
+    const fallbackModels = options.models?.length
+      ? options.models
+      : config.models.map((fallbackModel) => ({ model: fallbackModel }));
+
+    if (fallbackModels.length > 0) {
+      body.models = fallbackModels.slice(0, 3);
       body.route = options.route || 'fallback';
       body.allow_fallbacks = options.allow_fallbacks ?? true;
     }
@@ -209,6 +219,8 @@ class OpenRouterService {
     }
     if (options.provider) {
       body.provider = options.provider;
+    } else if (config.useLowLatencyRouting) {
+      body.provider = { sort: 'latency' };
     }
 
     if (options.reasoning_effort) {
@@ -216,12 +228,13 @@ class OpenRouterService {
     }
 
     const baseUrl = config.baseUrl.replace(/\/$/, '');
-    const timeoutMs = options.timeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS;
+    const timeoutMs = options.timeoutMs ?? config.timeoutMs;
     const timeoutSignal = AbortSignal.timeout(timeoutMs);
     const signal = options.signal
       ? AbortSignal.any([options.signal, timeoutSignal])
       : timeoutSignal;
 
+    const startedAt = Date.now();
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -294,6 +307,8 @@ class OpenRouterService {
     logger.debug('Chat completion successful', {
       model: usedModel,
       tokens: result.usage?.total_tokens,
+      cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
+      duration_ms: Date.now() - startedAt,
     });
 
     return result;

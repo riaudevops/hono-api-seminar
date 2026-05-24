@@ -1,4 +1,4 @@
-<h1 align="center">ZRAES AI API</h1>
+<h1 align="center">API SEMINAR TIF</h1>
 
 <p align="center">
   <strong>Backend untuk Sistem Manajemen Seminar KP & Tugas Akhir</strong><br>
@@ -92,7 +92,7 @@ cp .env.example .env
 
 ```env
 # Application
-APP_NAME="ZRAES AI API"
+APP_NAME="API SEMINAR TIF"
 APP_VERSION="1.0.0"
 APP_ENV=development
 

@@ -24,21 +24,8 @@ export default class DetailPenilaianService {
     penilaian: NonNullable<PenilaianWithDetails>,
     context: DetailPenilaianActorContext
   ) {
-    if (context.actor_type === LogActorType.DOSEN && context.nip !== penilaian.nip) {
+    if (context.nip && context.nip !== penilaian.nip) {
       throw new APIError('Anda tidak memiliki akses ke penilaian ini', 403);
-    }
-  }
-
-  private static assertCanMutatePenilaian(
-    penilaian: NonNullable<PenilaianWithDetails>,
-    context: DetailPenilaianActorContext
-  ) {
-    if (context.actor_type !== LogActorType.DOSEN) {
-      throw new APIError('Hanya dosen penilai yang dapat mengisi nilai', 403);
-    }
-
-    if (context.nip !== penilaian.nip) {
-      throw new APIError('Anda hanya dapat mengisi nilai milik Anda sendiri', 403);
     }
   }
 
@@ -128,6 +115,75 @@ export default class DetailPenilaianService {
     };
   }
 
+  public static async getPenilaianSaya(context: DetailPenilaianActorContext) {
+    const penilaianList = await DetailPenilaianRepository.findPenilaianByDosenNip(
+      context.nip as string
+    );
+
+    const data = penilaianList.map((p) => {
+      let totalNilai = 0;
+      let totalPersentase = 0;
+
+      for (const detail of p.detail_penilaian) {
+        totalNilai += detail.nilai * (detail.komponen.persentase / 100);
+        totalPersentase += detail.komponen.persentase;
+      }
+
+      const nilaiAkhir = totalPersentase > 0 ? (totalNilai / totalPersentase) * 100 : 0;
+      const isSelesai = JadwalHelper.getCurrentJakartaTime() >
+        JadwalHelper.convertToJakartaTimezone(p.jadwal.waktu_selesai);
+
+      return {
+        id_penilaian: p.id,
+        role: p.role,
+        jadwal: p.jadwal,
+        status: p.detail_penilaian.length > 0 ? 'Sudah Dinilai' : 'Belum Dinilai',
+        bisa_dinilai: isSelesai,
+        nilai_akhir: Math.round(nilaiAkhir * 100) / 100,
+      };
+    });
+
+    return {
+      response: true,
+      message: data.length
+        ? 'Data penilaian dosen berhasil diambil'
+        : 'Data penilaian dosen masih kosong',
+      data,
+    };
+  }
+
+  public static async getDetailPenilaianSaya(context: DetailPenilaianActorContext) {
+    const penilaianList = await DetailPenilaianRepository.findPenilaianByDosenNip(
+      context.nip as string
+    );
+    const activeComponentsByRole = new Map<PenilaiRole, ActiveComponent[]>();
+
+    for (const penilaian of penilaianList) {
+      if (!activeComponentsByRole.has(penilaian.role)) {
+        activeComponentsByRole.set(
+          penilaian.role,
+          await DetailPenilaianRepository.findActiveComponentsByRole(penilaian.role)
+        );
+      }
+    }
+
+    const data = penilaianList.map((penilaian) =>
+      this.formatSummary(
+        penilaian,
+        penilaian.detail_penilaian,
+        activeComponentsByRole.get(penilaian.role) ?? []
+      )
+    );
+
+    return {
+      response: true,
+      message: data.length
+        ? 'Data detail penilaian dosen berhasil diambil'
+        : 'Data detail penilaian dosen masih kosong',
+      data,
+    };
+  }
+
   public static async getByPenilaianId(
     id_penilaian: string,
     context: DetailPenilaianActorContext
@@ -166,7 +222,6 @@ export default class DetailPenilaianService {
       throw new APIError(`Penilaian dengan ID ${id_penilaian} tidak ditemukan`, 404);
     }
 
-    this.assertCanMutatePenilaian(penilaian, context);
     this.assertJadwalSelesai(penilaian);
 
     const activeComponents = await DetailPenilaianRepository.findActiveComponentsByRole(

@@ -1,12 +1,21 @@
 import Fuse from 'fuse.js';
-import { LogActionType, LogActorType, LogEntityType, StatusBerkas, StatusJadwal } from '@prisma/client';
+import {
+  LogActionType,
+  LogActorType,
+  LogEntityType,
+  type StatusBerkas,
+  type StatusJadwal,
+} from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
+import redisService from '../../infrastructures/redis.infrastructure';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { hashCacheKey } from '../../utils/cache-key.util';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
 import PendaftaranRepository from './pendaftaran.repository';
-import {
+import type {
   CreatePendaftaranByMahasiswaType,
   GetAllPendaftaranResponse,
   PendaftaranDashboardResponse,
@@ -35,140 +44,165 @@ export default class PendaftaranService {
   public static async getAll(
     params: GetAllParams = {}
   ): Promise<GetAllPendaftaranResponse> {
-    const {
-      periode = 'semua',
-      jenis_seminar,
-      status_berkas,
-      status_jadwal,
-      tahun_ajaran,
-      nim,
-      q,
-      page = 1,
-      limit = 10,
-    } = params;
+    return redisService.remember(
+      `pendaftaran:list:${hashCacheKey(params)}`,
+      300,
+      async () => {
+        const {
+          periode = 'semua',
+          jenis_seminar,
+          status_berkas,
+          status_jadwal,
+          tahun_ajaran,
+          nim,
+          q,
+          page = 1,
+          limit = 10,
+        } = params;
 
-    let pendaftaran = await PendaftaranRepository.findAllWithRelations();
+        let pendaftaran = await PendaftaranRepository.findAllWithRelations();
 
-    if (periode !== 'semua') {
-      const days = periode === 'last_7_hari' ? 7 : 30;
-      const from = new Date();
-      from.setDate(from.getDate() - days);
-      pendaftaran = pendaftaran.filter((p) => p.created_at >= from);
-    }
+        if (periode !== 'semua') {
+          const days = periode === 'last_7_hari' ? 7 : 30;
+          const from = new Date();
+          from.setDate(from.getDate() - days);
+          pendaftaran = pendaftaran.filter((p) => p.created_at >= from);
+        }
 
-    if (jenis_seminar) {
-      pendaftaran = pendaftaran.filter(
-        (p) => p.id_jenis_seminar === jenis_seminar
-      );
-    }
+        if (jenis_seminar) {
+          pendaftaran = pendaftaran.filter(
+            (p) => p.id_jenis_seminar === jenis_seminar
+          );
+        }
 
-    if (status_berkas) {
-      pendaftaran = pendaftaran.filter((p) => p.status_berkas === status_berkas);
-    }
+        if (status_berkas) {
+          pendaftaran = pendaftaran.filter(
+            (p) => p.status_berkas === status_berkas
+          );
+        }
 
-    if (status_jadwal) {
-      pendaftaran = pendaftaran.filter((p) => p.status_jadwal === status_jadwal);
-    }
+        if (status_jadwal) {
+          pendaftaran = pendaftaran.filter(
+            (p) => p.status_jadwal === status_jadwal
+          );
+        }
 
-    if (tahun_ajaran) {
-      pendaftaran = pendaftaran.filter((p) => p.tahun_ajaran === tahun_ajaran);
-    }
+        if (tahun_ajaran) {
+          pendaftaran = pendaftaran.filter(
+            (p) => p.tahun_ajaran === tahun_ajaran
+          );
+        }
 
-    if (nim) {
-      pendaftaran = pendaftaran.filter((p) => p.nim === nim);
-    }
+        if (nim) {
+          pendaftaran = pendaftaran.filter((p) => p.nim === nim);
+        }
 
-    if (q && q.trim()) {
-      const fuse = new Fuse(pendaftaran, {
-        keys: [
-          { name: 'mahasiswa.nama', weight: 0.4 },
-          { name: 'nim', weight: 0.3 },
-          { name: 'id_pengajuan_fst', weight: 0.15 },
-          { name: 'jenis_seminar.nama', weight: 0.1 },
-          { name: 'jenis_seminar.kode', weight: 0.05 },
-        ],
-        threshold: 0.4,
-        distance: 100,
-        minMatchCharLength: 2,
-        includeScore: true,
-        ignoreLocation: true,
-        findAllMatches: true,
-      });
-      pendaftaran = fuse.search(q.trim()).map((r) => r.item);
-    }
+        if (q && q.trim()) {
+          const fuse = new Fuse(pendaftaran, {
+            keys: [
+              { name: 'mahasiswa.nama', weight: 0.4 },
+              { name: 'nim', weight: 0.3 },
+              { name: 'id_pengajuan_fst', weight: 0.15 },
+              { name: 'jenis_seminar.nama', weight: 0.1 },
+              { name: 'jenis_seminar.kode', weight: 0.05 },
+            ],
+            threshold: 0.4,
+            distance: 100,
+            minMatchCharLength: 2,
+            includeScore: true,
+            ignoreLocation: true,
+            findAllMatches: true,
+          });
+          pendaftaran = fuse.search(q.trim()).map((r) => r.item);
+        }
 
-    const total = pendaftaran.length;
-    const skip = (page - 1) * limit;
-    const data = pendaftaran
-      .slice(skip, skip + limit)
-      .map(({ data_pendaftaran, ...item }) => ({
-        ...item,
-        tahun_ajaran_nama: TahunAjaranHelper.parseStringNameByCode(
-          item.tahun_ajaran
-        ),
-      }));
+        const total = pendaftaran.length;
+        const skip = (page - 1) * limit;
+        const data = pendaftaran
+          .slice(skip, skip + limit)
+          .map(({ data_pendaftaran, ...item }) => ({
+            ...item,
+            tahun_ajaran_nama: TahunAjaranHelper.parseStringNameByCode(
+              item.tahun_ajaran
+            ),
+          }));
 
-    return {
-      response: true,
-      message: 'Data pendaftaran berhasil diambil.',
-      data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+        return {
+          response: true,
+          message: 'Data pendaftaran berhasil diambil.',
+          data,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
+        };
+      }
+    );
   }
 
   // ===========================================================================
   // Koordinator: dashboard statistik
   // ===========================================================================
-  public static async getDashboard(params: { tahun_ajaran?: string } = {}): Promise<PendaftaranDashboardResponse> {
-    const { tahun_ajaran } = params;
-    const where = tahun_ajaran ? { tahun_ajaran } : undefined;
+  public static async getDashboard(
+    params: { tahun_ajaran?: string } = {}
+  ): Promise<PendaftaranDashboardResponse> {
+    return redisService.remember(
+      `pendaftaran:dashboard:${hashCacheKey(params)}`,
+      300,
+      async () => {
+        const { tahun_ajaran } = params;
+        const where = tahun_ajaran ? { tahun_ajaran } : undefined;
 
-    const [total, statusCounts, avgProcessingTime] = await Promise.all([
-      prisma.pendaftaran.count({ where }),
-      PendaftaranRepository.getStatsByStatus(where),
-      PendaftaranRepository.getAvgProcessingTime(where),
-    ]);
+        const [total, statusCounts, avgProcessingTime] = await Promise.all([
+          prisma.pendaftaran.count({ where }),
+          PendaftaranRepository.getStatsByStatus(where),
+          PendaftaranRepository.getAvgProcessingTime(where),
+        ]);
 
-    const pending = statusCounts.PENDING ?? 0;
-    const approved = statusCounts.APPROVED ?? 0;
-    const rejected = statusCounts.REJECTED ?? 0;
-    const revision = statusCounts.REVISI ?? 0;
-    const completed = approved + rejected;
-    const processingRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-    const avgProcessingTimeText =
-      avgProcessingTime !== null ? `${Math.round(avgProcessingTime / 3600000)} jam` : '0 jam';
+        const pending = statusCounts.PENDING ?? 0;
+        const approved = statusCounts.APPROVED ?? 0;
+        const rejected = statusCounts.REJECTED ?? 0;
+        const revision = statusCounts.REVISI ?? 0;
+        const completed = approved + rejected;
+        const processingRate =
+          total > 0 ? Math.round((completed / total) * 100) : 0;
+        const avgProcessingTimeText =
+          avgProcessingTime !== null
+            ? `${Math.round(avgProcessingTime / 3600000)} jam`
+            : '0 jam';
 
-    return {
-      response: true,
-      message: 'Statistik pendaftaran berhasil diambil.',
-      data: {
-        total,
-        pending,
-        approved,
-        rejected,
-        revision,
-        processingRate,
-        avgProcessingTime: avgProcessingTimeText,
-      },
-    };
+        return {
+          response: true,
+          message: 'Statistik pendaftaran berhasil diambil.',
+          data: {
+            total,
+            pending,
+            approved,
+            rejected,
+            revision,
+            processingRate,
+            avgProcessingTime: avgProcessingTimeText,
+          },
+        };
+      }
+    );
   }
 
   public static async getAllTahunAjaran(): Promise<TahunAjaranListResponse> {
-    const data = await PendaftaranRepository.getDistinctTahunAjaran();
+    return redisService.remember('pendaftaran:tahun-ajaran', 900, async () => {
+      const data = await PendaftaranRepository.getDistinctTahunAjaran();
 
-    return {
-      response: true,
-      message: 'Daftar tahun ajaran berhasil diambil.',
-      data: data.map((kode) => ({
-        kode,
-        nama: TahunAjaranHelper.parseStringNameByCode(kode),
-      })),
-    };
+      return {
+        response: true,
+        message: 'Daftar tahun ajaran berhasil diambil.',
+        data: data.map((kode) => ({
+          kode,
+          nama: TahunAjaranHelper.parseStringNameByCode(kode),
+        })),
+      };
+    });
   }
 
   // ===========================================================================
@@ -189,7 +223,10 @@ export default class PendaftaranService {
   // ===========================================================================
   // Koordinator: validasi status berkas
   // ===========================================================================
-  public static async validateBerkas(id: string, payload: UpdateStatusBerkasType) {
+  public static async validateBerkas(
+    id: string,
+    payload: UpdateStatusBerkasType
+  ) {
     const existing = await PendaftaranRepository.findById(id);
     if (!existing) {
       throw new APIError('Pendaftaran tidak ditemukan.', 404);
@@ -205,6 +242,7 @@ export default class PendaftaranService {
       old_values: existing,
       new_values: data,
     });
+    await CacheInvalidation.invalidatePendaftaran();
     return {
       response: true,
       message: `Status berkas berhasil diubah ke "${payload.status_berkas}".`,
@@ -224,12 +262,12 @@ export default class PendaftaranService {
       throw new APIError('Pendaftaran tidak ditemukan.', 404);
     }
 
-    await this.ensureKetuaSidangAllowed(
+    await PendaftaranService.ensureKetuaSidangAllowed(
       existing.id_jenis_seminar,
       payload.nip_ketua_sidang
     );
 
-    await this.ensureDosenListExists([
+    await PendaftaranService.ensureDosenListExists([
       payload.nip_pembimbing_1,
       payload.nip_pembimbing_2,
       payload.nip_penguji_1,
@@ -237,7 +275,10 @@ export default class PendaftaranService {
       payload.nip_ketua_sidang,
     ]);
 
-    const data = await PendaftaranRepository.updateDosenByKoordinator(id, payload);
+    const data = await PendaftaranRepository.updateDosenByKoordinator(
+      id,
+      payload
+    );
 
     await LogService.createEntityLog({
       action: LogActionType.UPDATE,
@@ -251,6 +292,7 @@ export default class PendaftaranService {
       },
       new_values: data,
     });
+    await CacheInvalidation.invalidatePendaftaran();
 
     return {
       response: true,
@@ -277,6 +319,7 @@ export default class PendaftaranService {
       entity_id: existing.id,
       old_values: existing,
     });
+    await CacheInvalidation.invalidatePendaftaran();
     return {
       response: true,
       message: 'Pendaftaran berhasil dihapus.',
@@ -295,7 +338,9 @@ export default class PendaftaranService {
     const data = await PendaftaranRepository.findAllByNimWithRelations(
       mahasiswa.nim
     );
-    const list = data.map(({ data_pendaftaran, ...pendaftaran }) => pendaftaran);
+    const list = data.map(
+      ({ data_pendaftaran, ...pendaftaran }) => pendaftaran
+    );
 
     return {
       response: true,
@@ -319,10 +364,7 @@ export default class PendaftaranService {
     }
 
     if (data.nim !== mahasiswa.nim) {
-      throw new APIError(
-        'Anda tidak memiliki akses ke pendaftaran ini.',
-        403
-      );
+      throw new APIError('Anda tidak memiliki akses ke pendaftaran ini.', 403);
     }
 
     return {
@@ -369,8 +411,11 @@ export default class PendaftaranService {
       );
     }
 
-    await this.ensureForeignKeysExist(payload);
-    const id = await this.generateId(payload.id_jenis_seminar, tahun_ajaran);
+    await PendaftaranService.ensureForeignKeysExist(payload);
+    const id = await PendaftaranService.generateId(
+      payload.id_jenis_seminar,
+      tahun_ajaran
+    );
 
     const data = await PendaftaranRepository.createWithDataDokumen({
       ...payload,
@@ -386,6 +431,7 @@ export default class PendaftaranService {
       entity_id: data.id,
       new_values: data,
     });
+    await CacheInvalidation.invalidatePendaftaran();
 
     return {
       response: true,
@@ -464,12 +510,12 @@ export default class PendaftaranService {
       }
     }
 
-    await this.ensureKetuaSidangAllowed(
+    await PendaftaranService.ensureKetuaSidangAllowed(
       payload.id_jenis_seminar ?? existing.id_jenis_seminar,
       payload.nip_ketua_sidang
     );
 
-    await this.ensureDosenListExists([
+    await PendaftaranService.ensureDosenListExists([
       payload.nip_pembimbing_1,
       payload.nip_pembimbing_2,
       payload.nip_penguji_1,
@@ -494,6 +540,7 @@ export default class PendaftaranService {
       old_values: existing,
       new_values: data,
     });
+    await CacheInvalidation.invalidatePendaftaran();
     return {
       response: true,
       message: 'Pendaftaran berhasil diperbarui.',
@@ -510,9 +557,10 @@ export default class PendaftaranService {
     const jenisSeminarOk = await PendaftaranRepository.jenisSeminarExists(
       payload.id_jenis_seminar
     );
-    if (!jenisSeminarOk) throw new APIError('Jenis seminar tidak ditemukan.', 404);
+    if (!jenisSeminarOk)
+      throw new APIError('Jenis seminar tidak ditemukan.', 404);
 
-    await this.ensureDosenListExists([
+    await PendaftaranService.ensureDosenListExists([
       payload.nip_pembimbing_1,
       payload.nip_pembimbing_2,
       payload.nip_penguji_1,
@@ -539,18 +587,26 @@ export default class PendaftaranService {
   ) {
     if (!nipKetuaSidang) return;
 
-    const jenisSeminar = await PendaftaranRepository.findJenisSeminarById(idJenisSeminar);
+    const jenisSeminar =
+      await PendaftaranRepository.findJenisSeminarById(idJenisSeminar);
     if (!jenisSeminar) {
       throw new APIError('Jenis seminar tidak ditemukan.', 404);
     }
 
     if (!jenisSeminar.ada_ketua_sidang) {
-      throw new APIError('Jenis seminar ini tidak menggunakan ketua sidang.', 400);
+      throw new APIError(
+        'Jenis seminar ini tidak menggunakan ketua sidang.',
+        400
+      );
     }
   }
 
-  private static async generateId(idJenisSeminar: string, tahunAjaran: string): Promise<string> {
-    const kodeJenisSeminar = await JenisSeminarHelper.resolveKodeById(idJenisSeminar);
+  private static async generateId(
+    idJenisSeminar: string,
+    tahunAjaran: string
+  ): Promise<string> {
+    const kodeJenisSeminar =
+      await JenisSeminarHelper.resolveKodeById(idJenisSeminar);
     const suffix = crypto.randomUUID().replace(/-/g, '').slice(0, 5);
     return `${kodeJenisSeminar}${tahunAjaran}${suffix}`;
   }

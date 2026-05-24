@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../utils/zod-error.util';
+import RateLimitMiddleware from '../middlewares/rate-limit.middleware';
 import KeahlianDosenHandler from '../handlers/keahlian-dosen.handler';
 import {
   createKeahlianDosenSchema,
@@ -19,14 +20,20 @@ keahlianDosenRoute.get(
 keahlianDosenRoute.get('/keahlian-dosen/:id', KeahlianDosenHandler.get);
 keahlianDosenRoute.post(
   '/keahlian-dosen',
+  RateLimitMiddleware.write(),
   zValidator('json', createKeahlianDosenSchema, zodError),
   KeahlianDosenHandler.create
 );
 keahlianDosenRoute.put(
   '/keahlian-dosen/:id',
+  RateLimitMiddleware.write(),
   zValidator('json', updateKeahlianDosenSchema, zodError),
   KeahlianDosenHandler.update
 );
-keahlianDosenRoute.delete('/keahlian-dosen/:id', KeahlianDosenHandler.delete);
+keahlianDosenRoute.delete(
+  '/keahlian-dosen/:id',
+  RateLimitMiddleware.write(),
+  KeahlianDosenHandler.delete
+);
 
 export default keahlianDosenRoute;

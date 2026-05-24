@@ -8,12 +8,13 @@ import { createLogger } from './utils/logger.util';
 import GlobalHandler from './handlers/global.handler';
 import globalRoute from './routes/global.route';
 import LogMiddleware from './middlewares/log.middleware';
+import RateLimitMiddleware from './middlewares/rate-limit.middleware';
 import { JadwalRoute } from './modules/jadwal';
 import { RuanganRoute } from './modules/ruangan';
 import dosenRoute from './routes/dosen.route';
 import { KomponenPenilaianRoute } from './modules/komponen-penilaian';
 import penilaianRoute from './routes/penilaian.route';
-import constraintDosenRoute from './routes/constraint-dosen.route';
+import { ConstraintDosenModuleRoute } from './modules/constraint-dosen';
 import { JadwalDraftModuleRoute } from './modules/jadwal-draft';
 import bidangKeahlianRoute from './routes/bidang-keahlian.route';
 import keahlianDosenRoute from './routes/keahlian-dosen.route';
@@ -49,6 +50,9 @@ app.use(
 
 app.use('*', LogMiddleware.structuredLogger);
 
+// Global rate limiter — IP-based safety net for the whole /api/* surface.
+app.use('/api/*', RateLimitMiddleware.global());
+
 app.notFound(GlobalHandler.notFound);
 app.onError(GlobalHandler.error);
 
@@ -83,7 +87,7 @@ app.route('/api', RuanganRoute);
 app.route('/api', dosenRoute);
 app.route('/api', KomponenPenilaianRoute);
 app.route('/api', penilaianRoute);
-app.route('/api', constraintDosenRoute);
+app.route('/api', ConstraintDosenModuleRoute);
 app.route('/api', JadwalDraftModuleRoute);
 app.route('/api', bidangKeahlianRoute);
 app.route('/api', keahlianDosenRoute);
