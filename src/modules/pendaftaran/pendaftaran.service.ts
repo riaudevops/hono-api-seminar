@@ -70,8 +70,9 @@ export default class PendaftaranService {
         }
 
         if (jenis_seminar) {
+          const kodeFilter = jenis_seminar.trim().toUpperCase();
           pendaftaran = pendaftaran.filter(
-            (p) => p.id_jenis_seminar === jenis_seminar
+            (p) => p.jenis_seminar?.kode?.toUpperCase() === kodeFilter
           );
         }
 

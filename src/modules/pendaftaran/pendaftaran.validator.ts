@@ -3,7 +3,8 @@ import { StatusBerkas, StatusJadwal } from '@prisma/client';
 
 export const getAllPendaftaranQuerySchema = z.object({
   periode: z.enum(['last_7_hari', 'last_30_hari', 'semua']).optional(),
-  jenis_seminar: z.string().optional(),
+  // Filter berdasarkan kode jenis seminar (mis. SEMKP, SEMPRO), bukan id internal
+  jenis_seminar: z.string().trim().min(1).optional(),
   status_berkas: z.nativeEnum(StatusBerkas).optional(),
   status_jadwal: z.nativeEnum(StatusJadwal).optional(),
   tahun_ajaran: z.string().optional(),
@@ -17,9 +18,7 @@ export const dashboardQuerySchema = z.object({
   tahun_ajaran: z.string().optional(),
 });
 
-const tahunAjaranSchema = z
-  .string()
-  .max(5, 'Tahun ajaran maksimal 5 karakter');
+const tahunAjaranSchema = z.string().max(5, 'Tahun ajaran maksimal 5 karakter');
 
 const idPengajuanFstSchema = z
   .string()
@@ -43,12 +42,7 @@ const nipNullableSchema = z
 
 const dokumenNilaiSchema: z.ZodType = z.record(
   z.string(),
-  z.union([
-    z.string(),
-    z.boolean(),
-    z.array(z.string()),
-    z.null(),
-  ])
+  z.union([z.string(), z.boolean(), z.array(z.string()), z.null()])
 );
 
 const uniqueNipRefinement = (data: {

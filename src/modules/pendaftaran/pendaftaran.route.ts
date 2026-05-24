@@ -47,9 +47,6 @@ pendaftaranRoute.put(
   PendaftaranHandler.updateByMahasiswa
 );
 
-// ============================================================================
-// Koordinator endpoints — list, detail, validasi status, hapus
-// ============================================================================
 pendaftaranRoute.get(
   '/koordinator/pendaftaran/tahun-ajaran',
   AuthMiddleware.JWTBearerTokenExtraction,
