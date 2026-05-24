@@ -1,12 +1,18 @@
+import Fuse from 'fuse.js';
 import {
   LogActionType,
   LogActorType,
   LogEntityType,
-  Prisma,
+  type Prisma,
 } from '@prisma/client';
 import { APIError } from '../../utils/api-error.util';
 import LogRepository from './log.repository';
-import { CreateLogType, GetLogParams, LogActorContext, LogFilter } from './log.type';
+import type {
+  CreateLogType,
+  GetLogParams,
+  LogActorContext,
+  LogFilter,
+} from './log.type';
 
 export interface CreateJadwalLogInput {
   action: LogActionType;
@@ -51,7 +57,14 @@ export default class LogService {
 
   public static async getAll(params: GetLogParams = {}) {
     const limit = params.limit ?? 50;
-    const offset = params.offset ?? 0;
+    const page =
+      params.page && params.page > 0
+        ? params.page
+        : params.offset !== undefined
+          ? Math.floor(params.offset / limit) + 1
+          : 1;
+    const offset = (page - 1) * limit;
+
     const filters: LogFilter = {
       entity_type: params.entity_type,
       entity_id: params.entity_id,
@@ -61,20 +74,104 @@ export default class LogService {
       start_date: params.start_date ? new Date(params.start_date) : undefined,
       end_date: params.end_date ? new Date(params.end_date) : undefined,
     };
-    const [logs, total] = await Promise.all([
-      LogRepository.findAll(filters, limit, offset),
-      LogRepository.count(filters),
-    ]);
+
+    const q = params.q?.trim();
+
+    // Metadata query params — dikembalikan di response getAll sebagai
+    // referensi opsi filter untuk konsumer (UI dropdown, dll).
+    const queryParamsMeta = {
+      filters: {
+        entity_type: Object.values(LogEntityType),
+        actor_type: Object.values(LogActorType),
+        action: Object.values(LogActionType),
+      },
+      text_filters: {
+        entity_id: 'string (id entity terkait, mis. id pendaftaran)',
+        actor_id: 'string (NIP / NIM / email pelaku aksi)',
+        q: 'string (fuzzy search via Fuse.js: actor_id, entity_id, action, entity_type, actor_type, old_values, new_values, context)',
+        start_date: 'ISO 8601 datetime (inclusive)',
+        end_date: 'ISO 8601 datetime (inclusive)',
+      },
+      pagination: {
+        page: 'integer >= 1 (default: 1)',
+        limit: 'integer 1..100 (default: 50)',
+        offset: 'integer >= 0 (legacy, dipakai bila page tidak diisi)',
+      },
+    };
+
+    // Fast path: tanpa fuzzy search — paginasi di level DB
+    if (!q) {
+      const [logs, total] = await Promise.all([
+        LogRepository.findAll(filters, limit, offset),
+        LogRepository.count(filters),
+      ]);
+
+      return {
+        response: true,
+        message: 'Data log berhasil diambil.',
+        data: logs,
+        pagination: {
+          page,
+          limit,
+          offset,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+        query_params: queryParamsMeta,
+      };
+    }
+
+    // Search path: ambil semua yang lolos filter, lalu Fuse.js + slice
+    const candidates = await LogRepository.findAll(filters);
+    const fuse = new Fuse(candidates, {
+      keys: [
+        { name: 'actor_id', weight: 0.3 },
+        { name: 'entity_id', weight: 0.3 },
+        { name: 'action', weight: 0.1 },
+        { name: 'entity_type', weight: 0.1 },
+        { name: 'actor_type', weight: 0.05 },
+        {
+          name: 'old_values',
+          weight: 0.075,
+          getFn: (item) =>
+            item.old_values ? JSON.stringify(item.old_values) : '',
+        },
+        {
+          name: 'new_values',
+          weight: 0.075,
+          getFn: (item) =>
+            item.new_values ? JSON.stringify(item.new_values) : '',
+        },
+        {
+          name: 'context',
+          weight: 0.05,
+          getFn: (item) => (item.context ? JSON.stringify(item.context) : ''),
+        },
+      ],
+      threshold: 0.4,
+      distance: 100,
+      minMatchCharLength: 2,
+      includeScore: true,
+      ignoreLocation: true,
+      findAllMatches: true,
+    });
+
+    const matched = fuse.search(q).map((r) => r.item);
+    const total = matched.length;
+    const data = matched.slice(offset, offset + limit);
 
     return {
       response: true,
       message: 'Data log berhasil diambil.',
-      data: logs,
+      data,
       pagination: {
+        page,
         limit,
         offset,
         total,
+        totalPages: Math.ceil(total / limit),
       },
+      query_params: queryParamsMeta,
     };
   }
 
@@ -106,7 +203,7 @@ export default class LogService {
   }
 
   public static async createJadwalLog(data: CreateJadwalLogInput) {
-    return this.createEntityLog({
+    return LogService.createEntityLog({
       action: data.action,
       actor_type: data.actor_type,
       actor_id: data.actor_id,
@@ -118,7 +215,7 @@ export default class LogService {
   }
 
   public static async createPenilaianLog(data: CreatePenilaianLogInput) {
-    return this.createEntityLog({
+    return LogService.createEntityLog({
       action: data.action,
       actor_type: data.actor_type,
       actor_id: data.actor_id,
@@ -138,7 +235,7 @@ export default class LogService {
     tx: any,
     data: CreatePenilaianLogInput
   ) {
-    return this.createEntityLogTx(tx, {
+    return LogService.createEntityLogTx(tx, {
       action: data.action,
       actor_type: data.actor_type,
       actor_id: data.actor_id,
@@ -155,7 +252,7 @@ export default class LogService {
   }
 
   public static async delete(id: string) {
-    await this.get(id);
+    await LogService.get(id);
     await LogRepository.destroy(id);
     return { response: true, message: 'Log berhasil dihapus.' };
   }

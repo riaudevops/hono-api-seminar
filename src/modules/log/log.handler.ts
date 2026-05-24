@@ -1,7 +1,11 @@
-import { Context } from 'hono';
-import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
+import type { Context } from 'hono';
+import type {
+  LogActionType,
+  LogActorType,
+  LogEntityType,
+} from '@prisma/client';
 import LogService from './log.service';
-import { GetLogParams } from './log.type';
+import type { GetLogParams } from './log.type';
 
 export default class LogHandler {
   private static buildParams(query: Record<string, string>): GetLogParams {
@@ -13,13 +17,17 @@ export default class LogHandler {
       action: query.action as LogActionType | undefined,
       limit: query.limit ? Number(query.limit) : undefined,
       offset: query.offset ? Number(query.offset) : undefined,
+      page: query.page ? Number(query.page) : undefined,
+      q: query.q,
       start_date: query.start_date,
       end_date: query.end_date,
     };
   }
 
   public static async getAll(c: Context) {
-    return c.json(await LogService.getAll(LogHandler.buildParams(c.req.query())));
+    return c.json(
+      await LogService.getAll(LogHandler.buildParams(c.req.query()))
+    );
   }
 
   public static async getLogSaya(c: Context) {

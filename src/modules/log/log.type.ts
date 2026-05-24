@@ -1,4 +1,4 @@
-import {
+import type {
   LogActionType,
   LogActorType,
   LogEntityType,
@@ -45,10 +45,12 @@ export interface GetLogParams {
   actor_id?: string;
   actor_type?: LogActorType;
   action?: LogActionType;
-  limit?: number;
-  offset?: number;
   start_date?: string;
   end_date?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+  offset?: number;
 }
 
 export interface LogActorContext {
