@@ -1,4 +1,4 @@
-import { StatusBerkas, StatusJadwal } from '@prisma/client';
+import type { StatusBerkas, StatusJadwal } from '@prisma/client';
 import type { PaginatedResponse } from '../../types/global.type';
 
 export interface PendaftaranType {
@@ -141,15 +141,4 @@ export interface PendaftaranDashboardResponse {
   response: boolean;
   message: string;
   data: PendaftaranDashboardData;
-}
-
-export interface TahunAjaranItem {
-  kode: string;
-  nama: string;
-}
-
-export interface TahunAjaranListResponse {
-  response: boolean;
-  message: string;
-  data: TahunAjaranItem[];
 }

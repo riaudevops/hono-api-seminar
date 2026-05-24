@@ -196,6 +196,137 @@ export default class ConstraintDosenService {
 
     logger.info('Parsing constraint from chat', { nip, message });
 
+    const parsed = await ConstraintDosenService.parseMessageWithAI(message);
+
+    const created = await Promise.all(
+      parsed.map((c: ParsedConstraint) =>
+        ConstraintDosenRepository.create({
+          type: c.type as ConstraintType,
+          hari: c.hari ?? undefined,
+          waktu_mulai: c.waktu_mulai ? new Date(c.waktu_mulai) : undefined,
+          waktu_selesai: c.waktu_selesai
+            ? new Date(c.waktu_selesai)
+            : undefined,
+          keterangan: c.keterangan ?? undefined,
+          priority: c.priority ?? 1,
+          raw_data: {
+            original_message: message,
+          } as unknown as Prisma.InputJsonValue,
+          dosen: { connect: { nip } },
+        })
+      )
+    );
+
+    await Promise.all(
+      created.map((constraint) =>
+        LogService.createEntityLog({
+          action: LogActionType.CREATE,
+          actor_type: LogActorType.DOSEN,
+          actor_id: nip,
+          entity_type: LogEntityType.CONSTRAINT_DOSEN,
+          entity_id: constraint.id,
+          new_values: constraint,
+        })
+      )
+    );
+    await CacheInvalidation.invalidateConstraint();
+
+    return {
+      response: true,
+      message: `${created.length} constraint berhasil ditambahkan`,
+      data: {
+        pesan: message,
+        constraints: created,
+      },
+    };
+  }
+
+  // ===========================================================================
+  // Chat-update: parse pesan natural-language, lalu apply hasil parsing
+  // pertama sebagai update terhadap constraint dengan id yang diberikan.
+  // ===========================================================================
+  public static async chatUpdate(email: string, id: string, message: string) {
+    const nip = await ConstraintDosenService.getNipFromEmail(email);
+
+    const existing = await ConstraintDosenRepository.findById(id);
+    if (!existing) {
+      throw new APIError('Constraint tidak ditemukan', 404);
+    }
+    if (existing.nip !== nip) {
+      throw new APIError(
+        'Anda tidak memiliki akses untuk mengubah constraint ini',
+        403
+      );
+    }
+
+    logger.info('Parsing constraint update from chat', { nip, id, message });
+
+    const parsed = await ConstraintDosenService.parseMessageWithAI(message);
+    const first = parsed[0];
+    if (!first) {
+      throw new APIError(
+        'AI tidak menemukan perubahan constraint dari pesan Anda. Mohon perjelas pesan.',
+        422
+      );
+    }
+    if (parsed.length > 1) {
+      logger.warn(
+        'AI mengembalikan lebih dari satu constraint untuk update; hanya yang pertama dipakai',
+        { id, total: parsed.length }
+      );
+    }
+
+    // Bangun payload update — hanya field yang non-undefined hasil parsing AI
+    // yang akan menimpa nilai existing. Field yang AI kembalikan null di-treat
+    // sebagai "reset ke null" (mirror perilaku PUT biasa di method update()).
+    const updateInput: Prisma.constraint_dosenUncheckedUpdateInput = {};
+    updateInput.type = first.type as ConstraintType;
+    updateInput.hari = first.hari;
+    updateInput.waktu_mulai = first.waktu_mulai
+      ? new Date(first.waktu_mulai)
+      : null;
+    updateInput.waktu_selesai = first.waktu_selesai
+      ? new Date(first.waktu_selesai)
+      : null;
+    updateInput.keterangan = first.keterangan ?? null;
+    if (first.priority !== undefined && first.priority !== null) {
+      updateInput.priority = first.priority;
+    }
+    updateInput.raw_data = {
+      original_message: message,
+    } as unknown as Prisma.InputJsonValue;
+
+    const constraint = await ConstraintDosenRepository.update(id, updateInput);
+    await LogService.createEntityLog({
+      action: LogActionType.UPDATE,
+      actor_type: LogActorType.DOSEN,
+      actor_id: nip,
+      entity_type: LogEntityType.CONSTRAINT_DOSEN,
+      entity_id: id,
+      old_values: existing,
+      new_values: constraint,
+      context: { source: 'chat', original_message: message },
+    });
+    await CacheInvalidation.invalidateConstraint();
+
+    return {
+      response: true,
+      message: 'Constraint berhasil diperbarui dari pesan',
+      data: {
+        pesan: message,
+        constraint,
+        ignored_extra: parsed.length > 1 ? parsed.slice(1) : undefined,
+      },
+    };
+  }
+
+  // ===========================================================================
+  // Helper: kirim pesan ke OpenRouter dan kembalikan array ParsedConstraint
+  // tervalidasi schema. Dipakai oleh chat() (create batch) dan chatUpdate().
+  // ===========================================================================
+  private static async parseMessageWithAI(
+    message: string
+  ): Promise<ParsedConstraint[]> {
     const response = await openRouterService.chatCompletion({
       messages: [
         textMessage('system', PARSE_CONSTRAINT_PROMPT),
@@ -244,46 +375,6 @@ export default class ConstraintDosenService {
       );
     }
 
-    const created = await Promise.all(
-      result.data.constraints.map((c: ParsedConstraint) =>
-        ConstraintDosenRepository.create({
-          type: c.type as ConstraintType,
-          hari: c.hari ?? undefined,
-          waktu_mulai: c.waktu_mulai ? new Date(c.waktu_mulai) : undefined,
-          waktu_selesai: c.waktu_selesai
-            ? new Date(c.waktu_selesai)
-            : undefined,
-          keterangan: c.keterangan ?? undefined,
-          priority: c.priority ?? 1,
-          raw_data: {
-            original_message: message,
-          } as unknown as Prisma.InputJsonValue,
-          dosen: { connect: { nip } },
-        })
-      )
-    );
-
-    await Promise.all(
-      created.map((constraint) =>
-        LogService.createEntityLog({
-          action: LogActionType.CREATE,
-          actor_type: LogActorType.DOSEN,
-          actor_id: nip,
-          entity_type: LogEntityType.CONSTRAINT_DOSEN,
-          entity_id: constraint.id,
-          new_values: constraint,
-        })
-      )
-    );
-    await CacheInvalidation.invalidateConstraint();
-
-    return {
-      response: true,
-      message: `${created.length} constraint berhasil ditambahkan`,
-      data: {
-        pesan: message,
-        constraints: created,
-      },
-    };
+    return result.data.constraints;
   }
 }

@@ -1,5 +1,5 @@
-import { Context } from 'hono';
-import TahunAjaranService from '../services/tahun-ajaran.service';
+import type { Context } from 'hono';
+import TahunAjaranService from './tahun-ajaran.service';
 
 export default class TahunAjaranHandler {
   public static async getAll(c: Context) {

@@ -48,12 +48,6 @@ pendaftaranRoute.put(
 );
 
 pendaftaranRoute.get(
-  '/koordinator/pendaftaran/tahun-ajaran',
-  AuthMiddleware.JWTBearerTokenExtraction,
-  PendaftaranHandler.getAllTahunAjaran
-);
-
-pendaftaranRoute.get(
   '/koordinator/pendaftaran',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getAllPendaftaranQuerySchema, zodError),

@@ -18,6 +18,7 @@ import { PendaftaranModuleRoute } from './modules/pendaftaran';
 import { MahasiswaModuleRoute } from './modules/mahasiswa';
 import { LogModuleRoute } from './modules/log';
 import { DetailPenilaianRoute } from './modules/detail-penilaian';
+import { TahunAjaranRoute } from './modules/tahun-ajaran';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 
 const apiRouter = new OpenAPIHono({
@@ -44,7 +45,8 @@ const routes = [
   MahasiswaModuleRoute,
   DetailPenilaianRoute,
   LogModuleRoute,
-]
+  TahunAjaranRoute,
+];
 
 routes.forEach((route) => {
   apiRouter.route('/', route);

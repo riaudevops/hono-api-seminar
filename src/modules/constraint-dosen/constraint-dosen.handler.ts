@@ -1,4 +1,4 @@
-import { Context } from 'hono';
+import type { Context } from 'hono';
 import ConstraintDosenService from './constraint-dosen.service';
 import { APIError } from '../../utils/api-error.util';
 
@@ -54,5 +54,12 @@ export default class ConstraintDosenHandler {
     const email = extractEmail(c);
     const { message } = await c.req.json();
     return c.json(await ConstraintDosenService.chat(email, message), 201);
+  }
+
+  public static async chatUpdate(c: Context) {
+    const email = extractEmail(c);
+    const { id } = c.req.param();
+    const { message } = await c.req.json();
+    return c.json(await ConstraintDosenService.chatUpdate(email, id, message));
   }
 }

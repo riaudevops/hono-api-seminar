@@ -42,6 +42,14 @@ constraintDosenRoute.get(
 );
 
 constraintDosenRoute.put(
+  '/constraint-saya/:id/chat',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.aiExpensive(),
+  zValidator('json', chatConstraintSchema, zodError),
+  ConstraintDosenHandler.chatUpdate
+);
+
+constraintDosenRoute.put(
   '/constraint-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   RateLimitMiddleware.write(),

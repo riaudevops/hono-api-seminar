@@ -1,7 +1,7 @@
-import { Context } from 'hono';
-import { StatusBerkas, StatusJadwal } from '@prisma/client';
+import type { Context } from 'hono';
+import type { StatusBerkas, StatusJadwal } from '@prisma/client';
 import PendaftaranService from './pendaftaran.service';
-import {
+import type {
   CreatePendaftaranByMahasiswaType,
   UpdateDosenByKoordinatorType,
   UpdatePendaftaranByMahasiswaType,
@@ -10,15 +10,15 @@ import {
 
 export default class PendaftaranHandler {
   // Koordinator
-  public static async getAllTahunAjaran(c: Context) {
-    return c.json(await PendaftaranService.getAllTahunAjaran());
-  }
-
   public static async getAll(c: Context) {
     const query = c.req.query();
     return c.json(
       await PendaftaranService.getAll({
-        periode: query.periode as 'last_7_hari' | 'last_30_hari' | 'semua' | undefined,
+        periode: query.periode as
+          | 'last_7_hari'
+          | 'last_30_hari'
+          | 'semua'
+          | undefined,
         jenis_seminar: query.jenis_seminar,
         status_berkas: query.status_berkas as StatusBerkas | undefined,
         status_jadwal: query.status_jadwal as StatusJadwal | undefined,
@@ -33,9 +33,11 @@ export default class PendaftaranHandler {
 
   public static async getDashboard(c: Context) {
     const query = c.req.query();
-    return c.json(await PendaftaranService.getDashboard({
-      tahun_ajaran: query.tahun_ajaran,
-    }));
+    return c.json(
+      await PendaftaranService.getDashboard({
+        tahun_ajaran: query.tahun_ajaran,
+      })
+    );
   }
 
   public static async getById(c: Context) {
@@ -82,8 +84,6 @@ export default class PendaftaranHandler {
     const { email } = c.get('user') as { email: string };
     const { id } = c.req.param();
     const body = (await c.req.json()) as UpdatePendaftaranByMahasiswaType;
-    return c.json(
-      await PendaftaranService.updateByMahasiswa(email, id, body)
-    );
+    return c.json(await PendaftaranService.updateByMahasiswa(email, id, body));
   }
 }

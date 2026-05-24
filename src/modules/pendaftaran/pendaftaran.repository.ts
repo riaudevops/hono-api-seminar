@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
-import { StatusBerkas, StatusJadwal } from '@prisma/client';
+import type { StatusBerkas, StatusJadwal } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
-import {
+import type {
   CreatePendaftaranByMahasiswaType,
   DataPendaftaranWithTemplate,
   PendaftaranType,
@@ -62,9 +62,7 @@ function mapNilaiByTipe(
         nilai_file_url: null,
         nilai_boolean: null,
         nilai_date:
-          value !== null && typeof value === 'string'
-            ? new Date(value)
-            : null,
+          value !== null && typeof value === 'string' ? new Date(value) : null,
         nilai_json: Prisma.JsonNull,
       };
     case 'MULTI_SELECT':
@@ -90,20 +88,21 @@ export default class PendaftaranRepository {
   public static async findAllWithRelations(): Promise<
     PendaftaranWithDataDokumen[]
   > {
-    const [pendaftaranList, jenisSeminars, mahasiswas, dosens] = await Promise.all([
-      prisma.pendaftaran.findMany({
-        orderBy: { created_at: 'desc' },
-      }),
-      prisma.jenis_seminar.findMany({
-        select: { id: true, nama: true, kode: true },
-      }),
-      prisma.mahasiswa.findMany({
-        select: { nim: true, nama: true, email: true },
-      }),
-      prisma.dosen.findMany({
-        select: { nip: true, nama: true },
-      }),
-    ]);
+    const [pendaftaranList, jenisSeminars, mahasiswas, dosens] =
+      await Promise.all([
+        prisma.pendaftaran.findMany({
+          orderBy: { created_at: 'desc' },
+        }),
+        prisma.jenis_seminar.findMany({
+          select: { id: true, nama: true, kode: true },
+        }),
+        prisma.mahasiswa.findMany({
+          select: { nim: true, nama: true, email: true },
+        }),
+        prisma.dosen.findMany({
+          select: { nip: true, nama: true },
+        }),
+      ]);
 
     const jenisSeminarById = new Map(
       jenisSeminars.map((jenisSeminar) => [jenisSeminar.id, jenisSeminar])
@@ -113,13 +112,14 @@ export default class PendaftaranRepository {
     );
     const dosenByNip = new Map(dosens.map((dosen) => [dosen.nip, dosen]));
 
-    const dataPendaftaran = await this.findDataPendaftaranByIds(
-      pendaftaranList.map((p) => p.id)
-    );
+    const dataPendaftaran =
+      await PendaftaranRepository.findDataPendaftaranByIds(
+        pendaftaranList.map((p) => p.id)
+      );
 
     return pendaftaranList.map((p) => {
       const mahasiswa = mahasiswaByNim.get(p.nim);
-      return this.mapWithRelations(
+      return PendaftaranRepository.mapWithRelations(
         p,
         jenisSeminarById.get(p.id_jenis_seminar) ?? null,
         mahasiswa
@@ -138,7 +138,7 @@ export default class PendaftaranRepository {
   public static async findAllByNimWithRelations(
     nim: string
   ): Promise<PendaftaranWithDataDokumen[]> {
-    const all = await this.findAllWithRelations();
+    const all = await PendaftaranRepository.findAllWithRelations();
     return all.filter((p) => p.nim === nim);
   }
 
@@ -164,24 +164,25 @@ export default class PendaftaranRepository {
       pendaftaran.nip_ketua_sidang,
     ].filter((nip): nip is string => !!nip);
 
-    const [jenisSeminar, mahasiswa, dataPendaftaran, dosens] = await Promise.all([
-      prisma.jenis_seminar.findUnique({
-        where: { id: pendaftaran.id_jenis_seminar },
-        select: { id: true, nama: true, kode: true },
-      }),
-      prisma.mahasiswa.findUnique({
-        where: { nim: pendaftaran.nim },
-        select: { nim: true, nama: true, email: true },
-      }),
-      this.findDataPendaftaranByIds([id]),
-      prisma.dosen.findMany({
-        where: { nip: { in: nips } },
-        select: { nip: true, nama: true },
-      }),
-    ]);
+    const [jenisSeminar, mahasiswa, dataPendaftaran, dosens] =
+      await Promise.all([
+        prisma.jenis_seminar.findUnique({
+          where: { id: pendaftaran.id_jenis_seminar },
+          select: { id: true, nama: true, kode: true },
+        }),
+        prisma.mahasiswa.findUnique({
+          where: { nim: pendaftaran.nim },
+          select: { nim: true, nama: true, email: true },
+        }),
+        PendaftaranRepository.findDataPendaftaranByIds([id]),
+        prisma.dosen.findMany({
+          where: { nip: { in: nips } },
+          select: { nip: true, nama: true },
+        }),
+      ]);
     const dosenByNip = new Map(dosens.map((dosen) => [dosen.nip, dosen]));
 
-    return this.mapWithRelations(
+    return PendaftaranRepository.mapWithRelations(
       pendaftaran,
       jenisSeminar ?? null,
       mahasiswa
@@ -299,7 +300,10 @@ export default class PendaftaranRepository {
         });
 
         for (const template of templates) {
-          const nilai = mapNilaiByTipe(template.tipe_input, data.dokumen[template.kode]);
+          const nilai = mapNilaiByTipe(
+            template.tipe_input,
+            data.dokumen[template.kode]
+          );
           await tx.data_pendaftaran.upsert({
             where: {
               id_pendaftaran_id_dokumen_template: {
@@ -391,7 +395,9 @@ export default class PendaftaranRepository {
     });
   }
 
-  public static async getStatsByStatus(where?: { tahun_ajaran?: string }): Promise<Record<StatusBerkas, number>> {
+  public static async getStatsByStatus(where?: {
+    tahun_ajaran?: string;
+  }): Promise<Record<StatusBerkas, number>> {
     const rows = await prisma.pendaftaran.findMany({
       where,
       select: { status_berkas: true },
@@ -401,11 +407,19 @@ export default class PendaftaranRepository {
         acc[row.status_berkas] += 1;
         return acc;
       },
-      { PENDING: 0, REVISI: 0, APPROVED: 0, REJECTED: 0, UPLOAD_ULANG: 0 } as Record<StatusBerkas, number>
+      {
+        PENDING: 0,
+        REVISI: 0,
+        APPROVED: 0,
+        REJECTED: 0,
+        UPLOAD_ULANG: 0,
+      } as Record<StatusBerkas, number>
     );
   }
 
-  public static async getAvgProcessingTime(where?: { tahun_ajaran?: string }): Promise<number | null> {
+  public static async getAvgProcessingTime(where?: {
+    tahun_ajaran?: string;
+  }): Promise<number | null> {
     const result = await prisma.pendaftaran.findMany({
       where: {
         ...where,
@@ -427,20 +441,13 @@ export default class PendaftaranRepository {
     return totalMs / result.length;
   }
 
-  public static async getDistinctTahunAjaran(): Promise<string[]> {
-    const rows = await prisma.pendaftaran.findMany({
-      select: { tahun_ajaran: true },
-      distinct: ['tahun_ajaran'],
-    });
-    return rows.map((r) => r.tahun_ajaran).sort((a, b) => b.localeCompare(a));
-  }
-
   public static async dosenExists(nip: string) {
     return (await prisma.dosen.count({ where: { nip } })) > 0;
   }
 
   private static async findDataPendaftaranByIds(ids: string[]) {
-    if (ids.length === 0) return new Map<string, DataPendaftaranWithTemplate[]>();
+    if (ids.length === 0)
+      return new Map<string, DataPendaftaranWithTemplate[]>();
 
     const rows = await prisma.data_pendaftaran.findMany({
       where: { id_pendaftaran: { in: ids } },
@@ -486,19 +493,19 @@ export default class PendaftaranRepository {
         dosenByNip.get(pendaftaran.nip_pembimbing_1)?.nama ?? null,
       nip_pembimbing_2: pendaftaran.nip_pembimbing_2,
       nama_pembimbing_2: pendaftaran.nip_pembimbing_2
-        ? dosenByNip.get(pendaftaran.nip_pembimbing_2)?.nama ?? null
+        ? (dosenByNip.get(pendaftaran.nip_pembimbing_2)?.nama ?? null)
         : null,
       nip_penguji_1: pendaftaran.nip_penguji_1,
       nama_penguji_1: pendaftaran.nip_penguji_1
-        ? dosenByNip.get(pendaftaran.nip_penguji_1)?.nama ?? null
+        ? (dosenByNip.get(pendaftaran.nip_penguji_1)?.nama ?? null)
         : null,
       nip_penguji_2: pendaftaran.nip_penguji_2,
       nama_penguji_2: pendaftaran.nip_penguji_2
-        ? dosenByNip.get(pendaftaran.nip_penguji_2)?.nama ?? null
+        ? (dosenByNip.get(pendaftaran.nip_penguji_2)?.nama ?? null)
         : null,
       nip_ketua_sidang: pendaftaran.nip_ketua_sidang,
       nama_ketua_sidang: pendaftaran.nip_ketua_sidang
-        ? dosenByNip.get(pendaftaran.nip_ketua_sidang)?.nama ?? null
+        ? (dosenByNip.get(pendaftaran.nip_ketua_sidang)?.nama ?? null)
         : null,
       status_berkas: pendaftaran.status_berkas,
       status_jadwal: pendaftaran.status_jadwal,

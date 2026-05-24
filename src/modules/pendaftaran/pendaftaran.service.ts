@@ -19,7 +19,6 @@ import type {
   CreatePendaftaranByMahasiswaType,
   GetAllPendaftaranResponse,
   PendaftaranDashboardResponse,
-  TahunAjaranListResponse,
   UpdateDosenByKoordinatorType,
   UpdatePendaftaranByMahasiswaType,
   UpdateStatusBerkasType,
@@ -189,21 +188,6 @@ export default class PendaftaranService {
         };
       }
     );
-  }
-
-  public static async getAllTahunAjaran(): Promise<TahunAjaranListResponse> {
-    return redisService.remember('pendaftaran:tahun-ajaran', 900, async () => {
-      const data = await PendaftaranRepository.getDistinctTahunAjaran();
-
-      return {
-        response: true,
-        message: 'Daftar tahun ajaran berhasil diambil.',
-        data: data.map((kode) => ({
-          kode,
-          nama: TahunAjaranHelper.parseStringNameByCode(kode),
-        })),
-      };
-    });
   }
 
   // ===========================================================================
