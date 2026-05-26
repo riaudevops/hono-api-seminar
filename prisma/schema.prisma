@@ -46,6 +46,7 @@ enum LogEntityType {
   KOMPONEN_PENILAIAN
   JADWAL_DRAFT
   LOG
+  BOBOT_PENILAIAN_ROLE
 }
 
 enum StatusJadwalDraft {
@@ -271,10 +272,6 @@ model constraint_dosen {
   @@index([nip, is_active])
 }
 
-// ============================================================
-// KONFIGURASI JENIS SEMINAR (dikelola Admin/Koordinator)
-// ============================================================
-
 model jenis_seminar {
   id          String  @id @default(cuid())
   kode        String  @unique @db.VarChar(20)
@@ -290,8 +287,24 @@ model jenis_seminar {
   pendaftaran   pendaftaran[]
   jadwal        jadwal[]
   jadwal_draft  jadwal_draft[]
+  bobot_penilaian_role bobot_penilaian_role[]
 
   @@index([kode])
+}
+
+model bobot_penilaian_role {
+  id               String      @id @default(cuid())
+  id_jenis_seminar String
+  role             PenilaiRole
+  persentase       Int
+
+  jenis_seminar    jenis_seminar @relation(fields: [id_jenis_seminar], references: [id], onDelete: Cascade)
+
+  created_at       DateTime    @default(now()) @db.Timestamptz
+  updated_at       DateTime    @updatedAt @db.Timestamptz
+
+  @@unique([id_jenis_seminar, role])
+  @@index([id_jenis_seminar])
 }
 
 enum TipeInputDokumen {

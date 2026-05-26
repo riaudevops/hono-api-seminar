@@ -2,12 +2,13 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import globalRoute from './routes/global.route';
 import { JadwalRoute } from './modules/jadwal';
 import { RuanganRoute } from './modules/ruangan';
-import dosenRoute from './routes/dosen.route';
 import { KomponenPenilaianRoute } from './modules/komponen-penilaian';
 import penilaianRoute from './routes/penilaian.route';
+import { DosenModuleRoute } from './modules/dosen';
 import { ConstraintDosenModuleRoute } from './modules/constraint-dosen';
 import { JadwalDraftModuleRoute } from './modules/jadwal-draft';
 import { BidangKeahlianRoute } from './modules/bidang-keahlian';
+import { BobotPenilaianRoleModuleRoute } from './modules/bobot-penilaian-role';
 import { KeahlianDosenRoute } from './modules/keahlian-dosen';
 import dosenSeminarRoute from './routes/dosen-seminar.route';
 import koordinatorRoute from './routes/koordinator.route';
@@ -29,12 +30,13 @@ const routes = [
   globalRoute,
   JadwalRoute,
   RuanganRoute,
-  dosenRoute,
+  DosenModuleRoute,
   KomponenPenilaianRoute,
   penilaianRoute,
   ConstraintDosenModuleRoute,
   JadwalDraftModuleRoute,
   BidangKeahlianRoute,
+  BobotPenilaianRoleModuleRoute,
   KeahlianDosenRoute,
   dosenSeminarRoute,
   koordinatorRoute,

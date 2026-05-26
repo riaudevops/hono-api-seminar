@@ -40,6 +40,10 @@ export class CacheInvalidation {
   public static async invalidateJenisSeminar() {
     await redisService.delByPattern('jenis-seminar:*');
   }
+
+  public static async invalidateBobotPenilaianRole() {
+    await redisService.delByPattern('bobot-penilaian-role:*');
+  }
 }
 
 export default CacheInvalidation;

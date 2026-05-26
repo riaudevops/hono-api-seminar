@@ -1,7 +1,7 @@
 import PenilaianRepository from '../repositories/penilaian.repository';
 import { KomponenPenilaianRepository } from '../modules/komponen-penilaian';
 import { ConstraintDosenRepository } from '../modules/constraint-dosen';
-import DosenRepository from '../repositories/dosen.repository';
+import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
 import { JadwalRepository } from '../modules/jadwal';
 import { LogRepository, LogService } from '../modules/log';
 import JadwalHelper from '../helpers/jadwal.helper';
@@ -13,8 +13,8 @@ import {
   LogActionType,
   LogActorType,
   LogEntityType,
-  ConstraintType,
-  Prisma,
+  type ConstraintType,
+  type Prisma,
 } from '@prisma/client';
 
 // ─── Mapping helpers ───────────────────────────────────────────────
@@ -90,7 +90,9 @@ export default class DosenSeminarService {
       const r = j.ruangan;
 
       const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
-      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(j.waktu_selesai);
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
+        j.waktu_selesai
+      );
 
       const kode = jenisKodeFromJadwal(j);
 
@@ -156,7 +158,9 @@ export default class DosenSeminarService {
 
       const j: any = p.jadwal;
       const waktuMulai = JadwalHelper.convertToJakartaTimezone(j.waktu_mulai);
-      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(j.waktu_selesai);
+      const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
+        j.waktu_selesai
+      );
       const jadwalDateStr = waktuMulai.toISOString().slice(0, 10);
 
       if (jadwalDateStr === todayStr) {
@@ -338,9 +342,7 @@ export default class DosenSeminarService {
         });
 
         await LogService.createPenilaianLogTx(tx, {
-          action: existingDetail
-            ? LogActionType.UPDATE
-            : LogActionType.CREATE,
+          action: existingDetail ? LogActionType.UPDATE : LogActionType.CREATE,
           actor_type: context.actor_type,
           actor_id: context.actor_id,
           id_jadwal: jadwal_id,

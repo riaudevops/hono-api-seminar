@@ -42,11 +42,14 @@ export default class LogHandler {
       | undefined;
     const context = LogService.getActorContext(user);
 
+    const params = LogHandler.buildParams(c.req.query());
+    delete params.actor_type;
+    delete params.entity_type;
+
     return c.json(
       await LogService.getAll({
-        ...LogHandler.buildParams(c.req.query()),
+        ...params,
         actor_id: context.actor_id,
-        actor_type: context.actor_type,
       })
     );
   }

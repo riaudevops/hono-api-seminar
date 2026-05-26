@@ -1,8 +1,8 @@
 import Fuse from 'fuse.js';
-import DosenRepository from '../repositories/dosen.repository';
-import redisService from '../infrastructures/redis.infrastructure';
-import { APIError } from '../utils/api-error.util';
-import { normalizeCachePart } from '../utils/cache-key.util';
+import DosenRepository from './dosen.repository';
+import redisService from '../../infrastructures/redis.infrastructure';
+import { APIError } from '../../utils/api-error.util';
+import { normalizeCachePart } from '../../utils/cache-key.util';
 
 export default class DosenService {
   public static async search(query: string) {

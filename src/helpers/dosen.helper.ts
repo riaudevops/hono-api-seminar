@@ -1,4 +1,4 @@
-import DosenRepository from '../repositories/dosen.repository';
+import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
 import { APIError } from '../utils/api-error.util';
 
 export default class DosenHelper {

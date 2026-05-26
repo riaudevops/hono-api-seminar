@@ -540,6 +540,108 @@ async function main() {
       ? resultRequirement
       : 'Data was inserted previously, no new data inserted.'
   );
+
+  // 8. Seeder Bobot Penilaian Role (inter-role weight per jenis_seminar)
+  // Total persentase per jenis_seminar HARUS 100%.
+  // Beda dengan komponen_penilaian.persentase yang intra-role.
+  type BobotSeed = {
+    jenis: string;
+    role:
+      | 'KP_PEMBIMBING'
+      | 'KP_PENGUJI'
+      | 'KP_INSTANSI'
+      | 'TA_PEMBIMBING_1'
+      | 'TA_PEMBIMBING_2'
+      | 'TA_PENGUJI_1'
+      | 'TA_PENGUJI_2'
+      | 'TA_KETUA_SIDANG';
+    persentase: number;
+  };
+
+  const bobotSeed: BobotSeed[] = [
+    // --- SEMKP (3 role, total 100) ---
+    { jenis: 'SEMKP', role: 'KP_PEMBIMBING', persentase: 30 },
+    { jenis: 'SEMKP', role: 'KP_PENGUJI', persentase: 30 },
+    { jenis: 'SEMKP', role: 'KP_INSTANSI', persentase: 40 },
+
+    // --- SEMPRO (2 pembimbing + 2 penguji, total 100) ---
+    { jenis: 'SEMPRO', role: 'TA_PEMBIMBING_1', persentase: 30 },
+    { jenis: 'SEMPRO', role: 'TA_PEMBIMBING_2', persentase: 20 },
+    { jenis: 'SEMPRO', role: 'TA_PENGUJI_1', persentase: 25 },
+    { jenis: 'SEMPRO', role: 'TA_PENGUJI_2', persentase: 25 },
+
+    // --- SEMHAS_LAPORAN (2 pembimbing + 2 penguji, total 100) ---
+    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 30 },
+    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 20 },
+    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PENGUJI_1', persentase: 25 },
+    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PENGUJI_2', persentase: 25 },
+
+    // --- SEMHAS_PAPERBASED (2 pembimbing + 2 penguji, total 100) ---
+    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 30 },
+    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 20 },
+    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 25 },
+    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PENGUJI_2', persentase: 25 },
+
+    // --- SIDANG_LAPORAN (2 pembimbing + 2 penguji + ketua sidang, total 100) ---
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 25 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 20 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_1', persentase: 22 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_2', persentase: 23 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_KETUA_SIDANG', persentase: 10 },
+
+    // --- SIDANG_PAPERBASED (2 pembimbing + 2 penguji + ketua sidang, total 100) ---
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 25 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 20 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 22 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_2', persentase: 23 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_KETUA_SIDANG', persentase: 10 },
+  ];
+
+  // Sanity check: total per jenis harus tepat 100
+  const totalsPerJenis = bobotSeed.reduce<Record<string, number>>(
+    (acc, item) => {
+      acc[item.jenis] = (acc[item.jenis] ?? 0) + item.persentase;
+      return acc;
+    },
+    {}
+  );
+  const invalidTotals = Object.entries(totalsPerJenis).filter(
+    ([, total]) => total !== 100
+  );
+  if (invalidTotals.length > 0) {
+    console.error(
+      '[ERROR] Total bobot per jenis_seminar tidak 100:',
+      invalidTotals
+    );
+  }
+
+  const missingJenisRefs = bobotSeed.filter((b) => !jenisMap.get(b.jenis));
+  if (missingJenisRefs.length > 0) {
+    console.error(
+      '[ERROR] Ada bobot_penilaian_role yang merefer jenis_seminar tidak ditemukan:',
+      missingJenisRefs
+    );
+  }
+
+  const resultBobotPenilaianRole = await prisma.bobot_penilaian_role.createMany(
+    {
+      data: bobotSeed
+        .filter((b) => jenisMap.get(b.jenis))
+        .map((b) => ({
+          id_jenis_seminar: jenisMap.get(b.jenis)!,
+          role: b.role,
+          persentase: b.persentase,
+        })),
+      skipDuplicates: true,
+    }
+  );
+
+  console.log(
+    '[DEBUG] Result of inserted bobot_penilaian_role createMany:',
+    resultBobotPenilaianRole.count > 0
+      ? resultBobotPenilaianRole
+      : 'Data was inserted previously, no new data inserted.'
+  );
 }
 
 main()

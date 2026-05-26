@@ -1,6 +1,6 @@
-import { Context } from 'hono';
+import type { Context } from 'hono';
 import DosenSeminarService from '../services/dosen-seminar.service';
-import DosenRepository from '../repositories/dosen.repository';
+import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
 import { APIError } from '../utils/api-error.util';
 
 async function extractNip(c: Context): Promise<string> {

@@ -1,5 +1,5 @@
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
-import DosenRepository from '../../repositories/dosen.repository';
+import { DosenModuleRepository as DosenRepository } from '../dosen';
 import BidangKeahlianRepository from '../bidang-keahlian/bidang-keahlian.repository';
 import { LogService } from '../log';
 import KeahlianDosenRepository from './keahlian-dosen.repository';

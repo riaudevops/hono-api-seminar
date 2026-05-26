@@ -1,7 +1,10 @@
-import { Context } from 'hono';
+import type { Context } from 'hono';
 import { APIError } from '../../utils/api-error.util';
 import MahasiswaService from './mahasiswa.service';
-import { GetAllMahasiswaQuery, UpdateDataSayaType } from './mahasiswa.type';
+import type {
+  GetAllMahasiswaQuery,
+  UpdateDataSayaType,
+} from './mahasiswa.type';
 
 export default class MahasiswaHandler {
   public static async getAll(c: Context) {
@@ -11,6 +14,12 @@ export default class MahasiswaHandler {
 
   public static async getStatistics(c: Context) {
     return c.json(await MahasiswaService.getStatistics());
+  }
+
+  public static async getDetail(c: Context) {
+    const nim = c.req.param('nim');
+    if (!nim) throw new APIError('Parameter nim wajib diisi.', 400);
+    return c.json(await MahasiswaService.getDetailByNim(nim));
   }
 
   public static async getDataSaya(c: Context) {

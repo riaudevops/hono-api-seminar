@@ -1,4 +1,4 @@
-import DosenRepository from '../../repositories/dosen.repository';
+import { DosenModuleRepository as DosenRepository } from '../dosen';
 import ConstraintDosenRepository from './constraint-dosen.repository';
 import { APIError } from '../../utils/api-error.util';
 import CacheInvalidation from '../../utils/cache-invalidation.util';
@@ -30,6 +30,11 @@ const PARSE_CONSTRAINT_PROMPT = readFileSync(
   join(process.cwd(), 'src/prompts/tasks/parse-constraint.md'),
   'utf-8'
 );
+
+type ConstraintChatProgressEmitter = (
+  event: string,
+  payload: Record<string, unknown>
+) => Promise<void> | void;
 
 export default class ConstraintDosenService {
   private static async getNipFromEmail(email: string): Promise<string> {
@@ -191,12 +196,48 @@ export default class ConstraintDosenService {
     };
   }
 
-  public static async chat(email: string, message: string) {
+  public static async chat(
+    email: string,
+    message: string,
+    emit?: ConstraintChatProgressEmitter,
+    signal?: AbortSignal
+  ) {
+    const throwIfAborted = () => {
+      if (signal?.aborted) {
+        throw new APIError(
+          'Proses chat constraint dibatalkan oleh client',
+          499
+        );
+      }
+    };
+    const sendProgress = async (
+      event: string,
+      payload: Record<string, unknown>
+    ) => {
+      throwIfAborted();
+      if (emit) await emit(event, payload);
+    };
+
     const nip = await ConstraintDosenService.getNipFromEmail(email);
 
     logger.info('Parsing constraint from chat', { nip, message });
+    await sendProgress('parsing', {
+      message: 'AI sedang memproses pesan constraint',
+    });
 
-    const parsed = await ConstraintDosenService.parseMessageWithAI(message);
+    const parsed = await ConstraintDosenService.parseMessageWithAI(
+      message,
+      signal
+    );
+
+    await sendProgress('parsed', {
+      count: parsed.length,
+      message: `${parsed.length} constraint berhasil dipahami dari pesan`,
+    });
+    await sendProgress('saving', {
+      count: parsed.length,
+      message: 'Menyimpan constraint',
+    });
 
     const created = await Promise.all(
       parsed.map((c: ParsedConstraint) =>
@@ -231,7 +272,7 @@ export default class ConstraintDosenService {
     );
     await CacheInvalidation.invalidateConstraint();
 
-    return {
+    const responseData = {
       response: true,
       message: `${created.length} constraint berhasil ditambahkan`,
       data: {
@@ -239,13 +280,38 @@ export default class ConstraintDosenService {
         constraints: created,
       },
     };
+
+    await sendProgress('done', responseData);
+    return responseData;
   }
 
   // ===========================================================================
   // Chat-update: parse pesan natural-language, lalu apply hasil parsing
   // pertama sebagai update terhadap constraint dengan id yang diberikan.
   // ===========================================================================
-  public static async chatUpdate(email: string, id: string, message: string) {
+  public static async chatUpdate(
+    email: string,
+    id: string,
+    message: string,
+    emit?: ConstraintChatProgressEmitter,
+    signal?: AbortSignal
+  ) {
+    const throwIfAborted = () => {
+      if (signal?.aborted) {
+        throw new APIError(
+          'Proses update constraint dibatalkan oleh client',
+          499
+        );
+      }
+    };
+    const sendProgress = async (
+      event: string,
+      payload: Record<string, unknown>
+    ) => {
+      throwIfAborted();
+      if (emit) await emit(event, payload);
+    };
+
     const nip = await ConstraintDosenService.getNipFromEmail(email);
 
     const existing = await ConstraintDosenRepository.findById(id);
@@ -260,8 +326,20 @@ export default class ConstraintDosenService {
     }
 
     logger.info('Parsing constraint update from chat', { nip, id, message });
+    await sendProgress('parsing', {
+      id,
+      message: 'AI sedang memproses pesan update constraint',
+    });
 
-    const parsed = await ConstraintDosenService.parseMessageWithAI(message);
+    const parsed = await ConstraintDosenService.parseMessageWithAI(
+      message,
+      signal
+    );
+
+    await sendProgress('parsed', {
+      count: parsed.length,
+      message: `${parsed.length} constraint berhasil dipahami dari pesan`,
+    });
     const first = parsed[0];
     if (!first) {
       throw new APIError(
@@ -296,6 +374,11 @@ export default class ConstraintDosenService {
       original_message: message,
     } as unknown as Prisma.InputJsonValue;
 
+    await sendProgress('saving', {
+      id,
+      message: 'Menyimpan perubahan constraint',
+    });
+
     const constraint = await ConstraintDosenRepository.update(id, updateInput);
     await LogService.createEntityLog({
       action: LogActionType.UPDATE,
@@ -309,7 +392,7 @@ export default class ConstraintDosenService {
     });
     await CacheInvalidation.invalidateConstraint();
 
-    return {
+    const responseData = {
       response: true,
       message: 'Constraint berhasil diperbarui dari pesan',
       data: {
@@ -318,6 +401,9 @@ export default class ConstraintDosenService {
         ignored_extra: parsed.length > 1 ? parsed.slice(1) : undefined,
       },
     };
+
+    await sendProgress('done', responseData);
+    return responseData;
   }
 
   // ===========================================================================
@@ -325,8 +411,13 @@ export default class ConstraintDosenService {
   // tervalidasi schema. Dipakai oleh chat() (create batch) dan chatUpdate().
   // ===========================================================================
   private static async parseMessageWithAI(
-    message: string
+    message: string,
+    signal?: AbortSignal
   ): Promise<ParsedConstraint[]> {
+    if (signal?.aborted) {
+      throw new APIError('Proses chat constraint dibatalkan oleh client', 499);
+    }
+
     const response = await openRouterService.chatCompletion({
       messages: [
         textMessage('system', PARSE_CONSTRAINT_PROMPT),
@@ -336,6 +427,10 @@ export default class ConstraintDosenService {
       maxTokens: 2048,
       provider: { sort: 'latency' },
     });
+
+    if (signal?.aborted) {
+      throw new APIError('Proses chat constraint dibatalkan oleh client', 499);
+    }
 
     const rawContent = response.choices?.[0]?.message?.content;
     if (!rawContent || typeof rawContent !== 'string') {

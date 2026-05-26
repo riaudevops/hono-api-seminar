@@ -31,6 +31,12 @@ mahasiswaModuleRoute.get(
   MahasiswaHandler.getAll
 );
 
+mahasiswaModuleRoute.get(
+  '/koordinator/mahasiswa/:nim/detail',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  MahasiswaHandler.getDetail
+);
+
 mahasiswaModuleRoute.put(
   '/mahasiswa/data-saya',
   AuthMiddleware.JWTBearerTokenExtraction,

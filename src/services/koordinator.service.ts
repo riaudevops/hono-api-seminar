@@ -1,5 +1,5 @@
 import prisma from '../infrastructures/db.infrastructure';
-import DosenRepository from '../repositories/dosen.repository';
+import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
 import JadwalHelper from '../helpers/jadwal.helper';
 import { APIError } from '../utils/api-error.util';
 import { PenilaiRole, LogEntityType } from '@prisma/client';
@@ -7,12 +7,12 @@ import { PenilaiRole, LogEntityType } from '@prisma/client';
 // ─── Mapping ───────────────────────────────────────────────────────
 
 const JENIS_LABEL: Record<string, { name: string; color: string }> = {
-  SEMKP:             { name: 'Seminar KP',      color: '#8b5cf6' },
-  SEMPRO:            { name: 'Seminar Proposal', color: '#3b82f6' },
-  SEMHAS_LAPORAN:    { name: 'Seminar Hasil',    color: '#10b981' },
-  SEMHAS_PAPERBASED: { name: 'Seminar Hasil',    color: '#10b981' },
-  SIDANG_LAPORAN:    { name: 'Sidang Akhir',     color: '#ef4444' },
-  SIDANG_PAPERBASED: { name: 'Sidang Akhir',     color: '#ef4444' },
+  SEMKP: { name: 'Seminar KP', color: '#8b5cf6' },
+  SEMPRO: { name: 'Seminar Proposal', color: '#3b82f6' },
+  SEMHAS_LAPORAN: { name: 'Seminar Hasil', color: '#10b981' },
+  SEMHAS_PAPERBASED: { name: 'Seminar Hasil', color: '#10b981' },
+  SIDANG_LAPORAN: { name: 'Sidang Akhir', color: '#ef4444' },
+  SIDANG_PAPERBASED: { name: 'Sidang Akhir', color: '#ef4444' },
 };
 
 const BIMBINGAN_ROLES: PenilaiRole[] = [
@@ -22,11 +22,11 @@ const BIMBINGAN_ROLES: PenilaiRole[] = [
 ];
 
 const JENIS_FRONTEND: Record<string, string> = {
-  SEMKP:             'Seminar KP',
-  SEMPRO:            'Seminar Proposal',
-  SEMHAS_LAPORAN:    'Seminar Hasil',
+  SEMKP: 'Seminar KP',
+  SEMPRO: 'Seminar Proposal',
+  SEMHAS_LAPORAN: 'Seminar Hasil',
   SEMHAS_PAPERBASED: 'Seminar Hasil',
-  SIDANG_LAPORAN:    'Sidang Akhir',
+  SIDANG_LAPORAN: 'Sidang Akhir',
   SIDANG_PAPERBASED: 'Sidang Akhir',
 };
 
@@ -248,7 +248,7 @@ export default class KoordinatorService {
   }
 
   public static async getDosenList() {
-    const dosenList = await prisma.dosen.findMany({
+    const dosenList = (await prisma.dosen.findMany({
       include: {
         keahlian_dosen: {
           include: { bidang_keahlian: true },
@@ -267,7 +267,7 @@ export default class KoordinatorService {
         },
       },
       orderBy: { nama: 'asc' },
-    }) as any[];
+    })) as any[];
 
     const now = JadwalHelper.getCurrentJakartaTime();
 

@@ -1,4 +1,4 @@
-import prisma from '../infrastructures/db.infrastructure';
+import prisma from '../../infrastructures/db.infrastructure';
 
 export interface CreateDosenInput {
   nip: string;

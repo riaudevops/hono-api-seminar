@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import ConstraintDosenService from './constraint-dosen.service';
 import { APIError } from '../../utils/api-error.util';
 
@@ -17,6 +18,70 @@ function extractEmail(c: Context): string {
   const email = userPayload.email as string;
   if (!email) throw new APIError('Email tidak ditemukan', 401);
   return email;
+}
+
+async function streamConstraintChat(
+  c: Context,
+  runner: (
+    emit: (event: string, payload: Record<string, unknown>) => Promise<void>,
+    signal: AbortSignal
+  ) => Promise<unknown>,
+  connectedMessage: string,
+  heartbeatMessage: string
+) {
+  const abortController = new AbortController();
+
+  c.header('Cache-Control', 'no-cache, no-transform');
+  c.header('Connection', 'keep-alive');
+  c.header('X-Accel-Buffering', 'no');
+
+  return streamSSE(c, async (stream) => {
+    let isClosed = false;
+
+    const sendEvent = async (
+      event: string,
+      payload: Record<string, unknown>
+    ) => {
+      if (isClosed) return;
+      await stream.writeSSE({
+        event,
+        data: JSON.stringify(payload),
+      });
+    };
+
+    await sendEvent('connected', {
+      message: connectedMessage,
+      timestamp: new Date().toISOString(),
+    });
+
+    const heartbeat = setInterval(() => {
+      void sendEvent('heartbeat', {
+        message: heartbeatMessage,
+        timestamp: new Date().toISOString(),
+      });
+    }, 5000);
+
+    stream.onAbort(() => {
+      isClosed = true;
+      abortController.abort();
+      clearInterval(heartbeat);
+    });
+
+    try {
+      await runner(sendEvent, abortController.signal);
+    } catch (err: any) {
+      if (!abortController.signal.aborted) {
+        await sendEvent('error', {
+          response: false,
+          message: err.message || 'Gagal memproses constraint dari chat',
+          statusCode: err.statusCode || 500,
+        });
+      }
+    } finally {
+      isClosed = true;
+      clearInterval(heartbeat);
+    }
+  });
 }
 
 export default class ConstraintDosenHandler {
@@ -53,13 +118,27 @@ export default class ConstraintDosenHandler {
   public static async chat(c: Context) {
     const email = extractEmail(c);
     const { message } = await c.req.json();
-    return c.json(await ConstraintDosenService.chat(email, message), 201);
+
+    return streamConstraintChat(
+      c,
+      (emit, signal) =>
+        ConstraintDosenService.chat(email, message, emit, signal),
+      'Stream chat constraint terhubung',
+      'Chat constraint masih diproses'
+    );
   }
 
   public static async chatUpdate(c: Context) {
     const email = extractEmail(c);
     const { id } = c.req.param();
     const { message } = await c.req.json();
-    return c.json(await ConstraintDosenService.chatUpdate(email, id, message));
+
+    return streamConstraintChat(
+      c,
+      (emit, signal) =>
+        ConstraintDosenService.chatUpdate(email, id, message, emit, signal),
+      'Stream update constraint terhubung',
+      'Update constraint masih diproses'
+    );
   }
 }

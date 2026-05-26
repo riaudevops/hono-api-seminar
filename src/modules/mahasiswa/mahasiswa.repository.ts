@@ -1,6 +1,36 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
-import { GetAllMahasiswaQuery, UpdateDataSayaType } from './mahasiswa.type';
+import type {
+  GetAllMahasiswaQuery,
+  UpdateDataSayaType,
+} from './mahasiswa.type';
+
+const fullInclude = {
+  pendaftaran: {
+    orderBy: { created_at: 'desc' },
+    include: {
+      jenis_seminar: true,
+      data_pendaftaran: {
+        include: { dokumen_template: true },
+      },
+    },
+  },
+  jadwal: {
+    orderBy: { tanggal: 'desc' },
+    include: {
+      jenis_seminar: true,
+      ruangan: true,
+      penilaian: {
+        include: {
+          dosen: true,
+          detail_penilaian: {
+            include: { komponen: true },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies Prisma.mahasiswaInclude;
 
 export default class MahasiswaRepository {
   private static buildWhere(
@@ -37,7 +67,7 @@ export default class MahasiswaRepository {
   }
 
   public static async findAll(query: GetAllMahasiswaQuery) {
-    const where = this.buildWhere(query);
+    const where = MahasiswaRepository.buildWhere(query);
     const skip = (query.page - 1) * query.limit;
 
     const [mahasiswa, total] = await prisma.$transaction([
@@ -79,7 +109,7 @@ export default class MahasiswaRepository {
       { angkatan: number; total: bigint }[]
     >`
       SELECT CAST('20' || SUBSTRING(nim, 2, 2) AS INTEGER) AS angkatan,
-             COUNT(*) AS total
+            COUNT(*) AS total
       FROM mahasiswa
       WHERE LENGTH(nim) >= 3
       GROUP BY angkatan
@@ -120,5 +150,55 @@ export default class MahasiswaRepository {
         no_hp: data.no_hp,
       },
     });
+  }
+
+  public static async findFullByNim(nim: string) {
+    const mahasiswa = await prisma.mahasiswa.findUnique({
+      where: { nim },
+      include: fullInclude,
+    });
+
+    if (!mahasiswa) return null;
+
+    const pendaftaranIds = mahasiswa.pendaftaran.map((p) => p.id);
+    const jadwalIds = mahasiswa.jadwal.map((j) => j.id);
+    const penilaianIds = mahasiswa.jadwal.flatMap((j) =>
+      j.penilaian.map((p) => p.id)
+    );
+
+    const logs = await prisma.log.findMany({
+      where: {
+        OR: [
+          { entity_type: 'MAHASISWA', entity_id: nim },
+          ...(pendaftaranIds.length
+            ? [
+                {
+                  entity_type: 'PENDAFTARAN' as const,
+                  entity_id: { in: pendaftaranIds },
+                },
+              ]
+            : []),
+          ...(jadwalIds.length
+            ? [
+                {
+                  entity_type: 'JADWAL' as const,
+                  entity_id: { in: jadwalIds },
+                },
+              ]
+            : []),
+          ...(penilaianIds.length
+            ? [
+                {
+                  entity_type: 'PENILAIAN' as const,
+                  entity_id: { in: penilaianIds },
+                },
+              ]
+            : []),
+        ],
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+
+    return { ...mahasiswa, logs };
   }
 }

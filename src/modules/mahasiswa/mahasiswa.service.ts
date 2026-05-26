@@ -53,6 +53,20 @@ export default class MahasiswaService {
     });
   }
 
+  public static async getDetailByNim(nim: string) {
+    return redisService.remember(`mahasiswa:detail:${nim}`, 300, async () => {
+      const data = await MahasiswaRepository.findFullByNim(nim);
+      if (!data) {
+        throw new APIError('Data mahasiswa tidak ditemukan.', 404);
+      }
+      return {
+        response: true,
+        message: 'Detail lengkap mahasiswa berhasil diambil.',
+        data,
+      };
+    });
+  }
+
   public static async getDataSaya(email: string) {
     const mahasiswa = await MahasiswaRepository.findByEmail(email);
     if (!mahasiswa) {
