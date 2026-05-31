@@ -618,12 +618,12 @@ async function main() {
   const missingJenisRefs = bobotSeed.filter((b) => !jenisMap.get(b.jenis));
   if (missingJenisRefs.length > 0) {
     console.error(
-      '[ERROR] Ada bobot_penilaian_role yang merefer jenis_seminar tidak ditemukan:',
+      '[ERROR] Ada bobot_penilai yang merefer jenis_seminar tidak ditemukan:',
       missingJenisRefs
     );
   }
 
-  const resultBobotPenilaianRole = await prisma.bobot_penilaian_role.createMany(
+  const resultBobotPenilai = await prisma.bobot_penilai.createMany(
     {
       data: bobotSeed
         .filter((b) => jenisMap.get(b.jenis))
@@ -637,9 +637,9 @@ async function main() {
   );
 
   console.log(
-    '[DEBUG] Result of inserted bobot_penilaian_role createMany:',
-    resultBobotPenilaianRole.count > 0
-      ? resultBobotPenilaianRole
+    '[DEBUG] Result of inserted bobot_penilai createMany:',
+    resultBobotPenilai.count > 0
+      ? resultBobotPenilai
       : 'Data was inserted previously, no new data inserted.'
   );
 }

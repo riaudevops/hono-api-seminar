@@ -22,7 +22,7 @@ export default class PendaftaranHandler {
         jenis_seminar: query.jenis_seminar,
         status_berkas: query.status_berkas as StatusBerkas | undefined,
         status_jadwal: query.status_jadwal as StatusJadwal | undefined,
-        tahun_ajaran: query.tahun_ajaran,
+        kode_tahun_ajaran: query.kode_tahun_ajaran,
         nim: query.nim,
         q: query.q,
         page: query.page ? Number(query.page) : undefined,
@@ -35,7 +35,7 @@ export default class PendaftaranHandler {
     const query = c.req.query();
     return c.json(
       await PendaftaranService.getDashboard({
-        tahun_ajaran: query.tahun_ajaran,
+        kode_tahun_ajaran: query.kode_tahun_ajaran,
       })
     );
   }

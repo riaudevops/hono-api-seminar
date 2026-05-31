@@ -20,6 +20,7 @@
     "@types/nodemailer": "^6.4.23",
     "colorette": "^2.0.20",
     "fuse.js": "^7.3.0",
+    "googleapis": "^173.0.0",
     "hono": "^4.12.12",
     "hono-rate-limiter": "^0.5.3",
     "ioredis": "^5.10.1",

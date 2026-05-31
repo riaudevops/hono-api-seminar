@@ -4,45 +4,50 @@ import { zValidator } from '@hono/zod-validator';
 import { zodError } from '../../utils/zod-error.util';
 import AuthMiddleware from '../../middlewares/auth.middleware';
 import RateLimitMiddleware from '../../middlewares/rate-limit.middleware';
-import BobotPenilaianRoleHandler from './bobot-penilaian-role.handler';
+import BobotPenilaiHandler from './bobot-penilai.handler';
 import {
   updateSingleBobotSchema,
-  upsertBobotPenilaianRoleSchema,
-} from './bobot-penilaian-role.validator';
+  upsertBobotPenilaiSchema,
+} from './bobot-penilai.validator';
 
 const bobotPenilaianRoleRoute = new Hono({ router: new RegExpRouter() });
 
 bobotPenilaianRoleRoute.get(
-  '/data-master/bobot-penilaian-role',
-  BobotPenilaianRoleHandler.getAll
+  '/data-master/bobot-penilai',
+  BobotPenilaiHandler.getAll
 );
 
 bobotPenilaianRoleRoute.get(
-  '/data-master/bobot-penilaian-role/jenis-seminar/:id_jenis_seminar',
-  BobotPenilaianRoleHandler.getByJenisSeminar
+  '/data-master/bobot-penilai/jenis-seminar/kode/:kode',
+  BobotPenilaiHandler.getByKodeJenisSeminar
 );
 
+// bobotPenilaianRoleRoute.get(
+//   '/data-master/bobot-penilai/jenis-seminar/:id_jenis_seminar',
+//   BobotPenilaiHandler.getByJenisSeminar
+// );
+
 bobotPenilaianRoleRoute.put(
-  '/koordinator/bobot-penilaian-role',
+  '/koordinator/bobot-penilai',
   AuthMiddleware.JWTBearerTokenExtraction,
   RateLimitMiddleware.write(),
-  zValidator('json', upsertBobotPenilaianRoleSchema, zodError),
-  BobotPenilaianRoleHandler.upsertBatch
+  zValidator('json', upsertBobotPenilaiSchema, zodError),
+  BobotPenilaiHandler.upsertBatch
 );
 
 bobotPenilaianRoleRoute.patch(
-  '/koordinator/bobot-penilaian-role/:id',
+  '/koordinator/bobot-penilai/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   RateLimitMiddleware.write(),
   zValidator('json', updateSingleBobotSchema, zodError),
-  BobotPenilaianRoleHandler.updateSingle
+  BobotPenilaiHandler.updateSingle
 );
 
 bobotPenilaianRoleRoute.delete(
-  '/koordinator/bobot-penilaian-role/:id',
+  '/koordinator/bobot-penilai/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
   RateLimitMiddleware.write(),
-  BobotPenilaianRoleHandler.deleteOne
+  BobotPenilaiHandler.deleteOne
 );
 
 export default bobotPenilaianRoleRoute;

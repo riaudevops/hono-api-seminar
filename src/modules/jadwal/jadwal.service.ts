@@ -241,19 +241,6 @@ export default class JadwalService {
     );
   }
 
-  public static async getAllTahunAjaran() {
-    const data = await JadwalRepository.getDistinctTahunAjaran();
-
-    return {
-      response: true,
-      message: 'Daftar tahun ajaran jadwal berhasil diambil.',
-      data: data.map((kode) => ({
-        kode,
-        nama: TahunAjaranHelper.parseStringNameByCode(kode),
-      })),
-    };
-  }
-
   public static async getAll(params: GetAllJadwalParams = {}) {
     return redisService.remember(
       `jadwal:list:${hashCacheKey(params)}`,

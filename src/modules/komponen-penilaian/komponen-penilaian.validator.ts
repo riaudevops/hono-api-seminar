@@ -9,6 +9,19 @@ export const getAllKomponenPenilaianQuerySchema = z.object({
     .transform((value) => (value === undefined ? undefined : value === 'true')),
 });
 
+export const getKomponenByRoleParamSchema = z.object({
+  role: z.nativeEnum(PenilaiRole, {
+    errorMap: () => ({ message: 'Role penilai tidak valid' }),
+  }),
+});
+
+export const getKomponenByRoleQuerySchema = z.object({
+  is_aktif: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+});
+
 export const createKomponenPenilaianSchema = z.object({
   nama: z
     .string()

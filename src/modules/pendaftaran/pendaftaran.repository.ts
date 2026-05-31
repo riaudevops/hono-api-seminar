@@ -15,7 +15,7 @@ import type {
 interface CreatePendaftaranInput extends CreatePendaftaranByMahasiswaType {
   id: string;
   nim: string;
-  tahun_ajaran: string;
+  kode_tahun_ajaran: string;
 }
 
 // Map TipeInputDokumen enum to the correct nilai_* column
@@ -206,10 +206,10 @@ export default class PendaftaranRepository {
   public static async findByNimJenisSeminarTahunAjaran(
     nim: string,
     id_jenis_seminar: string,
-    tahun_ajaran: string
+    kode_tahun_ajaran: string
   ) {
     return prisma.pendaftaran.findFirst({
-      where: { nim, id_jenis_seminar, tahun_ajaran },
+      where: { nim, id_jenis_seminar, kode_tahun_ajaran },
     });
   }
 
@@ -223,7 +223,7 @@ export default class PendaftaranRepository {
         data: {
           id: data.id,
           nim: data.nim,
-          tahun_ajaran: data.tahun_ajaran,
+          kode_tahun_ajaran: data.kode_tahun_ajaran,
           id_pengajuan_fst: data.id_pengajuan_fst,
           id_jenis_seminar: data.id_jenis_seminar,
           nip_pembimbing_1: data.nip_pembimbing_1,
@@ -338,7 +338,7 @@ export default class PendaftaranRepository {
   public static async updateStatusJadwalByJadwalData(
     nim: string,
     id_jenis_seminar: string,
-    tahun_ajaran: string,
+    kode_tahun_ajaran: string,
     status_jadwal: StatusJadwal,
     client: any = prisma
   ) {
@@ -346,7 +346,7 @@ export default class PendaftaranRepository {
       where: {
         nim,
         id_jenis_seminar,
-        tahun_ajaran,
+        kode_tahun_ajaran,
       },
       data: { status_jadwal },
     });
@@ -396,7 +396,7 @@ export default class PendaftaranRepository {
   }
 
   public static async getStatsByStatus(where?: {
-    tahun_ajaran?: string;
+    kode_tahun_ajaran?: string;
   }): Promise<Record<StatusBerkas, number>> {
     const rows = await prisma.pendaftaran.findMany({
       where,
@@ -418,7 +418,7 @@ export default class PendaftaranRepository {
   }
 
   public static async getAvgProcessingTime(where?: {
-    tahun_ajaran?: string;
+    kode_tahun_ajaran?: string;
   }): Promise<number | null> {
     const result = await prisma.pendaftaran.findMany({
       where: {
@@ -485,7 +485,7 @@ export default class PendaftaranRepository {
     return {
       id: pendaftaran.id,
       nim: pendaftaran.nim,
-      tahun_ajaran: pendaftaran.tahun_ajaran,
+      kode_tahun_ajaran: pendaftaran.kode_tahun_ajaran,
       id_pengajuan_fst: pendaftaran.id_pengajuan_fst,
       id_jenis_seminar: pendaftaran.id_jenis_seminar,
       nip_pembimbing_1: pendaftaran.nip_pembimbing_1,

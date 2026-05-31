@@ -41,8 +41,12 @@ export class CacheInvalidation {
     await redisService.delByPattern('jenis-seminar:*');
   }
 
-  public static async invalidateBobotPenilaianRole() {
-    await redisService.delByPattern('bobot-penilaian-role:*');
+  public static async invalidateBobotPenilai() {
+    await redisService.delByPattern('bobot-penilai:*');
+  }
+
+  public static async invalidateKomponenPenilaian() {
+    await redisService.delByPattern('komponen-penilaian:*');
   }
 }
 

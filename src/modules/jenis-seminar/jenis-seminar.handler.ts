@@ -1,9 +1,6 @@
-import { Context } from 'hono';
+import type { Context } from 'hono';
 import JenisSeminarService from './jenis-seminar.service';
-import {
-  CreateJenisSeminarType,
-  UpdateJenisSeminarType,
-} from './jenis-seminar.type';
+import type { UpsertJenisSeminarType } from './jenis-seminar.type';
 
 export default class JenisSeminarHandler {
   public static async getAll(c: Context) {
@@ -16,15 +13,10 @@ export default class JenisSeminarHandler {
     return c.json(await JenisSeminarService.getByKode(kode));
   }
 
-  public static async create(c: Context) {
-    const body = (await c.req.json()) as CreateJenisSeminarType;
-    return c.json(await JenisSeminarService.create(body), 201);
-  }
-
-  public static async update(c: Context) {
-    const { id } = c.req.param();
-    const body = (await c.req.json()) as UpdateJenisSeminarType;
-    return c.json(await JenisSeminarService.update(id, body));
+  public static async upsert(c: Context) {
+    const body = (await c.req.json()) as UpsertJenisSeminarType;
+    const result = await JenisSeminarService.upsert(body);
+    return c.json(result, result.data.was_created ? 201 : 200);
   }
 
   public static async delete(c: Context) {

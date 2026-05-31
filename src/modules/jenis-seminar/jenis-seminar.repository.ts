@@ -1,8 +1,5 @@
 import prisma from '../../infrastructures/db.infrastructure';
-import {
-  CreateJenisSeminarType,
-  UpdateJenisSeminarType,
-} from './jenis-seminar.type';
+import type { UpsertJenisSeminarType } from './jenis-seminar.type';
 
 export default class JenisSeminarRepository {
   public static async findAll(onlyAktif: boolean = false) {
@@ -48,9 +45,10 @@ export default class JenisSeminarRepository {
     });
   }
 
-  public static async create(data: CreateJenisSeminarType) {
-    return prisma.jenis_seminar.create({
-      data: {
+  public static async upsert(data: UpsertJenisSeminarType) {
+    return prisma.jenis_seminar.upsert({
+      where: { kode: data.kode },
+      create: {
         kode: data.kode,
         nama: data.nama,
         deskripsi: data.deskripsi,
@@ -59,13 +57,14 @@ export default class JenisSeminarRepository {
         wajib_penguji: data.wajib_penguji ?? 2,
         ada_ketua_sidang: data.ada_ketua_sidang ?? false,
       },
-    });
-  }
-
-  public static async update(id: string, data: UpdateJenisSeminarType) {
-    return prisma.jenis_seminar.update({
-      where: { id },
-      data,
+      update: {
+        nama: data.nama,
+        deskripsi: data.deskripsi,
+        is_aktif: data.is_aktif,
+        wajib_pembimbing: data.wajib_pembimbing,
+        wajib_penguji: data.wajib_penguji,
+        ada_ketua_sidang: data.ada_ketua_sidang,
+      },
     });
   }
 

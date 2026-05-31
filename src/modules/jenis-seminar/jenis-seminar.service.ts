@@ -5,10 +5,7 @@ import redisService from '../../infrastructures/redis.infrastructure';
 import CacheInvalidation from '../../utils/cache-invalidation.util';
 import { normalizeCachePart } from '../../utils/cache-key.util';
 import JenisSeminarRepository from './jenis-seminar.repository';
-import type {
-  CreateJenisSeminarType,
-  UpdateJenisSeminarType,
-} from './jenis-seminar.type';
+import type { UpsertJenisSeminarType } from './jenis-seminar.type';
 
 export default class JenisSeminarService {
   public static async getAll(onlyAktif: boolean = false) {
@@ -39,63 +36,31 @@ export default class JenisSeminarService {
     });
   }
 
-  public static async create(payload: CreateJenisSeminarType) {
+  public static async upsert(payload: UpsertJenisSeminarType) {
     const existing = await JenisSeminarRepository.findByKode(payload.kode);
-    if (existing) {
-      throw new APIError(
-        `Jenis seminar dengan kode "${payload.kode}" sudah ada.`,
-        409
-      );
-    }
+    const data = await JenisSeminarRepository.upsert(payload);
+    const wasCreated = !existing;
 
-    const data = await JenisSeminarRepository.create(payload);
     await LogService.createEntityLog({
-      action: LogActionType.CREATE,
+      action: wasCreated ? LogActionType.CREATE : LogActionType.UPDATE,
       actor_type: LogActorType.KOORDINATOR,
       actor_id: 'system',
       entity_type: LogEntityType.JENIS_SEMINAR,
       entity_id: data.id,
+      old_values: existing ?? undefined,
       new_values: data,
     });
     await CacheInvalidation.invalidateJenisSeminar();
+
     return {
       response: true,
-      message: 'Jenis seminar berhasil ditambahkan.',
-      data,
-    };
-  }
-
-  public static async update(id: string, payload: UpdateJenisSeminarType) {
-    const existing = await JenisSeminarRepository.findById(id);
-    if (!existing) {
-      throw new APIError('Jenis seminar tidak ditemukan.', 404);
-    }
-
-    if (payload.kode && payload.kode !== existing.kode) {
-      const duplicate = await JenisSeminarRepository.findByKode(payload.kode);
-      if (duplicate) {
-        throw new APIError(
-          `Jenis seminar dengan kode "${payload.kode}" sudah ada.`,
-          409
-        );
-      }
-    }
-
-    const data = await JenisSeminarRepository.update(id, payload);
-    await LogService.createEntityLog({
-      action: LogActionType.UPDATE,
-      actor_type: LogActorType.KOORDINATOR,
-      actor_id: 'system',
-      entity_type: LogEntityType.JENIS_SEMINAR,
-      entity_id: data.id,
-      old_values: existing,
-      new_values: data,
-    });
-    await CacheInvalidation.invalidateJenisSeminar();
-    return {
-      response: true,
-      message: 'Jenis seminar berhasil diperbarui.',
-      data,
+      message: wasCreated
+        ? 'Jenis seminar berhasil ditambahkan.'
+        : 'Jenis seminar berhasil diperbarui.',
+      data: {
+        ...data,
+        was_created: wasCreated,
+      },
     };
   }
 

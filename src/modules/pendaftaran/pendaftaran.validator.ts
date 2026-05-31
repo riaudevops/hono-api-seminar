@@ -7,7 +7,7 @@ export const getAllPendaftaranQuerySchema = z.object({
   jenis_seminar: z.string().trim().min(1).optional(),
   status_berkas: z.nativeEnum(StatusBerkas).optional(),
   status_jadwal: z.nativeEnum(StatusJadwal).optional(),
-  tahun_ajaran: z.string().optional(),
+  kode_tahun_ajaran: z.string().optional(),
   nim: z.string().optional(),
   q: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
@@ -15,10 +15,8 @@ export const getAllPendaftaranQuerySchema = z.object({
 });
 
 export const dashboardQuerySchema = z.object({
-  tahun_ajaran: z.string().optional(),
+  kode_tahun_ajaran: z.string().optional(),
 });
-
-const tahunAjaranSchema = z.string().max(5, 'Tahun ajaran maksimal 5 karakter');
 
 const idPengajuanFstSchema = z
   .string()

@@ -7,6 +7,8 @@ import KomponenPenilaianHandler from './komponen-penilaian.handler';
 import {
   createKomponenPenilaianSchema,
   getAllKomponenPenilaianQuerySchema,
+  getKomponenByRoleParamSchema,
+  getKomponenByRoleQuerySchema,
   updateKomponenPenilaianSchema,
   toggleStatusKomponenSchema,
 } from './komponen-penilaian.validator';
@@ -17,6 +19,13 @@ komponenRoute.get(
   '/data-master/komponen-penilaian',
   zValidator('query', getAllKomponenPenilaianQuerySchema, zodError),
   KomponenPenilaianHandler.getAll
+);
+
+komponenRoute.get(
+  '/data-master/komponen-penilaian/role/:role',
+  zValidator('param', getKomponenByRoleParamSchema, zodError),
+  zValidator('query', getKomponenByRoleQuerySchema, zodError),
+  KomponenPenilaianHandler.getByRole
 );
 
 komponenRoute.post(

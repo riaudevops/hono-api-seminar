@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 
 type PrismaClientOrTx = any;
@@ -101,17 +101,6 @@ export default class JadwalRepository {
 
   public static async count(filters: JadwalFilter = {}) {
     return await prisma.jadwal.count({ where: buildWhere(filters) });
-  }
-
-  public static async getDistinctTahunAjaran(): Promise<string[]> {
-    const rows = await prisma.jadwal.findMany({
-      select: { kode_tahun_ajaran: true },
-      distinct: ['kode_tahun_ajaran'],
-    });
-
-    return rows
-      .map((row) => row.kode_tahun_ajaran)
-      .sort((a, b) => b.localeCompare(a));
   }
 
   public static async findById(id: string, client: PrismaClientOrTx = prisma) {

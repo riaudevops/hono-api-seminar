@@ -88,6 +88,14 @@ const envSchema = z.object({
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
 
+  // Google Drive Configuration
+  GOOGLE_DRIVE_CLIENT_EMAIL: z.string().optional(),
+  GOOGLE_DRIVE_PRIVATE_KEY: z
+    .string()
+    .transform((val) => val.replace(/\\n/g, '\n'))
+    .optional(),
+  GOOGLE_DRIVE_FOLDER_ID: z.string().optional(),
+
   // Webhook Configuration
   WEBHOOK_SECRET: z.string().default('change-this-webhook-secret'),
 
@@ -305,6 +313,15 @@ class Config {
       url,
       keyPrefix: this.config.REDIS_KEY_PREFIX,
       defaultTtlSeconds: this.config.REDIS_DEFAULT_TTL_SECONDS,
+    };
+  }
+
+  // Google Drive getters
+  public get googleDrive() {
+    return {
+      clientEmail: this.config.GOOGLE_DRIVE_CLIENT_EMAIL,
+      privateKey: this.config.GOOGLE_DRIVE_PRIVATE_KEY,
+      folderId: this.config.GOOGLE_DRIVE_FOLDER_ID,
     };
   }
 

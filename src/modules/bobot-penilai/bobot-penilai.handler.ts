@@ -1,15 +1,15 @@
 import type { Context } from 'hono';
 import { APIError } from '../../utils/api-error.util';
 import { LogService } from '../log';
-import BobotPenilaianRoleService from './bobot-penilaian-role.service';
+import BobotPenilaiService from './bobot-penilai.service';
 import type {
   UpdateSingleBobotInput,
-  UpsertBobotPenilaianRoleInput,
-} from './bobot-penilaian-role.type';
+  UpsertBobotPenilaiInput,
+} from './bobot-penilai.type';
 
-export default class BobotPenilaianRoleHandler {
+export default class BobotPenilaiHandler {
   public static async getAll(c: Context) {
-    return c.json(await BobotPenilaianRoleService.getAll());
+    return c.json(await BobotPenilaiService.getAll());
   }
 
   public static async getByJenisSeminar(c: Context) {
@@ -18,16 +18,24 @@ export default class BobotPenilaianRoleHandler {
       throw new APIError('Parameter id_jenis_seminar wajib diisi.', 400);
     }
     return c.json(
-      await BobotPenilaianRoleService.getByJenisSeminar(id_jenis_seminar)
+      await BobotPenilaiService.getByJenisSeminar(id_jenis_seminar)
     );
   }
 
+  public static async getByKodeJenisSeminar(c: Context) {
+    const kode = c.req.param('kode');
+    if (!kode) {
+      throw new APIError('Parameter kode wajib diisi.', 400);
+    }
+    return c.json(await BobotPenilaiService.getByKodeJenisSeminar(kode));
+  }
+
   public static async upsertBatch(c: Context) {
-    const body = (c.req as any).valid('json') as UpsertBobotPenilaianRoleInput;
+    const body = (c.req as any).valid('json') as UpsertBobotPenilaiInput;
     const actor = LogService.getActorContext(
       c.get('user') as Parameters<typeof LogService.getActorContext>[0]
     );
-    return c.json(await BobotPenilaianRoleService.upsertBatch(body, actor));
+    return c.json(await BobotPenilaiService.upsertBatch(body, actor));
   }
 
   public static async updateSingle(c: Context) {
@@ -38,7 +46,7 @@ export default class BobotPenilaianRoleHandler {
       c.get('user') as Parameters<typeof LogService.getActorContext>[0]
     );
     return c.json(
-      await BobotPenilaianRoleService.updateSingle(id, body, actor)
+      await BobotPenilaiService.updateSingle(id, body, actor)
     );
   }
 
@@ -48,6 +56,6 @@ export default class BobotPenilaianRoleHandler {
     const actor = LogService.getActorContext(
       c.get('user') as Parameters<typeof LogService.getActorContext>[0]
     );
-    return c.json(await BobotPenilaianRoleService.deleteOne(id, actor));
+    return c.json(await BobotPenilaiService.deleteOne(id, actor));
   }
 }

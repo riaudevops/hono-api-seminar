@@ -29,7 +29,7 @@ export interface GetAllParams {
   jenis_seminar?: string;
   status_berkas?: StatusBerkas;
   status_jadwal?: StatusJadwal;
-  tahun_ajaran?: string;
+  kode_tahun_ajaran?: string;
   nim?: string;
   q?: string;
   page?: number;
@@ -52,7 +52,7 @@ export default class PendaftaranService {
           jenis_seminar,
           status_berkas,
           status_jadwal,
-          tahun_ajaran,
+          kode_tahun_ajaran,
           nim,
           q,
           page = 1,
@@ -87,9 +87,9 @@ export default class PendaftaranService {
           );
         }
 
-        if (tahun_ajaran) {
+        if (kode_tahun_ajaran) {
           pendaftaran = pendaftaran.filter(
-            (p) => p.tahun_ajaran === tahun_ajaran
+            (p) => p.kode_tahun_ajaran === kode_tahun_ajaran
           );
         }
 
@@ -122,8 +122,8 @@ export default class PendaftaranService {
           .slice(skip, skip + limit)
           .map(({ data_pendaftaran, ...item }) => ({
             ...item,
-            tahun_ajaran_nama: TahunAjaranHelper.parseStringNameByCode(
-              item.tahun_ajaran
+            kode_tahun_ajaran_nama: TahunAjaranHelper.parseStringNameByCode(
+              item.kode_tahun_ajaran
             ),
           }));
 
@@ -146,14 +146,14 @@ export default class PendaftaranService {
   // Koordinator: dashboard statistik
   // ===========================================================================
   public static async getDashboard(
-    params: { tahun_ajaran?: string } = {}
+    params: { kode_tahun_ajaran?: string } = {}
   ): Promise<PendaftaranDashboardResponse> {
     return redisService.remember(
       `pendaftaran:dashboard:${hashCacheKey(params)}`,
       300,
       async () => {
-        const { tahun_ajaran } = params;
-        const where = tahun_ajaran ? { tahun_ajaran } : undefined;
+        const { kode_tahun_ajaran } = params;
+        const where = kode_tahun_ajaran ? { kode_tahun_ajaran } : undefined;
 
         const [total, statusCounts, avgProcessingTime] = await Promise.all([
           prisma.pendaftaran.count({ where }),
@@ -388,17 +388,17 @@ export default class PendaftaranService {
       );
     }
 
-    const tahun_ajaran = TahunAjaranHelper.findSekarang();
+    const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
     const alreadyRegistered =
       await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
         mahasiswa.nim,
         payload.id_jenis_seminar,
-        tahun_ajaran
+        kode_tahun_ajaran
       );
     if (alreadyRegistered) {
       throw new APIError(
-        `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(tahun_ajaran)}.`,
+        `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(kode_tahun_ajaran)}.`,
         409
       );
     }
@@ -406,14 +406,14 @@ export default class PendaftaranService {
     await PendaftaranService.ensureForeignKeysExist(payload);
     const id = await PendaftaranService.generateId(
       payload.id_jenis_seminar,
-      tahun_ajaran
+      kode_tahun_ajaran
     );
 
     const data = await PendaftaranRepository.createWithDataDokumen({
       ...payload,
       id,
       nim: mahasiswa.nim,
-      tahun_ajaran,
+      kode_tahun_ajaran,
     });
     await LogService.createEntityLog({
       action: LogActionType.CREATE,
@@ -492,11 +492,11 @@ export default class PendaftaranService {
         await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
           mahasiswa.nim,
           payload.id_jenis_seminar,
-          existing.tahun_ajaran
+          existing.kode_tahun_ajaran
         );
       if (alreadyRegistered && alreadyRegistered.id !== id) {
         throw new APIError(
-          `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(existing.tahun_ajaran)}.`,
+          `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(existing.kode_tahun_ajaran)}.`,
           409
         );
       }

@@ -1,4 +1,4 @@
-import { Context } from 'hono';
+import type { Context } from 'hono';
 import { LogEntityType } from '@prisma/client';
 import JadwalService from './jadwal.service';
 import { APIError } from '../../utils/api-error.util';
@@ -52,10 +52,6 @@ export default class JadwalHandler {
 
   public static async getAll(c: Context) {
     return c.json(await JadwalService.getAll(c.req.query() as any));
-  }
-
-  public static async getAllTahunAjaran(c: Context) {
-    return c.json(await JadwalService.getAllTahunAjaran());
   }
 
   public static async get(c: Context) {

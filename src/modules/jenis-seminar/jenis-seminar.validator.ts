@@ -27,19 +27,9 @@ const jumlahSchema = z
   .min(0, 'Tidak boleh negatif')
   .max(10, 'Maksimal 10');
 
-export const postJenisSeminarSchema = z.object({
+export const upsertJenisSeminarSchema = z.object({
   kode: kodeSchema,
   nama: namaSchema,
-  deskripsi: deskripsiSchema,
-  is_aktif: z.boolean().optional(),
-  wajib_pembimbing: jumlahSchema.optional(),
-  wajib_penguji: jumlahSchema.optional(),
-  ada_ketua_sidang: z.boolean().optional(),
-});
-
-export const putJenisSeminarSchema = z.object({
-  kode: kodeSchema.optional(),
-  nama: namaSchema.optional(),
   deskripsi: deskripsiSchema.nullable(),
   is_aktif: z.boolean().optional(),
   wajib_pembimbing: jumlahSchema.optional(),

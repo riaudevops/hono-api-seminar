@@ -46,7 +46,7 @@ enum LogEntityType {
   KOMPONEN_PENILAIAN
   JADWAL_DRAFT
   LOG
-  BOBOT_PENILAIAN_ROLE
+  BOBOT_PENILAI
 }
 
 enum StatusJadwalDraft {
@@ -287,12 +287,12 @@ model jenis_seminar {
   pendaftaran   pendaftaran[]
   jadwal        jadwal[]
   jadwal_draft  jadwal_draft[]
-  bobot_penilaian_role bobot_penilaian_role[]
+  bobot_penilai bobot_penilai[]
 
   @@index([kode])
 }
 
-model bobot_penilaian_role {
+model bobot_penilai {
   id               String      @id @default(cuid())
   id_jenis_seminar String
   role             PenilaiRole
@@ -354,7 +354,7 @@ model requirement_dokumen {
 model pendaftaran {
   id                String       @id @default(cuid())
   nim               String       @db.VarChar(11)
-  tahun_ajaran      String       @db.VarChar(5)
+  kode_tahun_ajaran      String       @db.VarChar(5)
   id_pengajuan_fst  String       @unique @db.VarChar(50)
 
   id_jenis_seminar  String
@@ -378,7 +378,7 @@ model pendaftaran {
   @@index([nim])
   @@index([id_jenis_seminar])
   @@index([status_berkas])
-  @@index([tahun_ajaran, id_jenis_seminar])
+  @@index([kode_tahun_ajaran, id_jenis_seminar])
 }
 
 model data_pendaftaran {

@@ -1,6 +1,6 @@
 import type { PenilaiRole } from '@prisma/client';
 
-export interface BobotPenilaianRoleType {
+export interface BobotPenilaiType {
   id: string;
   id_jenis_seminar: string;
   role: PenilaiRole;
@@ -14,7 +14,7 @@ export interface UpsertBobotItem {
   persentase: number;
 }
 
-export interface UpsertBobotPenilaianRoleInput {
+export interface UpsertBobotPenilaiInput {
   id_jenis_seminar: string;
   bobot: UpsertBobotItem[];
 }

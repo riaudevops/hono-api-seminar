@@ -49,12 +49,6 @@ jadwalRoute.get(
   JadwalHandler.getAll
 );
 
-// jadwalRoute.get(
-//   '/koordinator/jadwal/detail/tahun-ajaran',
-//   AuthMiddleware.JWTBearerTokenExtraction,
-//   JadwalHandler.getAllTahunAjaran
-// );
-
 jadwalRoute.get(
   '/koordinator/jadwal/:id/logs',
   AuthMiddleware.JWTBearerTokenExtraction,

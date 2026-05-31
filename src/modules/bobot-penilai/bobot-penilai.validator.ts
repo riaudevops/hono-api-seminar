@@ -12,7 +12,7 @@ const bobotItemSchema = z.object({
   persentase: persentaseSchema,
 });
 
-export const upsertBobotPenilaianRoleSchema = z
+export const upsertBobotPenilaiSchema = z
   .object({
     id_jenis_seminar: z.string().min(1, 'id_jenis_seminar wajib diisi'),
     bobot: z.array(bobotItemSchema).min(1, 'Minimal satu role harus diisi'),

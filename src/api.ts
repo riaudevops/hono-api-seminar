@@ -8,7 +8,7 @@ import { DosenModuleRoute } from './modules/dosen';
 import { ConstraintDosenModuleRoute } from './modules/constraint-dosen';
 import { JadwalDraftModuleRoute } from './modules/jadwal-draft';
 import { BidangKeahlianRoute } from './modules/bidang-keahlian';
-import { BobotPenilaianRoleModuleRoute } from './modules/bobot-penilaian-role';
+import { BobotPenilaiModuleRoute } from './modules/bobot-penilai';
 import { KeahlianDosenRoute } from './modules/keahlian-dosen';
 import dosenSeminarRoute from './routes/dosen-seminar.route';
 import koordinatorRoute from './routes/koordinator.route';
@@ -20,6 +20,7 @@ import { MahasiswaModuleRoute } from './modules/mahasiswa';
 import { LogModuleRoute } from './modules/log';
 import { DetailPenilaianRoute } from './modules/detail-penilaian';
 import { TahunAjaranRoute } from './modules/tahun-ajaran';
+import { UploadRoute } from './modules/upload';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 
 const apiRouter = new OpenAPIHono({
@@ -36,7 +37,7 @@ const routes = [
   ConstraintDosenModuleRoute,
   JadwalDraftModuleRoute,
   BidangKeahlianRoute,
-  BobotPenilaianRoleModuleRoute,
+  BobotPenilaiModuleRoute,
   KeahlianDosenRoute,
   dosenSeminarRoute,
   koordinatorRoute,
@@ -48,6 +49,7 @@ const routes = [
   DetailPenilaianRoute,
   LogModuleRoute,
   TahunAjaranRoute,
+  UploadRoute,
 ];
 
 routes.forEach((route) => {

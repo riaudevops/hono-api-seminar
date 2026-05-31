@@ -4,7 +4,7 @@ import type { PaginatedResponse } from '../../types/global.type';
 export interface PendaftaranType {
   id: string;
   nim: string;
-  tahun_ajaran: string;
+  kode_tahun_ajaran: string;
   id_pengajuan_fst: string;
   id_jenis_seminar: string;
   nip_pembimbing_1: string;
@@ -42,7 +42,7 @@ export interface PendaftaranWithRelations extends PendaftaranType {
 
 export type GetAllPendaftaranResponse = PaginatedResponse<
   Omit<PendaftaranWithDataDokumen, 'data_pendaftaran'> & {
-    tahun_ajaran_nama: string;
+    kode_tahun_ajaran_nama: string;
   }
 >;
 

@@ -1,6 +1,15 @@
 import prisma from '../../infrastructures/db.infrastructure';
 import { APIError } from '../../utils/api-error.util';
-import { LogActionType, LogActorType, LogEntityType, PenilaiRole, Prisma } from '@prisma/client';
+import redisService from '../../infrastructures/redis.infrastructure';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { hashCacheKey } from '../../utils/cache-key.util';
+import {
+  LogActionType,
+  LogActorType,
+  LogEntityType,
+  type PenilaiRole,
+  Prisma,
+} from '@prisma/client';
 import { LogService } from '../log';
 
 export interface CreateKomponenInput {
@@ -34,7 +43,7 @@ export default class KomponenPenilaianService {
   }
 
   private static async generateKomponenId(role: PenilaiRole): Promise<string> {
-    const prefix = this.getIdPrefixByRole(role);
+    const prefix = KomponenPenilaianService.getIdPrefixByRole(role);
     const idPrefix = `${prefix}-`;
 
     const existingIds = await prisma.komponen_penilaian.findMany({
@@ -66,39 +75,85 @@ export default class KomponenPenilaianService {
   /**
    * Mengambil semua komponen penilaian, opsional difilter berdasarkan role dan status aktif
    */
-  public static async getAll(filters: {
-    role?: PenilaiRole;
-    is_aktif?: boolean;
-  } = {}) {
-    const komponen = await prisma.komponen_penilaian.findMany({
-      where: {
-        ...(filters.role ? { role: filters.role } : {}),
-        ...(filters.is_aktif !== undefined ? { is_aktif: filters.is_aktif } : {}),
-      },
-      orderBy: [{ role: 'asc' }, { is_aktif: 'desc' }, { id: 'asc' }],
-    });
+  public static async getAll(
+    filters: {
+      role?: PenilaiRole;
+      is_aktif?: boolean;
+    } = {}
+  ) {
+    const cacheKey = `komponen-penilaian:list:${hashCacheKey(filters)}`;
+    return redisService.remember(cacheKey, 1_800, async () => {
+      const komponen = await prisma.komponen_penilaian.findMany({
+        where: {
+          ...(filters.role ? { role: filters.role } : {}),
+          ...(filters.is_aktif !== undefined
+            ? { is_aktif: filters.is_aktif }
+            : {}),
+        },
+        orderBy: [{ role: 'asc' }, { is_aktif: 'desc' }, { id: 'asc' }],
+      });
 
-    return {
-      response: true,
-      message: 'Data komponen penilaian berhasil diambil',
-      data: komponen,
-    };
+      return {
+        response: true,
+        message: 'Data komponen penilaian berhasil diambil',
+        data: komponen,
+      };
+    });
+  }
+
+  /**
+   * Mengambil komponen penilaian berdasarkan role.
+   * Default hanya komponen yang aktif; teruskan `is_aktif: false` untuk inklusif.
+   */
+  public static async getByRole(
+    role: PenilaiRole,
+    options: { is_aktif?: boolean } = {}
+  ) {
+    const cacheKey = `komponen-penilaian:by-role:${role}:${hashCacheKey(options)}`;
+    return redisService.remember(cacheKey, 1_800, async () => {
+      const includeAll = options.is_aktif === false;
+      const komponen = await prisma.komponen_penilaian.findMany({
+        where: {
+          role,
+          ...(includeAll ? {} : { is_aktif: true }),
+        },
+        orderBy: [{ is_aktif: 'desc' }, { id: 'asc' }],
+      });
+
+      const total = komponen
+        .filter((k) => k.is_aktif)
+        .reduce((sum, k) => sum + k.persentase, 0);
+
+      return {
+        response: true,
+        message: `Data komponen penilaian untuk role ${role} berhasil diambil`,
+        data: {
+          role,
+          komponen,
+          total_persentase_aktif: total,
+          is_complete: total === 100,
+        },
+      };
+    });
   }
 
   /**
    * Mengambil daftar komponen penilaian yang sedang aktif untuk suatu role
    */
   public static async getActiveByRole(role: PenilaiRole) {
-    const komponen = await prisma.komponen_penilaian.findMany({
-      where: { role, is_aktif: true },
-      orderBy: { id: 'asc' },
-    });
+    const cacheKey = `komponen-penilaian:active-by-role:${role}`;
+    return redisService.remember(cacheKey, 1_800, async () => {
+      const komponen = await prisma.komponen_penilaian.findMany({
+        where: { role, is_aktif: true },
+        orderBy: { id: 'asc' },
+      });
 
-    return {
-      response: true,
-      message: `Data komponen penilaian aktif untuk role ${role} berhasil diambil`,
-      data: komponen,
-    };
+      return {
+        response: true,
+        message: `Data komponen penilaian aktif untuk role ${role} berhasil diambil`,
+        data: komponen,
+      };
+    });
   }
 
   /**
@@ -140,7 +195,10 @@ export default class KomponenPenilaianService {
   public static async create(data: CreateKomponenInput) {
     // Jika komponen akan langsung diaktifkan, validasi total persentasenya
     if (data.is_aktif !== false) {
-      await this.validatePercentageLimit(data.role, data.persentase);
+      await KomponenPenilaianService.validatePercentageLimit(
+        data.role,
+        data.persentase
+      );
     }
 
     let newComponent: Awaited<
@@ -148,7 +206,9 @@ export default class KomponenPenilaianService {
     > | null = null;
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      const generatedId = await this.generateKomponenId(data.role);
+      const generatedId = await KomponenPenilaianService.generateKomponenId(
+        data.role
+      );
 
       try {
         newComponent = await prisma.komponen_penilaian.create({
@@ -187,6 +247,8 @@ export default class KomponenPenilaianService {
       new_values: newComponent,
     });
 
+    await CacheInvalidation.invalidateKomponenPenilaian();
+
     return {
       response: true,
       message: 'Komponen penilaian berhasil dibuat',
@@ -212,7 +274,11 @@ export default class KomponenPenilaianService {
 
     // Jika komponen akan berakhir dalam status aktif, validasi total persentasenya
     if (isAktifToAsses) {
-      await this.validatePercentageLimit(roleToAsses, persentaseToAsses, id);
+      await KomponenPenilaianService.validatePercentageLimit(
+        roleToAsses,
+        persentaseToAsses,
+        id
+      );
     }
 
     const updatedComponent = await prisma.komponen_penilaian.update({
@@ -233,6 +299,8 @@ export default class KomponenPenilaianService {
       old_values: existing,
       new_values: updatedComponent,
     });
+
+    await CacheInvalidation.invalidateKomponenPenilaian();
 
     return {
       response: true,
@@ -277,6 +345,8 @@ export default class KomponenPenilaianService {
       old_values: existing,
     });
 
+    await CacheInvalidation.invalidateKomponenPenilaian();
+
     return {
       response: true,
       message: 'Komponen penilaian berhasil dihapus',
@@ -297,7 +367,7 @@ export default class KomponenPenilaianService {
 
     // Jika diaktifkan, pastikan totalnya tidak lebih dari 100%
     if (is_aktif) {
-      await this.validatePercentageLimit(
+      await KomponenPenilaianService.validatePercentageLimit(
         existing.role,
         existing.persentase,
         id
@@ -332,6 +402,8 @@ export default class KomponenPenilaianService {
     if (currentTotal < 100) {
       warningMsg = `Total persentase komponen aktif untuk role ${existing.role} sekarang adalah ${currentTotal}%. Anda perlu menambah atau mengaktifkan komponen lain agar mencapai 100%.`;
     }
+
+    await CacheInvalidation.invalidateKomponenPenilaian();
 
     return {
       response: true,
