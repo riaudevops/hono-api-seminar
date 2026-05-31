@@ -4,7 +4,6 @@ import DosenHandler from './dosen.handler';
 
 const dosenModuleRoute = new Hono({ router: new RegExpRouter() });
 
-dosenModuleRoute.get('/dosen/search', DosenHandler.search);
-dosenModuleRoute.get('/dosen', DosenHandler.getAll);
+dosenModuleRoute.get('/data-master/dosen', DosenHandler.getAll);
 
 export default dosenModuleRoute;

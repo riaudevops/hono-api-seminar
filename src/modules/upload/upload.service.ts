@@ -23,6 +23,19 @@ export interface UploadDriveFilePayload {
 }
 
 export default class UploadService {
+  public static async deleteDriveFile(fileId: string) {
+    if (!fileId.trim()) {
+      throw new APIError('ID file Google Drive wajib diisi.', 400);
+    }
+
+    await googleDriveService.deleteFile(fileId.trim());
+
+    return {
+      response: true,
+      message: 'File berhasil dihapus dari Google Drive.',
+    };
+  }
+
   public static async uploadRegistrationFile(
     payload: UploadDriveFilePayload
   ): Promise<DriveUploadResponse> {
@@ -34,6 +47,7 @@ export default class UploadService {
     const driveFile = await googleDriveService.uploadFile({
       file: payload.file,
       fileName: UploadService.buildFileName(payload),
+      folderPath: UploadService.buildFolderPath(payload),
     });
 
     return {
@@ -78,12 +92,7 @@ export default class UploadService {
 
   private static buildFileName(payload: UploadDriveFilePayload) {
     const extension = UploadService.getFileExtension(payload.file.name);
-    const parts = [
-      payload.nim,
-      payload.jenisSeminar,
-      payload.kodeDokumen ?? payload.idDokumenTemplate,
-      Date.now().toString(),
-    ]
+    const parts = [payload.kodeDokumen ?? payload.idDokumenTemplate]
       .filter(Boolean)
       .map((part) => UploadService.sanitizeFileNamePart(part!));
 
@@ -92,6 +101,13 @@ export default class UploadService {
         ? parts.join('_')
         : UploadService.sanitizeFileNamePart(payload.file.name);
     return extension ? `${baseName}.${extension}` : baseName;
+  }
+
+  private static buildFolderPath(payload: UploadDriveFilePayload) {
+    return [payload.jenisSeminar, payload.nim]
+      .filter(Boolean)
+      .map((part) => UploadService.sanitizeFileNamePart(part!))
+      .filter(Boolean);
   }
 
   private static getFileExtension(fileName: string) {

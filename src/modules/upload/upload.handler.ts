@@ -3,9 +3,36 @@ import UploadService from './upload.service';
 import { APIError } from '../../utils/api-error.util';
 
 export default class UploadHandler {
+  public static async deleteDriveFile(c: Context) {
+    const fileId = c.req.param('fileId');
+    if (!fileId) {
+      throw new APIError('ID file Google Drive wajib diisi.', 400);
+    }
+
+    return c.json(await UploadService.deleteDriveFile(fileId));
+  }
+
   public static async uploadDriveFile(c: Context) {
     const { email, nim } = c.get('user') as { email?: string; nim?: string };
-    const body = await c.req.parseBody();
+    const contentType = c.req.header('content-type') ?? '';
+
+    if (!contentType.toLowerCase().includes('multipart/form-data')) {
+      throw new APIError(
+        'Request upload wajib menggunakan multipart/form-data.',
+        400
+      );
+    }
+
+    let body: Awaited<ReturnType<typeof c.req.parseBody>>;
+    try {
+      body = await c.req.parseBody();
+    } catch {
+      throw new APIError(
+        'Body multipart/form-data tidak valid. Jika upload dari browser, jangan set header Content-Type secara manual.',
+        400
+      );
+    }
+
     const file = body.file;
 
     if (!(file instanceof File)) {

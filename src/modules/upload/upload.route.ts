@@ -13,4 +13,11 @@ uploadRoute.post(
   UploadHandler.uploadDriveFile
 );
 
+uploadRoute.delete(
+  '/mahasiswa/uploads/drive/:fileId',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  UploadHandler.deleteDriveFile
+);
+
 export default uploadRoute;
