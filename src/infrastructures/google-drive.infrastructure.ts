@@ -52,7 +52,7 @@ class GoogleDriveService {
     const auth = new google.auth.JWT({
       email: driveConfig.clientEmail,
       key: driveConfig.privateKey,
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      scopes: ['https://www.googleapis.com/auth/drive'],
     });
 
     this.drive = google.drive({ version: 'v3', auth });
@@ -86,6 +86,7 @@ class GoogleDriveService {
           body: Readable.from(buffer),
         },
         fields: 'id,name,mimeType,webViewLink,webContentLink',
+        supportsAllDrives: true,
       });
 
       const file = created.data;
@@ -99,11 +100,13 @@ class GoogleDriveService {
           type: 'anyone',
           role: 'reader',
         },
+        supportsAllDrives: true,
       });
 
       const metadata = await drive.files.get({
         fileId: file.id,
         fields: 'id,name,mimeType,webViewLink,webContentLink',
+        supportsAllDrives: true,
       });
 
       if (!metadata.data.webViewLink) {

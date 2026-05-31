@@ -9,7 +9,6 @@ const uploadRoute = new Hono({ router: new RegExpRouter() });
 uploadRoute.post(
   '/mahasiswa/uploads/drive',
   AuthMiddleware.JWTBearerTokenExtraction,
-  AuthMiddleware.requireRole('mahasiswa'),
   RateLimitMiddleware.write(),
   UploadHandler.uploadDriveFile
 );
