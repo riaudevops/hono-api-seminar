@@ -14,6 +14,7 @@ import CacheInvalidation from '../../utils/cache-invalidation.util';
 import { hashCacheKey } from '../../utils/cache-key.util';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
+import PendaftaranEmailService from './pendaftaran-email.service';
 import PendaftaranRepository from './pendaftaran.repository';
 import type {
   CreatePendaftaranByMahasiswaType,
@@ -235,6 +236,11 @@ export default class PendaftaranService {
       new_values: data,
     });
     await CacheInvalidation.invalidatePendaftaran();
+
+    if (existing.status_berkas !== data.status_berkas) {
+      PendaftaranEmailService.notifyStatusValidated(data.id);
+    }
+
     return {
       response: true,
       message: `Status berkas berhasil diubah ke "${payload.status_berkas}".`,
@@ -425,6 +431,8 @@ export default class PendaftaranService {
     });
     await CacheInvalidation.invalidatePendaftaran();
 
+    PendaftaranEmailService.notifyCreated(data.id);
+
     return {
       response: true,
       message: 'Pendaftaran berhasil ditambahkan.',
@@ -516,9 +524,10 @@ export default class PendaftaranService {
     ]);
 
     const data = await PendaftaranRepository.update(id, payload);
+    let latestData = data;
 
     if (payload.dokumen) {
-      await PendaftaranRepository.updateStatusBerkas(id, {
+      latestData = await PendaftaranRepository.updateStatusBerkas(id, {
         status_berkas: 'UPLOAD_ULANG',
       });
     }
@@ -530,13 +539,16 @@ export default class PendaftaranService {
       entity_type: LogEntityType.PENDAFTARAN,
       entity_id: data.id,
       old_values: existing,
-      new_values: data,
+      new_values: latestData,
     });
     await CacheInvalidation.invalidatePendaftaran();
+
+    PendaftaranEmailService.notifyUpdated(latestData.id);
+
     return {
       response: true,
       message: 'Pendaftaran berhasil diperbarui.',
-      data,
+      data: latestData,
     };
   }
 
