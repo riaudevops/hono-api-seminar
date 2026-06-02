@@ -7,18 +7,30 @@ console.log('[INFO] Seeding database...');
 async function main() {
   console.log('[DEBUG] Running createMany...');
 
-  // 1. Seeder Ruangan
+  const dataRuangan = [
+    { kode: 'FST-301', nama: 'FST-301', urutan: 1 },
+    { kode: 'FST-302', nama: 'FST-302', urutan: 2 },
+    { kode: 'FST-303', nama: 'FST-303', urutan: 3 },
+    { kode: 'FST-304', nama: 'FST-304', urutan: 4 },
+    { kode: 'FST-305', nama: 'FST-305', urutan: 5 },
+    { kode: 'FST-306', nama: 'FST-306', urutan: 6 },
+  ];
+
   const resultRuangan = await prisma.ruangan.createMany({
-    data: [
-      { kode: 'FST-301', nama: 'FST-301' },
-      { kode: 'FST-302', nama: 'FST-302' },
-      { kode: 'FST-303', nama: 'FST-303' },
-      { kode: 'FST-304', nama: 'FST-304' },
-      { kode: 'FST-305', nama: 'FST-305' },
-      { kode: 'FST-306', nama: 'FST-306' },
-    ],
+    data: dataRuangan,
     skipDuplicates: true,
   });
+
+  await Promise.all(
+    dataRuangan.map(
+      (ruangan) =>
+        prisma.$executeRaw`
+        UPDATE "ruangan"
+        SET "urutan" = ${ruangan.urutan}
+        WHERE "kode" = ${ruangan.kode}
+      `
+    )
+  );
 
   console.log(
     '[DEBUG] Result of inserted ruangan createMany:',
@@ -27,7 +39,6 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  // 2. Seeder Komponen Penilaian
   const resultKomponenPenilaian = await prisma.komponen_penilaian.createMany({
     data: [
       {
@@ -125,7 +136,6 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  // 3. Seeder Bidang Keahlian
   const resultBidangKeahlian = await prisma.bidang_keahlian.createMany({
     data: [
       { nama: 'Software Engineering' },
@@ -150,12 +160,8 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  // 4. Eksekusi Raw SQL untuk Dosen dan Mahasiswa
-
-  // Menggunakan process.cwd() untuk mendapatkan path absolut dari root project
   const sqlDirPath = path.join(process.cwd(), 'src', 'data');
 
-  // 4a. Seeder Dosen
   console.log('[DEBUG] Executing dosen.sql...');
   try {
     const dosenSqlPath = path.join(sqlDirPath, 'dosen.sql');
@@ -167,7 +173,6 @@ async function main() {
     console.error(`[ERROR] Failed to execute dosen.sql: ${error.message}`);
   }
 
-  // 4b. Seeder Mahasiswa
   console.log('[DEBUG] Executing mahasiswa.sql...');
   try {
     const mahasiswaSqlPath = path.join(sqlDirPath, 'mahasiswa.sql');
@@ -179,14 +184,8 @@ async function main() {
     console.error(`[ERROR] Failed to execute mahasiswa.sql: ${error.message}`);
   }
 
-  // 5. Seeder Dokumen Template (master dokumen yang dibutuhkan saat pendaftaran)
-  // Catatan: NIP pembimbing/penguji/ketua sidang TIDAK disimpan di sini.
-  // Field-field tersebut sudah jadi kolom flat di tabel `pendaftaran` dan
-  // jumlahnya ditentukan oleh `jenis_seminar.wajib_pembimbing` /
-  // `wajib_penguji` / `ada_ketua_sidang` — frontend render form berdasarkan itu.
   const resultDokumenTemplate = await prisma.dokumen_template.createMany({
     data: [
-      // --- Data umum (TEXT / DATE / URL) ---
       {
         kode: 'JUDUL_KP',
         nama: 'Judul Kerja Praktek',
@@ -225,7 +224,6 @@ async function main() {
         tipe_input: 'URL',
       },
 
-      // --- Dokumen upload ---
       {
         kode: 'SURAT_KET_INSTANSI',
         nama: 'Surat Keterangan Instansi',
@@ -317,7 +315,6 @@ async function main() {
         max_size_mb: 5,
       },
 
-      // --- Pilihan ---
       {
         kode: 'MATA_KULIAH_PILIHAN',
         nama: 'Mata Kuliah Pilihan',
@@ -349,7 +346,6 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  // 6. Seeder Jenis Seminar
   const resultJenisSeminar = await prisma.jenis_seminar.createMany({
     data: [
       {
@@ -415,8 +411,6 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  // 7. Seeder Requirement Dokumen (pivot jenis_seminar × dokumen_template)
-  // Ambil map kode → id karena pivot butuh FK
   const jenisList = await prisma.jenis_seminar.findMany({
     select: { id: true, kode: true },
   });
@@ -433,7 +427,6 @@ async function main() {
     wajib?: boolean;
   };
   const requirements: Req[] = [
-    // --- SEMKP ---
     { jenis: 'SEMKP', dokumen: 'JUDUL_KP', urutan: 1 },
     { jenis: 'SEMKP', dokumen: 'NAMA_INSTANSI', urutan: 2 },
     { jenis: 'SEMKP', dokumen: 'TANGGAL_MULAI_KP', urutan: 3 },
@@ -444,7 +437,6 @@ async function main() {
     { jenis: 'SEMKP', dokumen: 'BERKAS_SYARAT', urutan: 8 },
     { jenis: 'SEMKP', dokumen: 'LINK_REPOSITORY', urutan: 9, wajib: false },
 
-    // --- SEMPRO ---
     { jenis: 'SEMPRO', dokumen: 'JUDUL_TA', urutan: 1 },
     { jenis: 'SEMPRO', dokumen: 'PROPOSAL_TA', urutan: 2 },
     { jenis: 'SEMPRO', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
@@ -457,7 +449,6 @@ async function main() {
       wajib: false,
     },
 
-    // --- SEMHAS_LAPORAN ---
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'LAPORAN_HASIL_TA', urutan: 2 },
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
@@ -470,7 +461,6 @@ async function main() {
       wajib: false,
     },
 
-    // --- SEMHAS_PAPERBASED ---
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'DRAFT_PAPER', urutan: 2 },
     { jenis: 'SEMHAS_PAPERBASED', dokumen: 'LINK_PAPER_SUBMISSION', urutan: 3 },
@@ -484,7 +474,6 @@ async function main() {
       wajib: false,
     },
 
-    // --- SIDANG_LAPORAN ---
     { jenis: 'SIDANG_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
     { jenis: 'SIDANG_LAPORAN', dokumen: 'LAPORAN_AKHIR_TA', urutan: 2 },
     { jenis: 'SIDANG_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
@@ -497,7 +486,6 @@ async function main() {
       wajib: false,
     },
 
-    // --- SIDANG_PAPERBASED ---
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'DRAFT_PAPER', urutan: 2 },
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'LINK_PAPER_SUBMISSION', urutan: 3 },
@@ -541,9 +529,6 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  // 8. Seeder Bobot Penilaian Role (inter-role weight per jenis_seminar)
-  // Total persentase per jenis_seminar HARUS 100%.
-  // Beda dengan komponen_penilaian.persentase yang intra-role.
   type BobotSeed = {
     jenis: string;
     role:
@@ -559,37 +544,31 @@ async function main() {
   };
 
   const bobotSeed: BobotSeed[] = [
-    // --- SEMKP (3 role, total 100) ---
     { jenis: 'SEMKP', role: 'KP_PEMBIMBING', persentase: 30 },
     { jenis: 'SEMKP', role: 'KP_PENGUJI', persentase: 30 },
     { jenis: 'SEMKP', role: 'KP_INSTANSI', persentase: 40 },
 
-    // --- SEMPRO (2 pembimbing + 2 penguji, total 100) ---
     { jenis: 'SEMPRO', role: 'TA_PEMBIMBING_1', persentase: 30 },
     { jenis: 'SEMPRO', role: 'TA_PEMBIMBING_2', persentase: 20 },
     { jenis: 'SEMPRO', role: 'TA_PENGUJI_1', persentase: 25 },
     { jenis: 'SEMPRO', role: 'TA_PENGUJI_2', persentase: 25 },
 
-    // --- SEMHAS_LAPORAN (2 pembimbing + 2 penguji, total 100) ---
     { jenis: 'SEMHAS_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 30 },
     { jenis: 'SEMHAS_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 20 },
     { jenis: 'SEMHAS_LAPORAN', role: 'TA_PENGUJI_1', persentase: 25 },
     { jenis: 'SEMHAS_LAPORAN', role: 'TA_PENGUJI_2', persentase: 25 },
 
-    // --- SEMHAS_PAPERBASED (2 pembimbing + 2 penguji, total 100) ---
     { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 30 },
     { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 20 },
     { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 25 },
     { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PENGUJI_2', persentase: 25 },
 
-    // --- SIDANG_LAPORAN (2 pembimbing + 2 penguji + ketua sidang, total 100) ---
     { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 25 },
     { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 20 },
     { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_1', persentase: 22 },
     { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_2', persentase: 23 },
     { jenis: 'SIDANG_LAPORAN', role: 'TA_KETUA_SIDANG', persentase: 10 },
 
-    // --- SIDANG_PAPERBASED (2 pembimbing + 2 penguji + ketua sidang, total 100) ---
     { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 25 },
     { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 20 },
     { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 22 },
@@ -597,7 +576,6 @@ async function main() {
     { jenis: 'SIDANG_PAPERBASED', role: 'TA_KETUA_SIDANG', persentase: 10 },
   ];
 
-  // Sanity check: total per jenis harus tepat 100
   const totalsPerJenis = bobotSeed.reduce<Record<string, number>>(
     (acc, item) => {
       acc[item.jenis] = (acc[item.jenis] ?? 0) + item.persentase;
@@ -605,6 +583,7 @@ async function main() {
     },
     {}
   );
+
   const invalidTotals = Object.entries(totalsPerJenis).filter(
     ([, total]) => total !== 100
   );
@@ -623,18 +602,16 @@ async function main() {
     );
   }
 
-  const resultBobotPenilai = await prisma.bobot_penilai.createMany(
-    {
-      data: bobotSeed
-        .filter((b) => jenisMap.get(b.jenis))
-        .map((b) => ({
-          id_jenis_seminar: jenisMap.get(b.jenis)!,
-          role: b.role,
-          persentase: b.persentase,
-        })),
-      skipDuplicates: true,
-    }
-  );
+  const resultBobotPenilai = await prisma.bobot_penilai.createMany({
+    data: bobotSeed
+      .filter((b) => jenisMap.get(b.jenis))
+      .map((b) => ({
+        id_jenis_seminar: jenisMap.get(b.jenis)!,
+        role: b.role,
+        persentase: b.persentase,
+      })),
+    skipDuplicates: true,
+  });
 
   console.log(
     '[DEBUG] Result of inserted bobot_penilai createMany:',

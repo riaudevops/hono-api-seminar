@@ -15,4 +15,10 @@ export const postRuanganSchema = z.object({
     .string()
     .min(1, 'Nama ruangan tidak boleh kosong')
     .max(50, 'Nama ruangan maksimal 50 karakter'),
+  status: z.boolean().optional(),
+  urutan: z
+    .number()
+    .int('Urutan harus berupa bilangan bulat')
+    .min(0, 'Urutan tidak boleh kurang dari 0')
+    .optional(),
 });

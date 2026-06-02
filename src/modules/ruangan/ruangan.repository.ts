@@ -4,19 +4,19 @@ export interface CreateRuanganInput {
   kode: string;
   nama: string;
   status?: boolean;
+  urutan?: number;
 }
 
 export interface UpdateRuanganInput {
   nama?: string;
   status?: boolean;
+  urutan?: number;
 }
 
 export default class RuanganRepository {
   public static async findAll() {
     return prisma.ruangan.findMany({
-      orderBy: {
-        kode: 'asc',
-      },
+      orderBy: [{ urutan: 'asc' }, { kode: 'asc' }],
     });
   }
 
@@ -29,9 +29,7 @@ export default class RuanganRepository {
   public static async findAktif() {
     return prisma.ruangan.findMany({
       where: { status: true },
-      orderBy: {
-        kode: 'asc',
-      },
+      orderBy: [{ urutan: 'asc' }, { kode: 'asc' }],
     });
   }
 
@@ -41,6 +39,7 @@ export default class RuanganRepository {
         kode: data.kode,
         nama: data.nama,
         status: data.status ?? true,
+        urutan: data.urutan ?? 0,
       },
     });
   }

@@ -121,6 +121,7 @@ model ruangan {
   kode   String @id @db.VarChar(10)
   nama   String @db.VarChar(50)
   status Boolean @default(true) @db.Boolean
+  urutan Int @default(0)
 
   jadwal jadwal[]
 }
