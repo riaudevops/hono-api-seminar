@@ -1,94 +1,323 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with this repository.
 
 ## Project Overview
 
-Backend API for **API SEMINAR TIF** — Sistem Manajemen Seminar Kerja Praktik dan Tugas Akhir at TIF UIN Suska Riau. Built with **Hono v4** (OpenAPIHono) on **Bun** runtime with **Prisma** (PostgreSQL) and **OpenRouter** for AI-powered schedule generation.
+Backend API for **API SEMINAR TIF** — Sistem Manajemen Seminar Kerja Praktik dan Tugas Akhir at TIF UIN Suska Riau. The API runs on **Bun** + **Hono v4/OpenAPIHono**, uses **Prisma 7** with PostgreSQL, **Redis/ioredis** for cache/rate-limit/worker queue, **OpenRouter** for AI workflows, **Nodemailer** for email, and **Google APIs** for Drive uploads and Calendar invitations.
+
+The application has two runtime processes:
+
+1. **HTTP API server** (`src/index.ts`) — request routing, validation, auth, docs, synchronous DB mutations.
+2. **Background worker** (`src/worker.ts`) — Redis-backed queue consumer for long-running AI jobs, async audit-log writes, pendaftaran notification email, and jadwal/Google Calendar invitation delivery.
+
+Both processes must point to the same PostgreSQL and Redis instances in production.
 
 ## Commands
 
 ```bash
-bun run dev                         # Dev server with hot reload (src/index.ts)
-bun run start                       # Production server
-bun run dev:worker                  # Background worker with hot reload (src/worker.ts)
-bun run start:worker                # Production worker
-bunx prisma migrate dev             # Create and apply migration
-bunx prisma migrate deploy          # Apply migrations (production)
-bunx prisma db seed                 # Seed database
-bunx prisma studio                  # Database GUI
-bunx prisma generate                # Regenerate Prisma client after schema changes
-bunx tsc --noEmit --skipLibCheck    # Type-check project source
+bun run dev                              # API server with hot reload (src/index.ts)
+bun run start                            # API server (production-style Bun run)
+bun run dev:worker                       # Worker with hot reload (src/worker.ts)
+bun run start:worker                     # Worker process
+bun run demo:reset-db                    # DESTRUCTIVE demo reset: db push reset + seed + Redis clear
+
+bunx prisma migrate dev                  # Create/apply migration locally
+bunx prisma migrate deploy               # Apply migrations in production
+bunx prisma db push                      # Push Prisma schema without migration (dev/demo only)
+bunx prisma db seed                      # Run prisma/seed.ts
+bunx prisma studio                       # Prisma GUI
+bunx prisma generate                     # Regenerate Prisma client
+
+bunx tsc --noEmit --skipLibCheck --pretty false  # Type-check project source
+sh -n entrypoint.sh                              # Validate container entrypoint syntax
 ```
 
-No test, lint, or build script is configured in `package.json`. `bunx tsc --noEmit` currently reports dependency declaration errors unless `--skipLibCheck` is used.
+No test, lint, or build script is configured in `package.json`. Use `--skipLibCheck` for TypeScript checks because dependency declaration files can report external errors.
+
+## Deployment / Runtime
+
+The Docker image uses `entrypoint.sh` and `APP_PROCESS` to choose the process:
+
+```bash
+APP_PROCESS=server   # or api: starts src/index.ts
+APP_PROCESS=worker   # starts src/worker.ts
+```
+
+Run at least one API process and one worker process when queue-backed features are enabled. If the API is running without a worker, AI/log jobs can be enqueued but will remain `queued` until a worker starts.
+
+Important runtime env keys:
+
+- `DATABASE_URL` — PostgreSQL connection string used by Prisma adapter-pg.
+- `REDIS_ENABLED`, `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_KEY_PREFIX` — Redis cache/rate-limit/queue config.
+- `WORKER_JOB_TTL_SECONDS` — how long job status/result records remain in Redis.
+- `OPENROUTER_API_KEY`, `OPENROUTER_MODEL(S)`, `OPENROUTER_TIMEOUT_MS`, `OPENROUTER_MAX_RETRIES` — AI gateway config.
+- `EMAIL_USER`, `EMAIL_PASS`, `DEV_EMAIL_SINK` — mail sender config. Non-production email is redirected to `DEV_EMAIL_SINK` when set.
+- `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_DRIVE_FOLDER_ID` — Drive upload.
+- `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_IMPERSONATE_EMAIL` — Calendar invitations. Calendar sends attendee updates only in production; non-production creates/updates events with `sendUpdates=none`.
 
 ## Architecture
 
-### Layered Structure: Route → Handler → Service → Repository
+### Request Flow
 
-```
-src/routes/*.route.ts             # Hono route definitions + middleware chain (auth + zod validation)
-src/handlers/*.handler.ts         # Static classes, extract params from Context, delegate to services
-src/services/*.service.ts         # Business logic, throw APIError for violations
-src/repositories/*.repository.ts  # Prisma query wrappers, extend BaseRepository
+```text
+HTTP -> Hono route -> middleware -> zValidator -> handler -> service -> repository -> Prisma/PostgreSQL
 ```
 
-All route groups are mounted under `/api` in `src/index.ts`.
+`src/index.ts` builds the Hono app, applies CORS, structured request logging, a global `/api/*` rate limiter, global error handlers, OpenAPI docs at `/openapi.json`, Swagger UI at `/docs`, then mounts `apiRouter` under `/api`.
+
+`src/api.ts` imports all route groups and mounts them at `/` relative to `/api`.
+
+### Layering
+
+- **Routes** define paths, auth/rate-limit middleware, and Zod validation.
+- **Handlers** are static classes that extract `Context` params/body/user and call services.
+- **Services** contain business rules, transactions, cache invalidation, logs, and external integrations.
+- **Repositories** wrap Prisma queries. Many module repositories are static; legacy repositories may extend `BaseRepository`.
 
 ### Two Coexisting Layouts
 
-- **Flat layout (legacy)** — files split by layer under `src/routes/`, `src/handlers/`, `src/services/`, `src/repositories/`, `src/validators/`, `src/types/`.
-- **Feature modules (preferred for new work)** — under `src/modules/<feature>/`, colocating `*.route.ts`, `*.handler.ts`, `*.service.ts`, `*.repository.ts`, `*.validator.ts`, `*.type.ts`, with a barrel `index.ts` that exports `{Feature}Route`, `{Feature}Handler`, etc. Example: `src/modules/jenis-seminar/`, `src/modules/dokumen-template/`, `src/modules/mahasiswa/`. New features should follow this pattern.
+- **Legacy flat layout**: `src/routes/`, `src/handlers/`, `src/services/`, `src/repositories/`, `src/validators/`, `src/types/`.
+- **Preferred feature module layout**: `src/modules/<feature>/` colocates:
+  - `<feature>.route.ts`
+  - `<feature>.handler.ts`
+  - `<feature>.service.ts`
+  - `<feature>.repository.ts`
+  - `<feature>.validator.ts`
+  - `<feature>.type.ts`
+  - `index.ts` barrel exports
 
-### Router
+Use the module layout for new features.
 
-`OpenAPIHono` is instantiated with **`RegExpRouter`** (not the default TrieRouter) in `src/index.ts`. This was a deliberate choice — the default TrieRouter caused `UnsupportedPathError` when dynamic `:id` routes conflicted with static sibling routes at the same depth. When adding routes, be mindful that mixing dynamic and static paths under the same prefix is what triggered the original incident.
+### Router Choice
 
-### Key Directories
+`OpenAPIHono` is instantiated with **`RegExpRouter`** in both `src/index.ts` and route modules. Keep this. The default TrieRouter previously caused `UnsupportedPathError` when static and dynamic sibling paths conflicted at the same depth (for example `/x/static` next to `/x/:id`). Still define static routes before dynamic `:id` routes.
 
-- **`src/core/`** — DI container (`container.ts`), Zod-validated config singleton (`config.ts`), bootstrap (`bootstrap.ts`)
-- **`src/infrastructures/`** — Singleton infrastructure: Prisma DB, Nodemailer, OpenRouter LLM gateway
-- **`src/middlewares/`** — JWT Bearer auth + role-based access (`auth.middleware.ts`), structured request logging (`log.middleware.ts`)
-- **`src/validators/`** — Zod schemas for request validation, applied via `zValidator()` in routes (legacy; new features colocate validators inside their module folder)
-- **`src/prompts/`** — LLM prompt engineering: markdown persona/task prompts (`base/`, `tasks/`), typed rule constants (`context/`), Zod structured output schemas (`output/`)
-- **`src/helpers/`** — Domain-specific data transformation utilities
-- **`src/utils/`** — `APIError`, custom `Logger`, Zod error formatter, OpenRouter helpers, crypto utilities
-- **`src/types/`** — TypeScript interfaces and type definitions (legacy; new features colocate types inside their module folder)
-- **`src/modules/`** — Feature modules (see layout above)
-- **`src/worker.ts`** — Standalone background worker entry point (separate from HTTP server)
+## Key Directories
 
-### Response Format
+- `src/core/` — config singleton (`config.ts`), lightweight DI container, bootstrap/shutdown.
+- `src/infrastructures/` — Prisma DB, Redis, mail, OpenRouter, Google Drive, Google Calendar.
+- `src/modules/` — current feature modules and preferred place for new work.
+- `src/routes/`, `src/handlers/`, `src/services/`, `src/repositories/` — legacy/flat features still in use.
+- `src/middlewares/` — JWT auth, rate limits, request logging.
+- `src/prompts/` — LLM prompts and structured output schemas.
+- `src/helpers/` — domain helpers for auth, jadwal, dosen, ruangan, tahun ajaran, crypto, etc.
+- `src/utils/` — `APIError`, logger, OpenRouter helpers, cache utilities, Zod error formatter.
+- `src/data/` — SQL seed data. `prisma/seed.ts` currently loads only `dosen.sql` and `mahasiswa.sql` from this directory; demo SQL files are intentionally separate.
+- `scripts/` — operational scripts such as destructive demo DB reset.
+- `prisma/schema.prisma` — database model/enums.
 
-All endpoints return: `{ response: boolean, message: string, data?: any }`
+## Worker Queue
 
-Errors use `APIError` (from `src/utils/api-error.util.ts`) with a `statusCode` field. The global error handler in `GlobalHandler.error()` catches these and returns structured JSON.
+Worker infrastructure lives in `src/modules/worker-job/` and `src/worker.ts`.
 
-### OpenAPI / Swagger
+Queue behavior:
 
-OpenAPI spec served at `/openapi.json`, Swagger UI at `/docs`. Route files using `@hono/zod-openapi` contribute to the spec automatically when registered via `createRoute()`.
+- Queue and job records are stored in Redis with namespaced keys (`REDIS_KEY_PREFIX`).
+- `WorkerJobService.enqueue()` writes a job JSON record and pushes the job id onto the Redis list.
+- Worker uses `BRPOP` via `waitForNextJob()` and processes one job at a time in a loop.
+- Job status values: `queued`, `running`, `completed`, `failed`.
+- Progress events are appended with a monotonic `sequence` so SSE can stream only new events.
+- Job records expire after `WORKER_JOB_TTL_SECONDS` (default 24 hours).
 
-### Authentication
+Current job types:
 
-JWT Bearer token extracted in middleware (`AuthMiddleware.JWTBearerTokenExtraction`). **No signature verification** — relies on an external auth service. Roles: `mahasiswa`, `dosen`, `koordinator`. Use `AuthMiddleware.requireRole(...)` for role-based guards. User payload accessed via `c.get('user')`.
+- `log.create` — async audit-log insert.
+- `pendaftaran.email.send` — send pendaftaran notification email by worker.
+- `jadwal.email.send` — send/sync jadwal invitation through Google Calendar by worker.
+- `jadwal-draft.generate` — AI batch schedule draft generation.
+- `constraint-dosen.chat` — AI parse/create dosen constraints from natural language.
+- `constraint-dosen.chat-update` — AI parse/update one dosen constraint.
 
-### AI Schedule Generation
+Status endpoint:
 
-`JadwalDraftService` gathers context (rooms, existing schedules, dosen constraints), sends chunked requests to OpenRouter with structured prompts, validates output against Zod schemas, and creates draft schedule records. Supports approve/reject workflow. Prompts are in `src/prompts/`. `OpenRouterService.chatCompletion()` is the gateway for AI calls and applies bounded timeout/retry handling for transient upstream errors.
+- `GET /api/worker/jobs/:job_id` — authenticated generic job status/result lookup.
 
-### Database
+Feature-specific job aliases:
 
-PostgreSQL via Prisma with `@prisma/adapter-pg`. Connection is a lazy-initialized singleton with a Proxy for backward-compatible imports. Schema in `prisma/schema.prisma`. Seed data in `prisma/seed.ts` and `src/data/*.sql`.
+- `GET /api/koordinator/jadwal-draft/generate/jobs/:job_id`
+- `GET /api/dosen/constraint-saya/chat/jobs/:job_id`
 
-`pendaftaran` stores document/form values in the `data_pendaftaran` EAV-style table and tracks both `status_berkas` and `status_jadwal`. `tahun_ajaran` codes use `TahunAjaranHelper` format `YYYY1` for ganjil and `YYYY2` for genap.
+SSE helper:
+
+- `streamWorkerJob()` in `worker-job.sse.ts` polls job status/progress and emits `connected`, `heartbeat`, `job:status`, progress events, and terminal `job:done`/`job:error`.
+
+## AI Workflows
+
+### Schedule draft generation
+
+`JadwalDraftService.generate()` gathers rooms, existing schedules, dosen constraints, and requested students, chunks generation (`GENERATE_CHUNK_SIZE = 10`), calls OpenRouter, validates the model output with Zod (`GenerateBatchOutputSchema`), and creates `jadwal_draft` records. Approve/reject workflow lives in the same module.
+
+Important routes:
+
+- `POST /api/koordinator/jadwal-draft/generate` — enqueues worker job and returns `202` with `job_id`.
+- `POST /api/koordinator/jadwal-draft/generate/stream` — enqueues worker job and streams Redis job progress.
+
+Do not put long-running OpenRouter calls directly in HTTP handlers. Enqueue worker jobs instead.
+
+### Constraint chat
+
+`ConstraintDosenService.chat()` and `chatUpdate()` parse natural language into validated constraint data using OpenRouter + `ParseConstraintOutputSchema`.
+
+Routes:
+
+- `POST /api/dosen/constraint-saya/chat` — enqueues create-from-chat job.
+- `PUT /api/dosen/constraint-saya/:id/chat` — enqueues update-from-chat job.
+
+### OpenRouter gateway
+
+Use `openRouterService.chatCompletion()` from `src/infrastructures/openrouter.infrastructure.ts`. It handles:
+
+- Required `OPENROUTER_API_KEY` validation.
+- Timeout/abort handling.
+- Retry for transient upstream statuses (429/5xx/timeout etc.).
+- Mapping upstream failures to `APIError`.
+- Low-latency provider preferences where requested.
+
+Prompts live under `src/prompts/base`, `src/prompts/tasks`, `src/prompts/context`, and output schemas under `src/prompts/output`.
+
+## Database, Cache, and Seeds
+
+### Prisma / PostgreSQL
+
+- Prisma uses `@prisma/adapter-pg` and `withAccelerate()` extension.
+- DB singleton is lazy and exported through `src/infrastructures/db.infrastructure.ts`.
+- Schema uses PostgreSQL provider; datasource URL comes from `DATABASE_URL` at runtime.
+- Keep multi-table mutations in `prisma.$transaction()` and use transaction-scoped Prisma (`tx`) for all reads/writes that must be atomic.
+
+Domain notes:
+
+- `pendaftaran` stores document/form values in `data_pendaftaran` (EAV-style) and tracks both `status_berkas` and `status_jadwal`.
+- `jadwal` has uniqueness constraints around `nim`, seminar type, and academic year.
+- `jadwal_draft` stores AI suggestions by `batch_id`, with status `DRAFT`, `APPROVED`, or `REJECTED`.
+- `tahun_ajaran` codes use `TahunAjaranHelper`: `YYYY1` for ganjil and `YYYY2` for genap.
+- `constraint_dosen` stores parsed availability/preference/location constraints and raw AI data.
+
+### Redis
+
+Redis is used for:
+
+- General caching via `redisService.remember/getJson/setJson`.
+- Rate-limit counters.
+- Worker queue and job state.
+
+Redis is designed to degrade gracefully for cache/rate-limit paths, but the worker queue requires Redis. Some log enqueue paths fall back to synchronous DB writes when Redis is unavailable.
+
+Use `CacheInvalidation` utilities after mutating cached entities.
+
+### Seed/demo data
+
+- `prisma/seed.ts` seeds base/reference data and optionally loads selected SQL files such as `dosen.sql` and `mahasiswa.sql`.
+- Demo SQL files (`src/data/demo-*.sql`) are intentionally separate. Do not silently add them to normal seed unless the task explicitly asks for demo reset behavior.
+- `bun run demo:reset-db` is destructive. It runs `prisma db push --force-reset --accept-data-loss`, `prisma db seed`, clears Redis cache, and prints a demo summary. It refuses `APP_ENV=production` unless `--allow-production` is passed. If demo-specific rows are required, explicitly review/wire the `src/data/demo-*.sql` files first; normal seed does not currently execute them.
+
+## Authentication and Authorization
+
+`AuthMiddleware.JWTBearerTokenExtraction` extracts a Bearer JWT, decodes payload, and stores it at `c.get('user')`.
+
+Important: this middleware **does not verify JWT signatures**; it relies on an external auth service/trust boundary. Do not assume cryptographic verification exists unless you add it.
+
+Known roles:
+
+- `mahasiswa`
+- `dosen`
+- `koordinator`
+
+Use `AuthMiddleware.requireRole(...)` where role enforcement is needed. Some existing routes only require a decoded token and enforce identity in service logic.
+
+## Rate Limiting
+
+Global rate limiting is applied to `/api/*` in `src/index.ts`. Additional route-level tiers are available in `RateLimitMiddleware`:
+
+- `global`
+- `read`
+- `write`
+- `authStrict`
+- `aiExpensive`
+
+`aiExpensive` routes share a Redis counter prefix so generate and stream endpoints cannot bypass each other by alternating. If Redis is unavailable, the limiter falls back to in-memory counting.
+
+Health/docs/openapi paths bypass rate limits.
+
+## Audit Logging
+
+Audit logs are domain-level records in the `log` table.
+
+Guidelines:
+
+- For normal non-transactional mutations, use `LogService.createEntityLog(...)`, `createJadwalLog(...)`, or `createPenilaianLog(...)`. These enqueue `log.create` worker jobs.
+- For transaction-critical logs, write through the transaction (`tx.log.create(...)`) or use `LogService.createEntityLogTx(...)`. Do not enqueue logs that must atomically commit/rollback with the domain mutation.
+- Worker log processing calls `LogService.createEntityLogSync(...)` to avoid enqueue recursion.
+- If the log queue is unavailable, `LogService` falls back to synchronous DB insert for log preservation.
+
+## External Integrations
+
+### Email
+
+`mail.infrastructure.ts` uses Nodemailer. In non-production, when `DEV_EMAIL_SINK` is set, outbound recipients are overridden to the sink and original recipients are included in the message notice. Prefer the mail infrastructure over direct Nodemailer usage.
+
+### Google Drive
+
+`google-drive.infrastructure.ts` uploads registration files using a service-account JWT. `UploadService` validates file size/MIME and builds Drive folder paths/names.
+
+### Google Calendar
+
+`google-calendar.infrastructure.ts` creates/updates deterministic events for jadwal invitations. `JadwalService` enqueues `jadwal.email.send` after successful jadwal create/update; the worker then syncs Calendar invitations. Missing Google credentials cause Calendar sync to be skipped in the worker rather than blocking saved jadwal.
+
+## Error Handling and Response Shape
+
+Throw `APIError(message, statusCode)` for expected business/API errors. `GlobalHandler.error` maps `APIError` to JSON and hides unknown server errors.
+
+Common response shape:
+
+```ts
+{
+  response: boolean,
+  message: string,
+  data?: unknown,
+  pagination?: unknown,
+}
+```
+
+Validation errors are formatted through `zodError`.
 
 ## Conventions
 
-- **Static classes** for handlers, services, and repositories (no DI injection into these layers)
-- **Singleton pattern** with `getInstance()`/`resetInstance()` for infrastructure and utility classes
-- **Zod everywhere**: env validation, request validation, LLM output validation
-- **Custom logger**: use `createLogger('ContextName')` from `src/utils/logger.util.ts`
-- Validators use `.refine()` for cross-field business rules
-- Mutating module operations generally create audit logs via `LogService.createEntityLog` or `tx.log.create`; preserve this when adding `POST`, `PUT/PATCH`, or `DELETE` flows
-- Environment config via `src/core/config.ts` singleton — avoid reading `process.env` directly outside infrastructure/bootstrap code that intentionally lazy-loads environment values
-- New features go under `src/modules/<feature>/` with a barrel `index.ts`; mount the route in `src/index.ts` under `/api`
+- Use **static classes** for handlers, services, and repositories unless following an existing instance-based infrastructure pattern.
+- Use **singleton pattern** with `getInstance()`/`resetInstance()` for infrastructure utilities.
+- Use **Zod** for env validation, request validation, and LLM output validation.
+- Use `createLogger('ContextName')` instead of raw `console` for application logs.
+- Environment config belongs in `src/core/config.ts`; avoid direct `process.env` reads outside infrastructure/bootstrap code unless the file already intentionally lazy-loads env.
+- Keep route validators close to modules for new work (`*.validator.ts`).
+- Apply `RateLimitMiddleware.write()` to mutating endpoints and `RateLimitMiddleware.aiExpensive()` to AI endpoints.
+- Preserve audit logging and cache invalidation when changing mutating flows.
+- Keep static routes before dynamic `:id` routes.
+- For date/time scheduling, preserve Asia/Jakarta behavior and use existing helpers (`JadwalHelper`, `TahunAjaranHelper`) rather than ad-hoc formatting.
+- For worker payloads, store JSON-serializable data only. Rehydrate dates/enums in `src/worker.ts` before calling services.
+
+## Validation Checklist Before Finishing Changes
+
+Run at minimum:
+
+```bash
+bunx tsc --noEmit --skipLibCheck --pretty false
+```
+
+Also run targeted checks depending on the change:
+
+```bash
+sh -n entrypoint.sh                         # if entrypoint/deploy scripts changed
+bunx prisma generate                        # if Prisma schema changed
+bunx prisma migrate dev                     # if schema migration is required
+bunx prisma db seed                         # if seed files changed
+bun run demo:reset-db                       # only for intentional destructive demo validation
+```
+
+For worker/AI changes, verify:
+
+- API endpoint returns `202` + `job_id` for queued flows.
+- Worker process consumes the job and sets terminal status.
+- SSE emits progress and terminal events without duplicating progress sequence.
+- Redis unavailable behavior is acceptable for the touched code path.
+
+For seed safety, verify normal seed does not accidentally execute demo-only SQL unless explicitly intended.

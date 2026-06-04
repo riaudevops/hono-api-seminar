@@ -2,12 +2,17 @@ import type { StatusBerkas } from '@prisma/client';
 import { mailService } from '../../infrastructures/mail.infrastructure';
 import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 import { createLogger } from '../../utils/logger.util';
+import WorkerJobService from '../worker-job/worker-job.service';
+import {
+  WorkerJobType,
+  type WorkerPendaftaranEmailEvent,
+} from '../worker-job/worker-job.type';
 import PendaftaranRepository from './pendaftaran.repository';
 import type { PendaftaranWithDataDokumen } from './pendaftaran.type';
 
 const logger = createLogger('PendaftaranEmail');
 
-type PendaftaranEmailEvent = 'created' | 'updated' | 'status_validated';
+type PendaftaranEmailEvent = WorkerPendaftaranEmailEvent;
 
 type PendaftaranEmailContent = {
   subject: string;
@@ -27,51 +32,75 @@ type StatusMeta = {
 
 export default class PendaftaranEmailService {
   public static notifyCreated(pendaftaranId: string) {
-    void PendaftaranEmailService.sendById(pendaftaranId, 'created');
+    void PendaftaranEmailService.enqueueById(pendaftaranId, 'created');
   }
 
   public static notifyUpdated(pendaftaranId: string) {
-    void PendaftaranEmailService.sendById(pendaftaranId, 'updated');
+    void PendaftaranEmailService.enqueueById(pendaftaranId, 'updated');
   }
 
   public static notifyStatusValidated(pendaftaranId: string) {
-    void PendaftaranEmailService.sendById(pendaftaranId, 'status_validated');
+    void PendaftaranEmailService.enqueueById(pendaftaranId, 'status_validated');
   }
 
-  private static async sendById(
+  public static async enqueueById(
     pendaftaranId: string,
     event: PendaftaranEmailEvent
   ) {
     try {
-      const pendaftaran =
-        await PendaftaranRepository.findByIdWithRelations(pendaftaranId);
-
-      if (!pendaftaran) {
-        logger.warn('Pendaftaran notification email skipped: data not found', {
-          event,
-          pendaftaranId,
-        });
-        return;
-      }
-
-      if (event === 'created') {
-        await PendaftaranEmailService.sendCreated(pendaftaran);
-        return;
-      }
-
-      if (event === 'updated') {
-        await PendaftaranEmailService.sendUpdated(pendaftaran);
-        return;
-      }
-
-      await PendaftaranEmailService.sendStatusValidated(pendaftaran);
+      const job = await WorkerJobService.enqueue(
+        WorkerJobType.PENDAFTARAN_EMAIL_SEND,
+        { pendaftaranId, event },
+        { maxAttempts: 5 }
+      );
+      logger.info('Pendaftaran notification email queued', {
+        event,
+        pendaftaranId,
+        jobId: job.id,
+      });
+      return job;
     } catch (error) {
-      logger.error('Pendaftaran notification email task failed', {
+      logger.error('Pendaftaran notification email queue failed', {
         event,
         pendaftaranId,
         error: error instanceof Error ? error.message : String(error),
       });
+      return null;
     }
+  }
+
+  public static async sendById(
+    pendaftaranId: string,
+    event: PendaftaranEmailEvent
+  ) {
+    const pendaftaran =
+      await PendaftaranRepository.findByIdWithRelations(pendaftaranId);
+
+    if (!pendaftaran) {
+      logger.warn('Pendaftaran notification email skipped: data not found', {
+        event,
+        pendaftaranId,
+      });
+      return {
+        response: true,
+        skipped: true,
+        message: 'Pendaftaran tidak ditemukan, email dilewati.',
+      };
+    }
+
+    if (event === 'created') {
+      await PendaftaranEmailService.sendCreated(pendaftaran);
+    } else if (event === 'updated') {
+      await PendaftaranEmailService.sendUpdated(pendaftaran);
+    } else {
+      await PendaftaranEmailService.sendStatusValidated(pendaftaran);
+    }
+
+    return {
+      response: true,
+      skipped: false,
+      message: 'Email pendaftaran berhasil dikirim worker.',
+    };
   }
 
   private static async sendCreated(pendaftaran: PendaftaranWithDataDokumen) {
@@ -134,6 +163,7 @@ export default class PendaftaranEmailService {
         nim: pendaftaran.nim,
         error: error instanceof Error ? error.message : String(error),
       });
+      throw error;
     }
   }
 

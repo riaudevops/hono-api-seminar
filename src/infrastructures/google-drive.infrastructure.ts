@@ -37,8 +37,8 @@ class GoogleDriveService {
   private validateConfig() {
     const driveConfig = config.googleDrive;
     const missingConfigs = [
-      !driveConfig.clientEmail ? 'GOOGLE_DRIVE_CLIENT_EMAIL' : null,
-      !driveConfig.privateKey ? 'GOOGLE_DRIVE_PRIVATE_KEY' : null,
+      !driveConfig.clientEmail ? 'GOOGLE_CLIENT_EMAIL' : null,
+      !driveConfig.privateKey ? 'GOOGLE_PRIVATE_KEY' : null,
     ].filter(Boolean);
 
     if (missingConfigs.length > 0) {

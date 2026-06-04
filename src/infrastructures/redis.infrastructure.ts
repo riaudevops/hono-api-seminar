@@ -41,6 +41,10 @@ class RedisService {
     return `${prefix}:${key}`;
   }
 
+  public namespacedKey(key: string) {
+    return this.prefixKey(key);
+  }
+
   public getClient(): RedisClient | null {
     if (!this.isEnabled()) return null;
     if (this.client) return this.client;
@@ -120,6 +124,10 @@ class RedisService {
 
     await this.connect();
     return this.isHealthy() ? client : null;
+  }
+
+  public async getRawClient(): Promise<RedisClient | null> {
+    return this.ensureClient();
   }
 
   public async getJson<T>(key: string): Promise<T | null> {

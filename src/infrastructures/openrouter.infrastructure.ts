@@ -235,6 +235,17 @@ class OpenRouterService {
       : timeoutSignal;
 
     const startedAt = Date.now();
+    logger.info('OpenRouter request start', {
+      model,
+      maxTokens: body.max_tokens,
+      temperature: body.temperature,
+      messageCount: options.messages.length,
+      promptCharCount: options.messages.reduce((acc, m) => {
+        if (typeof m.content === 'string') return acc + m.content.length;
+        return acc;
+      }, 0),
+      timeoutMs,
+    });
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -280,6 +291,13 @@ class OpenRouterService {
     const content = choice?.message?.content;
 
     if (finishReason === 'length') {
+      logger.warn('AI output truncated by token limit', {
+        model: result.model || model,
+        finishReason,
+        outputTokens: result.usage?.completion_tokens,
+        promptTokens: result.usage?.prompt_tokens,
+        durationMs: Date.now() - startedAt,
+      });
       throw new APIError(
         `AI output terpotong karena batas token. Naikkan maxTokens atau kecilkan chunk size.`,
         422

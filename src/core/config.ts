@@ -20,6 +20,7 @@ const envSchema = z.object({
   PORT: z.string().transform(Number).default('8000'),
   APP_PORT: z.string().transform(Number).optional(),
   WORKERS: z.string().transform(Number).default('1'),
+  APP_PROCESS: z.enum(['server', 'api', 'worker']).default('server'),
 
   // Database Configuration
   DATABASE_URL: z.string().default('postgresql://localhost:5432/test'),
@@ -87,14 +88,17 @@ const envSchema = z.object({
   // Email Configuration
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
+  DEV_EMAIL_SINK: z.string().optional(),
 
-  // Google Drive Configuration
-  GOOGLE_DRIVE_CLIENT_EMAIL: z.string().optional(),
-  GOOGLE_DRIVE_PRIVATE_KEY: z
+  // Google Configuration
+  GOOGLE_CLIENT_EMAIL: z.string().optional(),
+  GOOGLE_PRIVATE_KEY: z
     .string()
     .transform((val) => val.replace(/\\n/g, '\n'))
     .optional(),
   GOOGLE_DRIVE_FOLDER_ID: z.string().optional(),
+  GOOGLE_CALENDAR_ID: z.string().default('primary'),
+  GOOGLE_CALENDAR_IMPERSONATE_EMAIL: z.string().optional(),
 
   // Webhook Configuration
   WEBHOOK_SECRET: z.string().default('change-this-webhook-secret'),
@@ -110,6 +114,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
   REDIS_KEY_PREFIX: z.string().default('seminar-tif'),
   REDIS_DEFAULT_TTL_SECONDS: z.string().transform(Number).default('300'),
+  WORKER_JOB_TTL_SECONDS: z.string().transform(Number).default('86400'),
 
   // Rate Limiter Configuration
   RATE_LIMIT_ENABLED: z
@@ -213,6 +218,7 @@ class Config {
       host: this.config.HOST,
       port: this.config.APP_PORT || this.config.PORT,
       workers: this.config.WORKERS,
+      process: this.config.APP_PROCESS,
     };
   }
 
@@ -265,6 +271,7 @@ class Config {
     return {
       user: this.config.EMAIL_USER,
       pass: this.config.EMAIL_PASS,
+      devEmailSink: this.config.DEV_EMAIL_SINK,
     };
   }
 
@@ -313,14 +320,26 @@ class Config {
       url,
       keyPrefix: this.config.REDIS_KEY_PREFIX,
       defaultTtlSeconds: this.config.REDIS_DEFAULT_TTL_SECONDS,
+      workerJobTtlSeconds: this.config.WORKER_JOB_TTL_SECONDS,
+    };
+  }
+
+  // Google getters
+  public get google() {
+    return {
+      clientEmail: this.config.GOOGLE_CLIENT_EMAIL,
+      privateKey: this.config.GOOGLE_PRIVATE_KEY,
+      driveFolderId: this.config.GOOGLE_DRIVE_FOLDER_ID,
+      calendarId: this.config.GOOGLE_CALENDAR_ID,
+      calendarImpersonateEmail: this.config.GOOGLE_CALENDAR_IMPERSONATE_EMAIL,
     };
   }
 
   // Google Drive getters
   public get googleDrive() {
     return {
-      clientEmail: this.config.GOOGLE_DRIVE_CLIENT_EMAIL,
-      privateKey: this.config.GOOGLE_DRIVE_PRIVATE_KEY,
+      clientEmail: this.config.GOOGLE_CLIENT_EMAIL,
+      privateKey: this.config.GOOGLE_PRIVATE_KEY,
       folderId: this.config.GOOGLE_DRIVE_FOLDER_ID,
     };
   }

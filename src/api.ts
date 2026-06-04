@@ -21,6 +21,7 @@ import { LogModuleRoute } from './modules/log';
 import { DetailPenilaianRoute } from './modules/detail-penilaian';
 import { TahunAjaranRoute } from './modules/tahun-ajaran';
 import { UploadRoute } from './modules/upload';
+import { WorkerJobRoute } from './modules/worker-job';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 
 const apiRouter = new OpenAPIHono({
@@ -50,6 +51,7 @@ const routes = [
   LogModuleRoute,
   TahunAjaranRoute,
   UploadRoute,
+  WorkerJobRoute,
 ];
 
 routes.forEach((route) => {

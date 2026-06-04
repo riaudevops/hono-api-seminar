@@ -37,6 +37,12 @@ jadwalDraftRoute.post(
 );
 
 jadwalDraftRoute.get(
+  '/koordinator/jadwal-draft/generate/jobs/:job_id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JadwalDraftHandler.getGenerateJob
+);
+
+jadwalDraftRoute.get(
   '/koordinator/jadwal-draft/batch/:batch_id',
   AuthMiddleware.JWTBearerTokenExtraction,
   JadwalDraftHandler.getDraftsByBatch

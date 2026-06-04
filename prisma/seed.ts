@@ -4,6 +4,26 @@ import path from 'path';
 
 console.log('[INFO] Seeding database...');
 
+async function executeSqlFile(
+  sqlDirPath: string,
+  fileName: string,
+  options: { required?: boolean } = {}
+) {
+  const required = options.required ?? true;
+  console.log(`[DEBUG] Executing ${fileName}...`);
+
+  try {
+    const sqlPath = path.join(sqlDirPath, fileName);
+    const sql = fs.readFileSync(sqlPath, 'utf8');
+
+    await prisma.$executeRawUnsafe(sql);
+    console.log(`[DEBUG] Successfully executed ${fileName}`);
+  } catch (error: any) {
+    console.error(`[ERROR] Failed to execute ${fileName}: ${error.message}`);
+    if (required) throw error;
+  }
+}
+
 async function main() {
   console.log('[DEBUG] Running createMany...');
 
@@ -162,27 +182,8 @@ async function main() {
 
   const sqlDirPath = path.join(process.cwd(), 'src', 'data');
 
-  console.log('[DEBUG] Executing dosen.sql...');
-  try {
-    const dosenSqlPath = path.join(sqlDirPath, 'dosen.sql');
-    const dosenSql = fs.readFileSync(dosenSqlPath, 'utf8');
-
-    await prisma.$executeRawUnsafe(dosenSql);
-    console.log('[DEBUG] Successfully executed dosen.sql');
-  } catch (error: any) {
-    console.error(`[ERROR] Failed to execute dosen.sql: ${error.message}`);
-  }
-
-  console.log('[DEBUG] Executing mahasiswa.sql...');
-  try {
-    const mahasiswaSqlPath = path.join(sqlDirPath, 'mahasiswa.sql');
-    const mahasiswaSql = fs.readFileSync(mahasiswaSqlPath, 'utf8');
-
-    await prisma.$executeRawUnsafe(mahasiswaSql);
-    console.log('[DEBUG] Successfully executed mahasiswa.sql');
-  } catch (error: any) {
-    console.error(`[ERROR] Failed to execute mahasiswa.sql: ${error.message}`);
-  }
+  await executeSqlFile(sqlDirPath, 'dosen.sql', { required: false });
+  await executeSqlFile(sqlDirPath, 'mahasiswa.sql', { required: false });
 
   const resultDokumenTemplate = await prisma.dokumen_template.createMany({
     data: [
@@ -361,7 +362,7 @@ async function main() {
         kode: 'SEMPRO',
         nama: 'Seminar Proposal Tugas Akhir',
         deskripsi: 'Seminar pemaparan proposal penelitian tugas akhir.',
-        wajib_pembimbing: 2,
+        wajib_pembimbing: 1,
         wajib_penguji: 2,
         ada_ketua_sidang: false,
       },
@@ -370,7 +371,7 @@ async function main() {
         nama: 'Seminar Hasil Tugas Akhir (Jalur Laporan)',
         deskripsi:
           'Seminar hasil penelitian tugas akhir melalui jalur laporan.',
-        wajib_pembimbing: 2,
+        wajib_pembimbing: 1,
         wajib_penguji: 2,
         ada_ketua_sidang: false,
       },
@@ -379,7 +380,7 @@ async function main() {
         nama: 'Seminar Hasil Tugas Akhir (Jalur Paper)',
         deskripsi:
           'Seminar hasil penelitian tugas akhir melalui jalur paper konferensi/jurnal.',
-        wajib_pembimbing: 2,
+        wajib_pembimbing: 1,
         wajib_penguji: 2,
         ada_ketua_sidang: false,
       },
@@ -387,7 +388,7 @@ async function main() {
         kode: 'SIDANG_LAPORAN',
         nama: 'Sidang Tugas Akhir (Jalur Laporan)',
         deskripsi: 'Sidang akhir pertahanan tugas akhir melalui jalur laporan.',
-        wajib_pembimbing: 2,
+        wajib_pembimbing: 1,
         wajib_penguji: 2,
         ada_ketua_sidang: true,
       },
@@ -396,7 +397,7 @@ async function main() {
         nama: 'Sidang Tugas Akhir (Jalur Paper)',
         deskripsi:
           'Sidang akhir pertahanan tugas akhir melalui jalur paper konferensi/jurnal.',
-        wajib_pembimbing: 2,
+        wajib_pembimbing: 1,
         wajib_penguji: 2,
         ada_ketua_sidang: true,
       },

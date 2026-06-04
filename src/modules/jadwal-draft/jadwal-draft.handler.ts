@@ -1,11 +1,10 @@
-import { Context } from 'hono';
-import { streamSSE } from 'hono/streaming';
+import type { Context } from 'hono';
 import JadwalDraftService from './jadwal-draft.service';
 import { APIError } from '../../utils/api-error.util';
-import { createLogger } from '../../utils/logger.util';
-import { LogActorType, StatusJadwalDraft } from '@prisma/client';
-
-const logger = createLogger('JadwalDraftHandler');
+import { LogActorType, type StatusJadwalDraft } from '@prisma/client';
+import WorkerJobService from '../worker-job/worker-job.service';
+import { streamWorkerJob } from '../worker-job/worker-job.sse';
+import { WorkerJobType } from '../worker-job/worker-job.type';
 
 function extractContext(c: Context) {
   const userPayload = c.get('user');
@@ -17,7 +16,8 @@ function extractContext(c: Context) {
   }
 
   return {
-    actor_id: (userPayload as any).id || (userPayload as any).email || 'unknown',
+    actor_id:
+      (userPayload as any).id || (userPayload as any).email || 'unknown',
     actor_type:
       (userPayload as any).role === 'admin'
         ? LogActorType.KOORDINATOR
@@ -31,81 +31,52 @@ export default class JadwalDraftHandler {
   public static async generate(c: Context) {
     const data = await c.req.json();
     const context = extractContext(c);
-    return c.json(await JadwalDraftService.generate(data, context), 201);
+    const job = await WorkerJobService.enqueue(
+      WorkerJobType.JADWAL_DRAFT_GENERATE,
+      { data, context },
+      { maxAttempts: 1 }
+    );
+
+    return c.json(
+      {
+        response: true,
+        message: 'Generate jadwal draft dikirim ke worker.',
+        data: {
+          job_id: job.id,
+          status: job.status,
+          status_url: `/api/worker/jobs/${job.id}`,
+        },
+      },
+      202
+    );
   }
 
   public static async generateStream(c: Context) {
     const data = await c.req.json();
     const context = extractContext(c);
-    const abortController = new AbortController();
+    const job = await WorkerJobService.enqueue(
+      WorkerJobType.JADWAL_DRAFT_GENERATE,
+      { data, context },
+      { maxAttempts: 1 }
+    );
 
-    c.header('Cache-Control', 'no-cache, no-transform');
-    c.header('Connection', 'keep-alive');
-    c.header('X-Accel-Buffering', 'no');
-
-    return streamSSE(c, async (stream) => {
-      let isClosed = false;
-
-      const sendEvent = async (event: string, payload: Record<string, unknown>) => {
-        if (isClosed) return;
-        await stream.writeSSE({
-          event,
-          data: JSON.stringify(payload),
-        });
-      };
-
-      logger.info('SSE stream connected');
-      await sendEvent('connected', {
-        message: 'Stream generate jadwal terhubung',
-        timestamp: new Date().toISOString(),
-      });
-
-      const heartbeat = setInterval(() => {
-        void sendEvent('heartbeat', {
-          message: 'Generate jadwal masih diproses',
-          timestamp: new Date().toISOString(),
-        });
-      }, 5000);
-
-      stream.onAbort(() => {
-        isClosed = true;
-        abortController.abort();
-        clearInterval(heartbeat);
-        logger.info('SSE stream aborted');
-      });
-
-      try {
-        await JadwalDraftService.generate(
-          data,
-          context,
-          sendEvent,
-          abortController.signal
-        );
-      } catch (err: any) {
-        if (!abortController.signal.aborted) {
-          await sendEvent('error', {
-            response: false,
-            message: err.message || 'Gagal generate jadwal draft',
-            statusCode: err.statusCode || 500,
-          });
-        }
-      } finally {
-        isClosed = true;
-        clearInterval(heartbeat);
-        logger.info('SSE stream finished', {
-          aborted: abortController.signal.aborted,
-        });
-      }
+    return streamWorkerJob(c, {
+      jobId: job.id,
+      connectedMessage: 'Stream generate jadwal terhubung ke worker',
+      heartbeatMessage: 'Generate jadwal masih diproses worker',
     });
+  }
+
+  public static async getGenerateJob(c: Context) {
+    const { job_id } = c.req.param();
+    return c.json(await WorkerJobService.get(job_id));
   }
 
   public static async getDrafts(c: Context) {
     const batch_id = c.req.query('batch_id');
     const statusRaw = c.req.query('status');
     const status = statusRaw as StatusJadwalDraft | undefined;
-    return c.json(
-      await JadwalDraftService.getDrafts({ batch_id, status })
-    );
+    return c.json(await JadwalDraftService.getDrafts({ batch_id, status }));
   }
 
   public static async getDraftsByBatch(c: Context) {

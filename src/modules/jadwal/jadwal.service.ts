@@ -21,6 +21,15 @@ import prisma from '../../infrastructures/db.infrastructure';
 import redisService from '../../infrastructures/redis.infrastructure';
 import CacheInvalidation from '../../utils/cache-invalidation.util';
 import { hashCacheKey } from '../../utils/cache-key.util';
+import googleCalendarService from '../../infrastructures/google-calendar.infrastructure';
+import WorkerJobService from '../worker-job/worker-job.service';
+import {
+  WorkerJobType,
+  type WorkerJadwalEmailAction,
+} from '../worker-job/worker-job.type';
+import { createLogger } from '../../utils/logger.util';
+
+const logger = createLogger('JadwalService');
 
 type JenisSeminarConfig = {
   id: string;
@@ -422,10 +431,14 @@ export default class JadwalService {
     await CacheInvalidation.invalidateJadwal();
     await CacheInvalidation.invalidatePendaftaran();
 
+    const googleCalendarJob =
+      await JadwalService.enqueueGoogleCalendarInvitation(id, 'created');
+
     return {
       response: true,
       message: 'Jadwal berhasil ditambahkan',
       data: jadwalWithTimezone,
+      google_calendar: googleCalendarJob,
     };
   }
 
@@ -531,10 +544,14 @@ export default class JadwalService {
     await CacheInvalidation.invalidateJadwal();
     await CacheInvalidation.invalidatePendaftaran();
 
+    const googleCalendarJob =
+      await JadwalService.enqueueGoogleCalendarInvitation(id, 'updated');
+
     return {
       response: true,
       message: 'Jadwal berhasil diperbarui',
       data: jadwalWithTimezone,
+      google_calendar: googleCalendarJob,
     };
   }
 
@@ -583,6 +600,69 @@ export default class JadwalService {
       response: true,
       message: 'Jadwal berhasil dihapus',
     };
+  }
+
+  private static async enqueueGoogleCalendarInvitation(
+    jadwalId: string,
+    action: WorkerJadwalEmailAction
+  ) {
+    try {
+      const job = await WorkerJobService.enqueue(
+        WorkerJobType.JADWAL_EMAIL_SEND,
+        { jadwalId, action },
+        { maxAttempts: 5 }
+      );
+      return {
+        success: true,
+        queued: true,
+        job_id: job.id,
+        status: job.status,
+        message: 'Undangan jadwal akan dikirim oleh worker.',
+      };
+    } catch (error: any) {
+      logger.error('Google Calendar invitation queue failed', {
+        jadwalId,
+        action,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        success: false,
+        queued: false,
+        skipped: false,
+        message:
+          'Jadwal tersimpan, tetapi undangan Google Calendar gagal masuk antrean worker',
+        error: error?.message ?? 'Unknown error',
+      };
+    }
+  }
+
+  public static async sendGoogleCalendarInvitationById(
+    jadwalId: string,
+    action: WorkerJadwalEmailAction
+  ) {
+    const jadwal = await JadwalRepository.findById(jadwalId);
+    if (!jadwal) {
+      logger.warn('Google Calendar invitation skipped: jadwal not found', {
+        jadwalId,
+        action,
+      });
+      return {
+        success: false,
+        skipped: true,
+        message: 'Jadwal tidak ditemukan, undangan Google Calendar dilewati',
+      };
+    }
+
+    try {
+      return await googleCalendarService.syncJadwalInvitation(jadwal, action);
+    } catch (error: any) {
+      logger.error('Google Calendar API Error', {
+        jadwalId,
+        action,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   private static async validateJenisSeminar(

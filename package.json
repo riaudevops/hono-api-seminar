@@ -4,7 +4,8 @@
     "start": "bun run src/index.ts",
     "start:worker": "bun run src/worker.ts",
     "dev": "bun run --hot src/index.ts",
-    "dev:worker": "bun run --hot src/worker.ts"
+    "dev:worker": "bun run --hot src/worker.ts",
+    "demo:reset-db": "bun scripts/reset-demo-db.ts"
   },
   "prisma": {
     "seed": "bun run --hot prisma/seed.ts"

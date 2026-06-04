@@ -86,6 +86,11 @@ ${Object.entries(SEMINAR_DURATION_MINUTES)
 ### Jam Operasional
 - Jam kerja: ${OPERATING_HOURS.start} - ${OPERATING_HOURS.end} WIB
 - Hari kerja: ${WORK_DAYS.map((d) => DAY_NAMES[d]).join(', ')}
+- **WAJIB**: \`waktu_selesai\` setiap jadwal HARUS ≤ ${OPERATING_HOURS.end} WIB. Jadwal yang berakhir setelah ${OPERATING_HOURS.end} (mis. 17:30, 18:00) akan ditolak validator.
+- Karena durasi seminar fixed, batas akhir \`waktu_mulai\`:
+  - SEMKP (60 menit): paling lambat 16:00 (selesai 17:00)
+  - SEMPRO/SEMHAS/SIDANG (120 menit): paling lambat 15:00 (selesai 17:00)
+- Bila hari penuh, dorong ke hari kerja berikutnya. JANGAN meleber lewat 17:00.
 
 ### Constraint
 - Tidak ada buffer antar seminar di ruangan yang sama; jadwal boleh berurutan langsung jika waktu selesai sama dengan waktu mulai berikutnya

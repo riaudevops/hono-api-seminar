@@ -6,6 +6,12 @@ import {
   type Prisma,
 } from '@prisma/client';
 import { APIError } from '../../utils/api-error.util';
+import { createLogger } from '../../utils/logger.util';
+import WorkerJobService from '../worker-job/worker-job.service';
+import {
+  type WorkerJobPublic,
+  WorkerJobType,
+} from '../worker-job/worker-job.type';
 import LogRepository from './log.repository';
 import type {
   CreateLogType,
@@ -32,6 +38,8 @@ export interface CreatePenilaianLogInput {
   old_nilai?: number | null;
   new_nilai?: number | null;
 }
+
+const logger = createLogger('LogService');
 
 export default class LogService {
   public static getActorContext(user?: {
@@ -186,6 +194,15 @@ export default class LogService {
   }
 
   public static async create(data: CreateLogType) {
+    const log = await LogService.enqueueCreateLog(data);
+    return {
+      response: true,
+      message: 'Log berhasil dikirim ke worker.',
+      data: log,
+    };
+  }
+
+  public static async createSync(data: CreateLogType) {
     const log = await LogRepository.create(data);
     return {
       response: true,
@@ -195,7 +212,31 @@ export default class LogService {
   }
 
   public static async createEntityLog(data: CreateLogType) {
+    return LogService.enqueueCreateLog(data);
+  }
+
+  public static async createEntityLogSync(data: CreateLogType) {
     return LogRepository.create(data);
+  }
+
+  private static async enqueueCreateLog(
+    data: CreateLogType
+  ): Promise<
+    WorkerJobPublic | Awaited<ReturnType<typeof LogRepository.create>>
+  > {
+    try {
+      return await WorkerJobService.enqueue(WorkerJobType.LOG_CREATE, data, {
+        maxAttempts: 5,
+      });
+    } catch (error) {
+      logger.warn('Worker log queue unavailable, writing log synchronously', {
+        action: data.action,
+        entity_type: data.entity_type,
+        entity_id: data.entity_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return LogService.createEntityLogSync(data);
+    }
   }
 
   public static async createEntityLogTx(tx: any, data: CreateLogType) {

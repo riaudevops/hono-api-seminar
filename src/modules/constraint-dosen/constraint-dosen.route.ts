@@ -35,6 +35,12 @@ constraintDosenRoute.post(
   ConstraintDosenHandler.chat
 );
 
+// constraintDosenRoute.get(
+//   '/dosen/constraint-saya/chat/jobs/:job_id',
+//   AuthMiddleware.JWTBearerTokenExtraction,
+//   ConstraintDosenHandler.getChatJob
+// );
+
 constraintDosenRoute.get(
   '/dosen/constraint-saya/:id',
   AuthMiddleware.JWTBearerTokenExtraction,
