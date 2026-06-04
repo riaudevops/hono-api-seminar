@@ -373,22 +373,27 @@ export default class JadwalService {
       penilai: data.penilai,
     });
 
-    const id = await JadwalHelper.generateId(jenis.kode);
     const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
-
-    const existing = await JadwalRepository.existsByMahasiswaAndJenis(
-      data.nim,
-      jenis.id,
-      kode_tahun_ajaran
-    );
-    if (existing) {
-      throw new APIError(
-        `Mahasiswa ${data.nim} sudah memiliki jadwal untuk jenis ${jenis.kode}`,
-        400
-      );
-    }
+    let createdId = '';
 
     const jadwalWithTimezone = await prisma.$transaction(async (tx) => {
+      const existing = await JadwalRepository.existsByMahasiswaAndJenis(
+        data.nim,
+        jenis.id,
+        kode_tahun_ajaran,
+        undefined,
+        tx
+      );
+      if (existing) {
+        throw new APIError(
+          `Mahasiswa ${data.nim} sudah memiliki jadwal untuk jenis ${jenis.kode}`,
+          400
+        );
+      }
+
+      const id = await JadwalHelper.generateId(jenis.kode, tx);
+      createdId = id;
+
       await JadwalRepository.create(
         {
           id,
@@ -432,7 +437,7 @@ export default class JadwalService {
     await CacheInvalidation.invalidatePendaftaran();
 
     const googleCalendarJob =
-      await JadwalService.enqueueGoogleCalendarInvitation(id, 'created');
+      await JadwalService.enqueueGoogleCalendarInvitation(createdId, 'created');
 
     return {
       response: true,

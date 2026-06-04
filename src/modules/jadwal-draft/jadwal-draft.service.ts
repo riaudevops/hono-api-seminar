@@ -16,12 +16,15 @@ import openRouterService from '../../infrastructures/openrouter.infrastructure';
 import prisma from '../../infrastructures/db.infrastructure';
 import redisService from '../../infrastructures/redis.infrastructure';
 import { GenerateBatchOutputSchema } from '../../prompts/output/schedule-schema';
-import { getScheduleRulesAsText } from '../../prompts/context/schedule-rules';
+import {
+  BREAK_TIME,
+  getScheduleRulesAsText,
+  SEMINAR_DURATION_MINUTES,
+} from '../../prompts/context/schedule-rules';
 import JadwalDraftRepository from './jadwal-draft.repository';
 import { JadwalRepository, JadwalService } from '../jadwal';
 import RuanganRepository from '../ruangan/ruangan.repository';
 import { ConstraintDosenRepository } from '../constraint-dosen';
-import PenilaianRepository from '../../repositories/penilaian.repository';
 import { LogService } from '../../modules/log';
 import JadwalHelper from '../../helpers/jadwal.helper';
 import JenisSeminarHelper from '../../helpers/jenis-seminar.helper';
@@ -335,6 +338,7 @@ export default class JadwalDraftService {
         excludedDates: data.tanggal_dikecualikan || [],
         tanggalMulai,
         endDate,
+        constraintList,
       });
 
       JadwalDraftService.validateGeneratedDraftsHardConstraints({
@@ -347,6 +351,7 @@ export default class JadwalDraftService {
         excludedDates: data.tanggal_dikecualikan || [],
         tanggalMulai,
         endDate,
+        constraintList,
       });
 
       drafts.push(...chunkDrafts);
@@ -607,7 +612,7 @@ export default class JadwalDraftService {
           const kode = await JenisSeminarHelper.resolveKodeById(
             draft.id_jenis_seminar
           );
-          const id = await JadwalHelper.generateId(kode);
+          const id = await JadwalHelper.generateId(kode, tx);
 
           const jadwal = await tx.jadwal.create({
             data: {
@@ -1009,7 +1014,10 @@ export default class JadwalDraftService {
         ),
         kode_ruangan: s.kode_ruangan,
         list_dosen: mhsInput?.list_dosen || [],
-        llm_reasoning: { reasoning: s.reasoning },
+        llm_reasoning: {
+          reasoning: s.reasoning,
+          jenis: s.jenis,
+        },
         confidence: s.confidence,
       });
     }
@@ -1030,17 +1038,13 @@ export default class JadwalDraftService {
     excludedDates: string[];
     tanggalMulai: Date;
     endDate: Date;
+    constraintList: any[];
   }) {
     const blockingSchedules = [...params.existingBlockingSchedules];
 
     for (const draft of params.drafts) {
       const original = JadwalDraftService.summarizeDraftForLog(draft);
-      const durationMinutes = Math.max(
-        60,
-        Math.round(
-          (draft.waktu_selesai.getTime() - draft.waktu_mulai.getTime()) / 60_000
-        )
-      );
+      const durationMinutes = JadwalDraftService.getDraftDurationMinutes(draft);
 
       const repaired = JadwalDraftService.findFirstValidSlot({
         draft,
@@ -1050,6 +1054,7 @@ export default class JadwalDraftService {
         excludedDates: params.excludedDates,
         tanggalMulai: params.tanggalMulai,
         endDate: params.endDate,
+        constraintList: params.constraintList,
       });
 
       if (!repaired) {
@@ -1104,6 +1109,7 @@ export default class JadwalDraftService {
     excludedDates: string[];
     tanggalMulai: Date;
     endDate: Date;
+    constraintList: any[];
   }) {
     const excludedDates = new Set(params.excludedDates);
     const minDate = JadwalHelper.formatDateInJakarta(params.tanggalMulai);
@@ -1125,6 +1131,9 @@ export default class JadwalDraftService {
           waktuMulai,
           params.durationMinutes
         );
+        if (JadwalDraftService.overlapsBreakTime(waktuMulai, waktuSelesai)) {
+          continue;
+        }
 
         for (const kodeRuangan of params.activeRoomCodes) {
           const hasConflict = params.blockingSchedules.some((schedule) => {
@@ -1144,14 +1153,25 @@ export default class JadwalDraftService {
             return schedule.dosen_terlibat.some((nip) => draftNips.has(nip));
           });
 
-          if (!hasConflict) {
-            return {
+          if (hasConflict) continue;
+          if (
+            !JadwalDraftService.satisfiesDosenConstraints({
+              nips: [...draftNips],
               tanggal,
-              waktu_mulai: waktuMulai,
-              waktu_selesai: waktuSelesai,
-              kode_ruangan: kodeRuangan,
-            };
+              waktuMulai,
+              waktuSelesai,
+              constraintList: params.constraintList,
+            })
+          ) {
+            continue;
           }
+
+          return {
+            tanggal,
+            waktu_mulai: waktuMulai,
+            waktu_selesai: waktuSelesai,
+            kode_ruangan: kodeRuangan,
+          };
         }
       }
     }
@@ -1185,6 +1205,15 @@ export default class JadwalDraftService {
     return times;
   }
 
+  private static overlapsBreakTime(waktuMulai: string, waktuSelesai: string) {
+    return JadwalDraftService.timeStringsOverlap(
+      waktuMulai,
+      waktuSelesai,
+      BREAK_TIME.start,
+      BREAK_TIME.end
+    );
+  }
+
   private static addMinutesToTime(time: string, minutesToAdd: number) {
     const [hours, minutes] = time.split(':').map(Number);
     return JadwalDraftService.minutesToTime(
@@ -1192,10 +1221,115 @@ export default class JadwalDraftService {
     );
   }
 
+  private static diffTimeMinutes(waktuMulai: string, waktuSelesai: string) {
+    const [startHours, startMinutes] = waktuMulai.split(':').map(Number);
+    const [endHours, endMinutes] = waktuSelesai.split(':').map(Number);
+    return endHours * 60 + endMinutes - (startHours * 60 + startMinutes);
+  }
+
   private static minutesToTime(totalMinutes: number) {
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+
+  private static satisfiesDosenConstraints(params: {
+    nips: string[];
+    tanggal: string;
+    waktuMulai: string;
+    waktuSelesai: string;
+    constraintList: any[];
+  }) {
+    const day = new Date(`${params.tanggal}T00:00:00.000Z`).getUTCDay();
+    const activeConstraints = params.constraintList.filter((item) =>
+      params.nips.includes(item.nip)
+    );
+
+    for (const item of activeConstraints) {
+      const constraints: any[] = Array.isArray(item.constraints)
+        ? item.constraints
+        : [];
+      const available = constraints.filter(
+        (constraint) =>
+          constraint.type === 'AVAILABLE_TIME' &&
+          (constraint.hari == null || constraint.hari === day)
+      );
+
+      if (
+        available.length > 0 &&
+        !available.some((constraint) =>
+          JadwalDraftService.constraintCoversSlot(
+            constraint,
+            params.waktuMulai,
+            params.waktuSelesai
+          )
+        )
+      ) {
+        return false;
+      }
+
+      const unavailable = constraints.filter(
+        (constraint) =>
+          constraint.type === 'UNAVAILABLE_TIME' &&
+          (constraint.hari == null || constraint.hari === day)
+      );
+      if (
+        unavailable.some((constraint) =>
+          JadwalDraftService.constraintOverlapsSlot(
+            constraint,
+            params.waktuMulai,
+            params.waktuSelesai
+          )
+        )
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private static constraintCoversSlot(
+    constraint: any,
+    waktuMulai: string,
+    waktuSelesai: string
+  ) {
+    if (!constraint.waktu_mulai || !constraint.waktu_selesai) return true;
+    return (
+      constraint.waktu_mulai <= waktuMulai &&
+      constraint.waktu_selesai >= waktuSelesai
+    );
+  }
+
+  private static constraintOverlapsSlot(
+    constraint: any,
+    waktuMulai: string,
+    waktuSelesai: string
+  ) {
+    if (!constraint.waktu_mulai || !constraint.waktu_selesai) return true;
+    return JadwalDraftService.timeStringsOverlap(
+      waktuMulai,
+      waktuSelesai,
+      constraint.waktu_mulai,
+      constraint.waktu_selesai
+    );
+  }
+
+  private static getDraftDurationMinutes(draft: CreateJadwalDraftInput) {
+    const jenis =
+      typeof draft.llm_reasoning?.jenis === 'string'
+        ? draft.llm_reasoning.jenis
+        : null;
+
+    return jenis && SEMINAR_DURATION_MINUTES[jenis]
+      ? SEMINAR_DURATION_MINUTES[jenis]
+      : Math.max(
+          60,
+          Math.round(
+            (draft.waktu_selesai.getTime() - draft.waktu_mulai.getTime()) /
+              60_000
+          )
+        );
   }
 
   private static summarizeDraftForLog(draft: CreateJadwalDraftInput) {
@@ -1221,6 +1355,7 @@ export default class JadwalDraftService {
     excludedDates: string[];
     tanggalMulai: Date;
     endDate: Date;
+    constraintList: any[];
   }) {
     const excludedDates = new Set(params.excludedDates);
     const minDate = JadwalHelper.formatDateInJakarta(params.tanggalMulai);
@@ -1292,6 +1427,55 @@ export default class JadwalDraftService {
         );
       }
 
+      const expectedDuration =
+        JadwalDraftService.getDraftDurationMinutes(draft);
+      const actualDuration = JadwalDraftService.diffTimeMinutes(
+        waktuMulai,
+        waktuSelesai
+      );
+      if (actualDuration !== expectedDuration) {
+        logger.error('Hard constraint failed: durasi seminar tidak sesuai', {
+          draft: draftSummary,
+          expectedDuration,
+          actualDuration,
+        });
+        throw new APIError(
+          'AI menghasilkan durasi jadwal yang tidak sesuai jenis seminar. Silakan coba lagi.',
+          502
+        );
+      }
+
+      if (JadwalDraftService.overlapsBreakTime(waktuMulai, waktuSelesai)) {
+        logger.error('Hard constraint failed: overlap jam istirahat', {
+          draft: draftSummary,
+          breakTime: `${BREAK_TIME.start}–${BREAK_TIME.end} WIB`,
+        });
+        throw new APIError(
+          'AI menghasilkan jadwal pada jam istirahat. Silakan coba lagi.',
+          502
+        );
+      }
+
+      const draftNips = new Set(draft.list_dosen.map((d) => d.nip));
+      if (
+        !JadwalDraftService.satisfiesDosenConstraints({
+          nips: [...draftNips],
+          tanggal,
+          waktuMulai,
+          waktuSelesai,
+          constraintList: params.constraintList,
+        })
+      ) {
+        logger.error('Hard constraint failed: constraint dosen', {
+          draft: draftSummary,
+          nips: [...draftNips],
+        });
+        throw new APIError(
+          'AI menghasilkan jadwal yang melanggar constraint dosen. Silakan coba lagi.',
+          502
+        );
+      }
+
       const day = new Date(`${tanggal}T00:00:00.000Z`).getUTCDay();
       if (day === 0 || day === 6) {
         const dayNames = [
@@ -1343,7 +1527,6 @@ export default class JadwalDraftService {
           );
         }
 
-        const draftNips = new Set(draft.list_dosen.map((d) => d.nip));
         const conflictingNips = schedule.dosen_terlibat.filter((nip) =>
           draftNips.has(nip)
         );

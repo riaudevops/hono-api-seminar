@@ -189,9 +189,10 @@ export default class JadwalRepository {
   }
 
   public static async findLastIdByPrefix(
-    prefix: string
+    prefix: string,
+    client: PrismaClientOrTx = prisma
   ): Promise<string | null> {
-    const lastJadwal = await prisma.jadwal.findFirst({
+    const lastJadwal = await client.jadwal.findFirst({
       where: { id: { startsWith: prefix } },
       orderBy: { id: 'desc' },
       select: { id: true },

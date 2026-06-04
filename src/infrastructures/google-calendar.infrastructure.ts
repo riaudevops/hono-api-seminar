@@ -94,20 +94,8 @@ class GoogleCalendarService {
       };
     }
 
-    const attendees = this.buildAttendees(jadwal);
-    if (attendees.length === 0) {
-      logger.warn('Google Calendar invitation skipped: no lecturer email', {
-        jadwalId: jadwal.id,
-      });
-      return {
-        success: false,
-        skipped: true,
-        message: 'Google Calendar dilewati karena email dosen tidak tersedia',
-      };
-    }
-
     const eventId = this.buildEventId(jadwal.id);
-    const requestBody = this.buildEvent(jadwal, attendees, action);
+    const requestBody = this.buildEvent(jadwal, action);
     const calendarId = config.google.calendarId;
     const sendUpdates = config.app.isProduction ? 'all' : 'none';
 
@@ -131,7 +119,7 @@ class GoogleCalendarService {
         htmlLink: response.data.htmlLink,
         message:
           sendUpdates === 'all'
-            ? 'Undangan Google Calendar berhasil diperbarui dan dikirim ke dosen'
+            ? 'Event Google Calendar berhasil diperbarui tanpa attendee/undangan email'
             : 'Event Google Calendar berhasil diperbarui tanpa mengirim email (non-production)',
       };
     } catch (error: any) {
@@ -166,14 +154,13 @@ class GoogleCalendarService {
       htmlLink: response.data.htmlLink,
       message:
         sendUpdates === 'all'
-          ? 'Undangan Google Calendar berhasil dibuat dan dikirim ke dosen'
+          ? 'Event Google Calendar berhasil dibuat tanpa attendee/undangan email'
           : 'Event Google Calendar berhasil dibuat tanpa mengirim email (non-production)',
     };
   }
 
   private buildEvent(
     jadwal: JadwalForCalendar,
-    attendees: calendar_v3.Schema$EventAttendee[],
     action: CalendarSyncAction
   ): calendar_v3.Schema$Event {
     const jenisNama = jadwal.jenis_seminar?.nama ?? 'Seminar';
@@ -194,7 +181,6 @@ class GoogleCalendarService {
         dateTime: jadwal.waktu_selesai.toISOString(),
         timeZone: TIME_ZONE,
       },
-      attendees,
       guestsCanInviteOthers: false,
       guestsCanModify: false,
       guestsCanSeeOtherGuests: true,
@@ -236,8 +222,8 @@ class GoogleCalendarService {
       .join('');
 
     const opening = isUpdate
-      ? 'Terdapat perubahan jadwal seminar. Mohon meninjau kembali detail jadwal berikut dan memberikan konfirmasi kehadiran melalui tombol RSVP pada undangan Google Calendar ini.'
-      : 'Anda diundang sebagai dosen pada jadwal seminar berikut. Mohon memberikan konfirmasi kehadiran melalui tombol RSVP pada undangan Google Calendar ini.';
+      ? 'Terdapat perubahan jadwal seminar. Mohon meninjau kembali detail jadwal berikut.'
+      : 'Berikut detail jadwal seminar yang telah dibuat.';
 
     return [
       '<p>Yth. Bapak/Ibu Dosen,</p>',
@@ -250,27 +236,10 @@ class GoogleCalendarService {
       `<li><b>Ruangan:</b> ${this.escapeHtml(ruangan)}</li>`,
       '</ul>',
       dosenList ? `<p><b>Daftar Dosen:</b></p><ul>${dosenList}</ul>` : '',
-      '<p>Silakan pilih <b>Yes</b>, <b>Maybe</b>, atau <b>No</b> pada undangan ini agar koordinator mengetahui status kehadiran Bapak/Ibu.</p>',
       '<p>Terima kasih.</p>',
     ]
       .filter(Boolean)
       .join('\n');
-  }
-
-  private buildAttendees(
-    jadwal: JadwalForCalendar
-  ): calendar_v3.Schema$EventAttendee[] {
-    const seen = new Set<string>();
-    return (jadwal.penilaian ?? [])
-      .map((item) => item.dosen?.email?.trim())
-      .filter((email): email is string => Boolean(email))
-      .filter((email) => {
-        const key = email.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map((email) => ({ email }));
   }
 
   private buildLocation(jadwal: JadwalForCalendar) {

@@ -2,7 +2,6 @@ import { JadwalRepository } from '../modules/jadwal';
 import JenisSeminarHelper from './jenis-seminar.helper';
 
 export default class JadwalHelper {
-  private static readonly SERVER_TIMEZONE = 'Europe/Stockholm';
   private static readonly CLIENT_TIMEZONE = 'Asia/Jakarta';
 
   private static getTahunAkademik(): string {
@@ -20,12 +19,19 @@ export default class JadwalHelper {
    * Generate jadwal id dari kode jenis seminar, bukan id FK.
    * Prefix id tetap pakai singkatan kode (agar id human-readable).
    */
-  public static async generateId(kodeJenis: string): Promise<string> {
-    const singkatan = this.singkatanKode(kodeJenis);
-    const tahunAjaran = this.getTahunAkademik();
+  public static async generateId(
+    kodeJenis: string,
+    client?: any
+  ): Promise<string> {
+    const singkatan = JadwalHelper.singkatanKode(kodeJenis);
+    const tahunAjaran = JadwalHelper.getTahunAkademik();
     const prefix = `J${singkatan}${tahunAjaran}`;
 
-    const lastId = await JadwalRepository.findLastIdByPrefix(prefix);
+    if (client?.$executeRaw) {
+      await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${prefix}))`;
+    }
+
+    const lastId = await JadwalRepository.findLastIdByPrefix(prefix, client);
 
     let nextNumber = 1;
     if (lastId) {
@@ -52,14 +58,17 @@ export default class JadwalHelper {
   }
 
   /** Overload legacy: panggil dengan id FK → resolve jadi kode dulu */
-  public static async generateIdByJenisId(id_jenis_seminar: string): Promise<string> {
+  public static async generateIdByJenisId(
+    id_jenis_seminar: string,
+    client?: any
+  ): Promise<string> {
     const kode = await JenisSeminarHelper.resolveKodeById(id_jenis_seminar);
-    return this.generateId(kode);
+    return JadwalHelper.generateId(kode, client);
   }
 
   public static convertToJakartaTimezone(date: Date): Date {
     const dateFormatter = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: this.CLIENT_TIMEZONE,
+      timeZone: JadwalHelper.CLIENT_TIMEZONE,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -74,7 +83,7 @@ export default class JadwalHelper {
 
   public static convertFromJakartaTimezone(date: Date): Date {
     const jakartaFormatter = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: this.CLIENT_TIMEZONE,
+      timeZone: JadwalHelper.CLIENT_TIMEZONE,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -93,7 +102,7 @@ export default class JadwalHelper {
 
   public static formatDateInJakarta(date: Date): string {
     return new Intl.DateTimeFormat('sv-SE', {
-      timeZone: this.CLIENT_TIMEZONE,
+      timeZone: JadwalHelper.CLIENT_TIMEZONE,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -102,7 +111,7 @@ export default class JadwalHelper {
 
   public static formatTimeInJakarta(date: Date): string {
     return new Intl.DateTimeFormat('sv-SE', {
-      timeZone: this.CLIENT_TIMEZONE,
+      timeZone: JadwalHelper.CLIENT_TIMEZONE,
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
@@ -110,17 +119,20 @@ export default class JadwalHelper {
   }
 
   public static createDateFromJakartaDate(date: string): Date {
-    return this.createDateFromJakartaDateTime(date, '00:00');
+    return JadwalHelper.createDateFromJakartaDateTime(date, '00:00');
   }
 
-  public static createDateFromJakartaDateTime(date: string, time: string): Date {
+  public static createDateFromJakartaDateTime(
+    date: string,
+    time: string
+  ): Date {
     return new Date(`${date}T${time}:00.000+07:00`);
   }
 
   public static getCurrentJakartaTime(): Date {
     const today = new Date();
     const dateFormatter = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: this.CLIENT_TIMEZONE,
+      timeZone: JadwalHelper.CLIENT_TIMEZONE,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',

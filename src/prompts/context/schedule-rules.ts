@@ -21,6 +21,12 @@ export const OPERATING_HOURS = {
   end: '17:00',
 } as const;
 
+/** Jam istirahat kampus; jadwal tidak boleh overlap dengan rentang ini */
+export const BREAK_TIME = {
+  start: '12:00',
+  end: '13:00',
+} as const;
+
 /** Hari kerja (1 = Senin, 5 = Jumat) */
 export const WORK_DAYS = [1, 2, 3, 4, 5] as const;
 
@@ -86,10 +92,13 @@ ${Object.entries(SEMINAR_DURATION_MINUTES)
 ### Jam Operasional
 - Jam kerja: ${OPERATING_HOURS.start} - ${OPERATING_HOURS.end} WIB
 - Hari kerja: ${WORK_DAYS.map((d) => DAY_NAMES[d]).join(', ')}
+- Jam istirahat: ${BREAK_TIME.start} - ${BREAK_TIME.end} WIB.
+- **WAJIB**: Jadwal TIDAK BOLEH overlap dengan jam istirahat ${BREAK_TIME.start} - ${BREAK_TIME.end} WIB. Contoh invalid: 11:00-13:00, 12:00-13:00, 12:30-13:30.
 - **WAJIB**: \`waktu_selesai\` setiap jadwal HARUS ≤ ${OPERATING_HOURS.end} WIB. Jadwal yang berakhir setelah ${OPERATING_HOURS.end} (mis. 17:30, 18:00) akan ditolak validator.
 - Karena durasi seminar fixed, batas akhir \`waktu_mulai\`:
   - SEMKP (60 menit): paling lambat 16:00 (selesai 17:00)
   - SEMPRO/SEMHAS/SIDANG (120 menit): paling lambat 15:00 (selesai 17:00)
+- Durasi seminar HARUS persis sesuai jenis. SEMKP wajib 60 menit, bukan 120 menit.
 - Bila hari penuh, dorong ke hari kerja berikutnya. JANGAN meleber lewat 17:00.
 
 ### Constraint
