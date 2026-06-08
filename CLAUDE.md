@@ -146,12 +146,23 @@ SSE helper:
 
 ### Schedule draft generation
 
-`JadwalDraftService.generate()` gathers rooms, existing schedules, dosen constraints, and requested students, chunks generation (`GENERATE_CHUNK_SIZE = 10`), calls OpenRouter, validates the model output with Zod (`GenerateBatchOutputSchema`), and creates `jadwal_draft` records. Approve/reject workflow lives in the same module.
+`JadwalDraftService.generate()` gathers rooms, existing schedules, dosen constraints, and requested students, chunks generation (`GENERATE_CHUNK_SIZE = 8`), calls OpenRouter, validates the model output with Zod (`GenerateBatchOutputSchema`), and creates `jadwal_draft` records. Approve/reject workflow lives in the same module.
+
+Generation tuning (keep small for reliability):
+
+- `GENERATE_CHUNK_SIZE = 8` mahasiswa per request. Do not set to `Infinity` — a single giant request balloons context (30-50KB), forces large output/timeout, and increases AI hallucination of constraint conflicts. Cross-chunk awareness is preserved by `generatedBlockingSchedules`, which is appended after each valid chunk and fed into the next chunk's `jadwal_ada` context. Dosen constraints are auto-filtered per chunk via `getConstraintsForNipsCached([...chunkNips])`.
+- `generateChunkSuggestions` uses `maxTokens: 8192`, `timeoutMs: 90_000`, and `response_format: { type: 'json_object' }` (structured output to reduce parse failures). `extractJsonFromAiContent` + `JSON.parse` remain as fallback.
+- Mahasiswa/dosen validation at the start of `generate()` runs in parallel (`Promise.all`), not serially, before the AI request.
+- After AI output, `repairGeneratedDraftsHardConstraints` (neuro-symbolic repair to first valid slot) runs before `validateGeneratedDraftsHardConstraints` (final hard-constraint guard). Keep both; structured output lowers parse failure, not hard-constraint failure.
 
 Important routes:
 
 - `POST /api/koordinator/jadwal-draft/generate` — enqueues worker job and returns `202` with `job_id`.
 - `POST /api/koordinator/jadwal-draft/generate/stream` — enqueues worker job and streams Redis job progress.
+
+Approve/reject:
+
+- `JadwalDraftService.approveBatch()` turns DRAFT rows into real `jadwal` inside a `prisma.$transaction`. For each approved draft it must update `pendaftaran.status_jadwal` to `SUDAH_JADWAL` via `PendaftaranRepository.updateStatusJadwalByJadwalData(nim, id_jenis_seminar, kode_tahun_ajaran, StatusJadwal.SUDAH_JADWAL, tx)`. Any code path that creates a `jadwal` (here and `JadwalService.post()`) must keep `pendaftaran.status_jadwal` in sync, matched on `nim` + `id_jenis_seminar` + `kode_tahun_ajaran`.
 
 Do not put long-running OpenRouter calls directly in HTTP handlers. Enqueue worker jobs instead.
 
@@ -173,6 +184,7 @@ Use `openRouterService.chatCompletion()` from `src/infrastructures/openrouter.in
 - Retry for transient upstream statuses (429/5xx/timeout etc.).
 - Mapping upstream failures to `APIError`.
 - Low-latency provider preferences where requested.
+- Structured output via `response_format` (`{ type: 'json_object' }` or `json_schema`) when set in `ChatCompletionOptions`. Models that do not support it are gracefully ignored by OpenRouter, so keep caller-side JSON parsing as fallback.
 
 Prompts live under `src/prompts/base`, `src/prompts/tasks`, `src/prompts/context`, and output schemas under `src/prompts/output`.
 
@@ -266,7 +278,9 @@ Guidelines:
 
 ## Error Handling and Response Shape
 
-Throw `APIError(message, statusCode)` for expected business/API errors. `GlobalHandler.error` maps `APIError` to JSON and hides unknown server errors.
+Throw `APIError(message, statusCode, details?)` for expected business/API errors. `GlobalHandler.error` maps `APIError` to JSON and hides unknown server errors.
+
+`APIError` carries an optional `details?: Record<string, unknown>` field for structured failure context. For AI validation failures (jadwal-draft and constraint-dosen workers), embed a short human-readable suffix in the message (`"<message> [Detail: ...]"`) AND populate `details`. The worker (`src/worker.ts`) logs both `error` (message) and `details`; `WorkerJobService.serializeError` persists `details` into the job record so SSE/poll responses expose it. Prefer the `buildAIError(message, detailText, details, statusCode)` helper pattern used in `jadwal-draft.service.ts` and `constraint-dosen.service.ts` instead of bare generic messages.
 
 Common response shape:
 

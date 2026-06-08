@@ -5,6 +5,7 @@ import {
   LogActionType,
   LogActorType,
   LogEntityType,
+  StatusJadwal,
   StatusJadwalDraft,
 } from '@prisma/client';
 import { APIError } from '../../utils/api-error.util';
@@ -23,6 +24,7 @@ import {
 } from '../../prompts/context/schedule-rules';
 import JadwalDraftRepository from './jadwal-draft.repository';
 import { JadwalRepository, JadwalService } from '../jadwal';
+import PendaftaranRepository from '../pendaftaran/pendaftaran.repository';
 import RuanganRepository from '../ruangan/ruangan.repository';
 import { ConstraintDosenRepository } from '../constraint-dosen';
 import { LogService } from '../../modules/log';
@@ -224,6 +226,9 @@ export default class JadwalDraftService {
     );
     const drafts: CreateJadwalDraftInput[] = [];
     const generatedBlockingSchedules: any[] = [];
+    // Akumulasi metrik repair rate (saran #3): berapa banyak draft yang harus
+    // dipindah backend karena slot AI melanggar hard constraint.
+    let batchRepairedCount = 0;
 
     logger.info('Batch chunks prepared', {
       batchId,
@@ -303,12 +308,16 @@ export default class JadwalDraftService {
         totalChunks: mahasiswaChunks.length,
       });
 
-      const result = await JadwalDraftService.generateChunkSuggestions(
+      const result = await JadwalDraftService.generateChunkSuggestionsWithRetry(
         contextData,
         {
           batchId,
           chunk: currentChunk,
           totalChunks: mahasiswaChunks.length,
+        },
+        {
+          mahasiswaChunk,
+          excludedDates: data.tanggal_dikecualikan || [],
         },
         signal
       );
@@ -341,15 +350,6 @@ export default class JadwalDraftService {
         message: `Memproses hasil generate AI chunk ${currentChunk}/${mahasiswaChunks.length}`,
       });
 
-      JadwalDraftService.validateChunkSuggestionsCoverage(
-        result.suggestions,
-        mahasiswaChunk
-      );
-      JadwalDraftService.validateExcludedDates(
-        result.suggestions,
-        data.tanggal_dikecualikan || []
-      );
-
       const chunkDrafts = await JadwalDraftService.mapSuggestionsToDrafts({
         suggestions: result.suggestions,
         mahasiswaChunk,
@@ -357,18 +357,20 @@ export default class JadwalDraftService {
         batchId,
       });
 
-      JadwalDraftService.repairGeneratedDraftsHardConstraints({
-        drafts: chunkDrafts,
-        existingBlockingSchedules: [
-          ...baseBlockingSchedules,
-          ...generatedBlockingSchedules,
-        ],
-        activeRoomCodes: ruanganList.map((r: any) => r.kode),
-        excludedDates: data.tanggal_dikecualikan || [],
-        tanggalMulai,
-        endDate,
-        constraintList,
-      });
+      const chunkRepairedCount =
+        JadwalDraftService.repairGeneratedDraftsHardConstraints({
+          drafts: chunkDrafts,
+          existingBlockingSchedules: [
+            ...baseBlockingSchedules,
+            ...generatedBlockingSchedules,
+          ],
+          activeRoomCodes: ruanganList.map((r: any) => r.kode),
+          excludedDates: data.tanggal_dikecualikan || [],
+          tanggalMulai,
+          endDate,
+          constraintList,
+        });
+      batchRepairedCount += chunkRepairedCount;
 
       JadwalDraftService.validateGeneratedDraftsHardConstraints({
         drafts: chunkDrafts,
@@ -397,6 +399,10 @@ export default class JadwalDraftService {
         durationMs: Date.now() - chunkStartedAt,
         chunkDraftCount: chunkDrafts.length,
         totalDraftCount: drafts.length,
+        repairedCount: chunkRepairedCount,
+        repairRatePct: chunkDrafts.length
+          ? Math.round((chunkRepairedCount / chunkDrafts.length) * 100)
+          : 0,
       });
 
       await sendProgress('chunk:done', {
@@ -417,6 +423,25 @@ export default class JadwalDraftService {
         404
       );
     }
+
+    // Ringkasan repair rate (saran #3): sinyal untuk prompt tuning.
+    // >50% → prompt/model perlu di-tune; <10% → LLM sudah cukup akurat.
+    const repairRatePct = drafts.length
+      ? Math.round((batchRepairedCount / drafts.length) * 100)
+      : 0;
+    const repairHint =
+      repairRatePct > 50
+        ? 'TINGGI: pertimbangkan prompt/model tuning'
+        : repairRatePct < 10
+          ? 'RENDAH: LLM cukup akurat'
+          : 'SEDANG';
+    logger.info('Batch repair rate', {
+      batchId,
+      repaired: batchRepairedCount,
+      total: drafts.length,
+      repairRatePct,
+      hint: repairHint,
+    });
 
     JadwalDraftService.validateGeneratedDraftsNoObviousConflicts(drafts);
 
@@ -693,6 +718,14 @@ export default class JadwalDraftService {
             where: { id: draft.id },
             data: { status: StatusJadwalDraft.APPROVED },
           });
+
+          await PendaftaranRepository.updateStatusJadwalByJadwalData(
+            draft.nim,
+            draft.id_jenis_seminar,
+            kode_tahun_ajaran,
+            StatusJadwal.SUDAH_JADWAL,
+            tx
+          );
 
           await LogService.createEntityLogTx(tx, {
             action: LogActionType.UPDATE,
@@ -971,6 +1004,70 @@ export default class JadwalDraftService {
     return result.data;
   }
 
+  // ===========================================================================
+  // Retry wrapper untuk satu chunk pada level kualitas output AI.
+  // Membungkus generateChunkSuggestions + coverage + excluded-dates checks.
+  // - Retry untuk kegagalan parse/format/coverage (output AI jelek).
+  // - TIDAK retry untuk abort (statusCode 499 / signal.aborted).
+  // - openRouterService sudah punya retry internal untuk transient HTTP
+  //   (429/5xx/timeout), jadi ini lapisan tambahan khusus kualitas output.
+  // Tidak ada state global yang ter-mutasi saat gagal (generatedBlockingSchedules
+  // baru di-push setelah validate sukses di main loop), jadi retry aman.
+  // ===========================================================================
+  private static async generateChunkSuggestionsWithRetry(
+    contextData: Record<string, unknown>,
+    meta: { batchId: string; chunk: number; totalChunks: number },
+    params: {
+      mahasiswaChunk: Array<{ nim: string; kode_jenis: string }>;
+      excludedDates: string[];
+    },
+    signal?: AbortSignal,
+    maxAttempts = 2
+  ) {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (signal?.aborted) {
+        throw new APIError('Generate jadwal dibatalkan oleh client', 499);
+      }
+
+      try {
+        const result = await JadwalDraftService.generateChunkSuggestions(
+          contextData,
+          meta,
+          signal
+        );
+        JadwalDraftService.validateChunkSuggestionsCoverage(
+          result.suggestions,
+          params.mahasiswaChunk
+        );
+        JadwalDraftService.validateExcludedDates(
+          result.suggestions,
+          params.excludedDates
+        );
+        return result;
+      } catch (error) {
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        // Abort tidak boleh di-retry.
+        if (statusCode === 499 || signal?.aborted) throw error;
+
+        lastError = error;
+        if (attempt < maxAttempts) {
+          logger.warn('Chunk AI generate attempt failed, retrying', {
+            batchId: meta.batchId,
+            chunk: meta.chunk,
+            totalChunks: meta.totalChunks,
+            attempt,
+            maxAttempts,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
   private static extractJsonFromAiContent(content: string) {
     const jsonFenceMatch = content.match(/```json\s*([\s\S]*?)```/i);
     if (jsonFenceMatch?.[1]) return jsonFenceMatch[1].trim();
@@ -1133,8 +1230,9 @@ export default class JadwalDraftService {
     tanggalMulai: Date;
     endDate: Date;
     constraintList: any[];
-  }) {
+  }): number {
     const blockingSchedules = [...params.existingBlockingSchedules];
+    let repairedCount = 0;
 
     for (const draft of params.drafts) {
       const original = JadwalDraftService.summarizeDraftForLog(draft);
@@ -1169,6 +1267,7 @@ export default class JadwalDraftService {
 
       const updated = JadwalDraftService.summarizeDraftForLog(draft);
       if (JSON.stringify(original) !== JSON.stringify(updated)) {
+        repairedCount += 1;
         logger.warn('AI schedule draft repaired before validation', {
           original,
           repaired: updated,
@@ -1187,6 +1286,8 @@ export default class JadwalDraftService {
         JadwalDraftService.formatGeneratedDraftForAi(draft)
       );
     }
+
+    return repairedCount;
   }
 
   private static findFirstValidSlot(params: {
