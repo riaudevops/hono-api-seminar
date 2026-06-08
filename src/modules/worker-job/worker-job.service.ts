@@ -243,9 +243,11 @@ export default class WorkerJobService {
 
   private static serializeError(error: unknown) {
     if (error instanceof Error) {
+      const details = (error as { details?: unknown }).details;
       return {
         message: error.message,
         statusCode: (error as any).statusCode,
+        ...(details !== undefined ? { details } : {}),
         stack: error.stack,
       };
     }

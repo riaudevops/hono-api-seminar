@@ -109,6 +109,7 @@ export type WorkerJobBase<
   error?: {
     message: string;
     statusCode?: number;
+    details?: unknown;
     stack?: string;
   };
 };

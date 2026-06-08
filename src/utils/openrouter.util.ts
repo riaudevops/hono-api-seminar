@@ -103,6 +103,27 @@ export interface ChatCompletionOptions {
   // Reasoning Tokens
   /** Reasoning effort level (for reasoning models) */
   reasoning_effort?: ReasoningEffort;
+
+  // Structured Output
+  /**
+   * Instruksikan model mengembalikan JSON terstruktur. Mengurangi parse
+   * failure rate untuk task yang outputnya harus JSON valid.
+   * - `{ type: 'json_object' }` aman untuk kebanyakan model OpenAI / Gemini /
+   *   Claude lewat OpenRouter.
+   * - `{ type: 'json_schema', json_schema: {...} }` untuk strict schema.
+   * Model yang tidak support biasanya di-ignore oleh OpenRouter (graceful
+   * degradation), parser di sisi caller tetap sebagai fallback.
+   */
+  response_format?:
+    | { type: 'json_object' }
+    | {
+        type: 'json_schema';
+        json_schema: {
+          name: string;
+          strict?: boolean;
+          schema: Record<string, unknown>;
+        };
+      };
 }
 
 // --- Response Types ---

@@ -407,6 +407,23 @@ export default class ConstraintDosenService {
   }
 
   // ===========================================================================
+  // Helper: bangun APIError dengan suffix "[Detail: <text>]" pada message dan
+  // field structured `details`, supaya log Worker / response API langsung
+  // memuat konteks kegagalan AI tanpa perlu cross-reference dua baris log.
+  // ===========================================================================
+  private static buildAIError(
+    message: string,
+    detailText: string,
+    details: Record<string, unknown>,
+    statusCode = 502
+  ): APIError {
+    const fullMessage = detailText
+      ? `${message} [Detail: ${detailText}]`
+      : message;
+    return new APIError(fullMessage, statusCode, details);
+  }
+
+  // ===========================================================================
   // Helper: kirim pesan ke OpenRouter dan kembalikan array ParsedConstraint
   // tervalidasi schema. Dipakai oleh chat() (create batch) dan chatUpdate().
   // ===========================================================================
@@ -432,11 +449,20 @@ export default class ConstraintDosenService {
       throw new APIError('Proses chat constraint dibatalkan oleh client', 499);
     }
 
+    const messageLength = message.length;
+    const messagePreview =
+      message.length > 80 ? `${message.slice(0, 80)}...` : message;
+
     const rawContent = response.choices?.[0]?.message?.content;
     if (!rawContent || typeof rawContent !== 'string') {
-      throw new APIError(
+      throw ConstraintDosenService.buildAIError(
         'AI tidak dapat memproses pesan Anda. Silakan coba lagi.',
-        502
+        `length pesan ${messageLength}, response kosong`,
+        {
+          reason: 'empty_ai_response',
+          messageLength,
+          messagePreview,
+        }
       );
     }
 
@@ -449,11 +475,19 @@ export default class ConstraintDosenService {
     let parsed: unknown;
     try {
       parsed = JSON.parse(jsonStr);
-    } catch {
-      logger.error('Failed to parse AI JSON output', { rawContent });
-      throw new APIError(
+    } catch (parseErr) {
+      const parseMessage =
+        parseErr instanceof Error ? parseErr.message : String(parseErr);
+      throw ConstraintDosenService.buildAIError(
         'AI mengembalikan format yang tidak valid. Silakan coba lagi.',
-        502
+        `length pesan ${messageLength}, raw length ${rawContent.length}, parse error: ${parseMessage}`,
+        {
+          reason: 'invalid_json',
+          messageLength,
+          messagePreview,
+          rawContentLength: rawContent.length,
+          parseError: parseMessage,
+        }
       );
     }
 
@@ -461,12 +495,22 @@ export default class ConstraintDosenService {
     const result = ParseConstraintOutputSchema.safeParse(wrapped);
 
     if (!result.success) {
-      logger.error('AI output validation failed', {
-        errors: result.error.issues,
-      });
-      throw new APIError(
+      const issues = result.error.issues.slice(0, 3).map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      const issueText = issues
+        .map((it) => `${it.path || '<root>'}: ${it.message}`)
+        .join('; ');
+      throw ConstraintDosenService.buildAIError(
         'AI mengembalikan data yang tidak valid. Silakan coba lagi.',
-        502
+        `length pesan ${messageLength}, ${issueText}`,
+        {
+          reason: 'schema_validation_failed',
+          messageLength,
+          messagePreview,
+          issues,
+        }
       );
     }
 

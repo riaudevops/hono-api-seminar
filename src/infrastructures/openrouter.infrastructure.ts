@@ -227,6 +227,10 @@ class OpenRouterService {
       body.reasoning = { effort: options.reasoning_effort };
     }
 
+    if (options.response_format) {
+      body.response_format = options.response_format;
+    }
+
     const baseUrl = config.baseUrl.replace(/\/$/, '');
     const timeoutMs = options.timeoutMs ?? config.timeoutMs;
     const timeoutSignal = AbortSignal.timeout(timeoutMs);

@@ -149,6 +149,7 @@ async function startWorker() {
           error instanceof Error ? error.message : String(error);
         const errStack = error instanceof Error ? error.stack : undefined;
         const errStatusCode = (error as { statusCode?: number })?.statusCode;
+        const errDetails = (error as { details?: unknown })?.details;
         logger.error('Worker job failed', {
           jobId: job.id,
           type: job.type,
@@ -157,6 +158,7 @@ async function startWorker() {
           maxAttempts: latest?.max_attempts,
           statusCode: errStatusCode,
           error: errMessage,
+          ...(errDetails !== undefined ? { details: errDetails } : {}),
           stack: errStack,
         });
       }

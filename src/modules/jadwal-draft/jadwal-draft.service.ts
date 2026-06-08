@@ -38,10 +38,16 @@ import type {
 } from './jadwal-draft.type';
 
 const logger = createLogger('JadwalDraftService');
-// Generate semua mahasiswa dalam satu request AI agar AI bisa menyebar slot
-// secara global tanpa masalah konflik antar-chunk. Pastikan maxTokens di
-// generateChunkSuggestions cukup besar untuk total output mahasiswa.
-const GENERATE_CHUNK_SIZE = Number.POSITIVE_INFINITY;
+// Chunking 8 mahasiswa/request: trade-off antara context size dan global awareness.
+// - Context per request kecil (≈10-15KB) sehingga AI lebih reliable, output ≤2-4KB,
+//   parse failure rate turun, latency per chunk ≈15-30 detik vs 2-4 menit.
+// - Antar-chunk awareness dijaga oleh `generatedBlockingSchedules` yang di-update
+//   setelah tiap chunk valid, lalu di-feed ke `buildChunkContextData` chunk berikutnya
+//   sebagai entry `jadwal_ada` (lihat loop di generate()). Jadi chunk N+1 tahu slot
+//   yang sudah terpakai chunk N.
+// - Constraint dosen sudah otomatis terfilter per chunk lewat
+//   `getConstraintsForNipsCached([...chunkNips])` (line ~241).
+const GENERATE_CHUNK_SIZE = 8;
 
 type GenerateProgressEmitter = (
   event: string,
@@ -106,44 +112,67 @@ export default class JadwalDraftService {
     await sendProgress('jenis:resolving', {
       message: 'Mencocokkan jenis seminar',
     });
+    // Resolve kode_jenis → id_jenis_seminar paralel agar tidak serial-await
+    // tiap kode ke DB.
+    await sendProgress('jenis:resolving', {
+      message: 'Mencocokkan jenis seminar',
+    });
     const kodeSet = new Set<string>();
     for (const mhs of data.list_mahasiswa) kodeSet.add(mhs.kode_jenis);
     const kodeToId = new Map<string, string>();
-    for (const kode of kodeSet) {
-      kodeToId.set(kode, await JenisSeminarHelper.resolveIdByKode(kode));
-    }
+    const kodeArr = [...kodeSet];
+    const idArr = await Promise.all(
+      kodeArr.map((kode) => JenisSeminarHelper.resolveIdByKode(kode))
+    );
+    kodeArr.forEach((kode, i) => kodeToId.set(kode, idArr[i]));
 
     const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
-    // Validate mahasiswa + dosen + cek existing jadwal
+    // Validate mahasiswa + dosen + cek existing jadwal secara paralel.
+    // Sebelumnya: serial await per mahasiswa = N round-trip DB sebelum AI dimulai.
+    // Sekarang: emit progress 'validating:start', kemudian semua tugas validasi
+    // berjalan bersamaan; progress per-item dipancarkan saat tiap tugas selesai.
     const allNips = new Set<string>();
-    for (const [index, mhs] of data.list_mahasiswa.entries()) {
-      await sendProgress('validating', {
-        current: index + 1,
-        total: data.list_mahasiswa.length,
-        nim: mhs.nim,
-        message: `Memvalidasi mahasiswa ${mhs.nim}`,
-      });
-      await JadwalService.validateMahasiswa(mhs.nim);
+    const totalMhs = data.list_mahasiswa.length;
+    await sendProgress('validating:start', {
+      total: totalMhs,
+      message: `Memvalidasi ${totalMhs} mahasiswa`,
+    });
 
-      const idJenis = kodeToId.get(mhs.kode_jenis)!;
-      const existing = await JadwalRepository.existsByMahasiswaAndJenis(
-        mhs.nim,
-        idJenis,
-        kode_tahun_ajaran
-      );
-      if (existing) {
-        throw new APIError(
-          `Mahasiswa ${mhs.nim} sudah memiliki jadwal untuk jenis ${mhs.kode_jenis}`,
-          400
+    let validatedCount = 0;
+    await Promise.all(
+      data.list_mahasiswa.map(async (mhs) => {
+        const idJenis = kodeToId.get(mhs.kode_jenis)!;
+
+        const [, existing] = await Promise.all([
+          JadwalService.validateMahasiswa(mhs.nim),
+          JadwalRepository.existsByMahasiswaAndJenis(
+            mhs.nim,
+            idJenis,
+            kode_tahun_ajaran
+          ),
+        ]);
+        if (existing) {
+          throw new APIError(
+            `Mahasiswa ${mhs.nim} sudah memiliki jadwal untuk jenis ${mhs.kode_jenis}`,
+            400
+          );
+        }
+
+        await Promise.all(
+          mhs.list_dosen.map((d) => JadwalService.validateDosen(d.nip, d.role))
         );
-      }
+        for (const d of mhs.list_dosen) allNips.add(d.nip);
 
-      for (const d of mhs.list_dosen) {
-        await JadwalService.validateDosen(d.nip, d.role);
-        allNips.add(d.nip);
-      }
-    }
+        validatedCount += 1;
+        await sendProgress('validating', {
+          current: validatedCount,
+          total: totalMhs,
+          nim: mhs.nim,
+          message: `Memvalidasi mahasiswa ${mhs.nim}`,
+        });
+      })
+    );
 
     const tanggalMulai = new Date(data.tanggal_mulai);
     const endDate = new Date(tanggalMulai);
@@ -857,17 +886,29 @@ export default class JadwalDraftService {
         textMessage('user', JSON.stringify(contextData)),
       ],
       temperature: 0.3,
-      maxTokens: 32768,
+      // Chunk size 8 mahasiswa: output JSON 8 suggestion ~2-4KB, 8192 token jelas muat.
+      maxTokens: 8192,
+      // Structured output: mengurangi parse failure (rawContent kosong / non-JSON /
+      // markdown fence). extractJsonFromAiContent tetap dipertahankan sebagai fallback.
+      response_format: { type: 'json_object' },
       provider: { sort: 'latency' },
       signal,
-      timeoutMs: 240_000,
+      // 90 detik per chunk: chunk kecil + structured output cukup ~15-30 detik;
+      // 90 detik beri safety margin tanpa bikin user nunggu lama saat retry.
+      timeoutMs: 90_000,
     });
 
     const rawContent = response.choices?.[0]?.message?.content;
     if (!rawContent || typeof rawContent !== 'string') {
-      throw new APIError(
+      throw JadwalDraftService.buildAIError(
         'AI tidak dapat memproses permintaan. Silakan coba lagi.',
-        502
+        `chunk ${meta.chunk}/${meta.totalChunks}, response kosong`,
+        {
+          reason: 'empty_ai_response',
+          batchId: meta.batchId,
+          chunkIndex: meta.chunk,
+          totalChunks: meta.totalChunks,
+        }
       );
     }
 
@@ -876,30 +917,54 @@ export default class JadwalDraftService {
     let parsed: unknown;
     try {
       parsed = JSON.parse(jsonStr);
-    } catch {
+    } catch (parseErr) {
+      const parseMessage =
+        parseErr instanceof Error ? parseErr.message : String(parseErr);
       logger.error('Failed to parse AI JSON output', {
         batchId: meta.batchId,
         chunk: meta.chunk,
         totalChunks: meta.totalChunks,
         rawContent,
       });
-      throw new APIError(
+      throw JadwalDraftService.buildAIError(
         'AI mengembalikan format yang tidak valid. Silakan coba lagi.',
-        502
+        `chunk ${meta.chunk}/${meta.totalChunks}, length ${rawContent.length}, parse error: ${parseMessage}`,
+        {
+          reason: 'invalid_json',
+          batchId: meta.batchId,
+          chunkIndex: meta.chunk,
+          totalChunks: meta.totalChunks,
+          rawContentLength: rawContent.length,
+          parseError: parseMessage,
+        }
       );
     }
 
     const result = GenerateBatchOutputSchema.safeParse(parsed);
     if (!result.success) {
+      const issues = result.error.issues.slice(0, 3).map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      const issueText = issues
+        .map((it) => `${it.path || '<root>'}: ${it.message}`)
+        .join('; ');
       logger.error('AI output validation failed', {
         batchId: meta.batchId,
         chunk: meta.chunk,
         totalChunks: meta.totalChunks,
         errors: result.error.issues,
       });
-      throw new APIError(
+      throw JadwalDraftService.buildAIError(
         'AI mengembalikan data yang tidak valid. Silakan coba lagi.',
-        502
+        `chunk ${meta.chunk}/${meta.totalChunks}, ${issueText}`,
+        {
+          reason: 'schema_validation_failed',
+          batchId: meta.batchId,
+          chunkIndex: meta.chunk,
+          totalChunks: meta.totalChunks,
+          issues,
+        }
       );
     }
 
@@ -937,19 +1002,41 @@ export default class JadwalDraftService {
 
     for (const suggestion of suggestions) {
       const key = `${suggestion.nim}|${suggestion.jenis}`;
-      if (!expected.has(key) || received.has(key)) {
-        throw new APIError(
+      if (!expected.has(key)) {
+        throw JadwalDraftService.buildAIError(
           'AI mengembalikan jumlah jadwal yang tidak sesuai dengan daftar mahasiswa. Silakan coba lagi.',
-          502
+          `unexpected entry NIM ${suggestion.nim} jenis ${suggestion.jenis} (tidak ada di daftar mahasiswa)`,
+          {
+            reason: 'unexpected_suggestion',
+            unexpected: { nim: suggestion.nim, jenis: suggestion.jenis },
+            expectedCount: expected.size,
+          }
+        );
+      }
+      if (received.has(key)) {
+        throw JadwalDraftService.buildAIError(
+          'AI mengembalikan jumlah jadwal yang tidak sesuai dengan daftar mahasiswa. Silakan coba lagi.',
+          `duplicate entry NIM ${suggestion.nim} jenis ${suggestion.jenis}`,
+          {
+            reason: 'duplicate_suggestion',
+            duplicate: { nim: suggestion.nim, jenis: suggestion.jenis },
+          }
         );
       }
       received.add(key);
     }
 
     if (received.size !== expected.size) {
-      throw new APIError(
+      const missing = [...expected].filter((k) => !received.has(k));
+      throw JadwalDraftService.buildAIError(
         'AI mengembalikan jumlah jadwal yang tidak sesuai dengan daftar mahasiswa. Silakan coba lagi.',
-        502
+        `expected ${expected.size}, received ${received.size}, missing ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? `, +${missing.length - 5} lainnya` : ''}`,
+        {
+          reason: 'coverage_mismatch',
+          expectedCount: expected.size,
+          receivedCount: received.size,
+          missing,
+        }
       );
     }
   }
@@ -961,11 +1048,18 @@ export default class JadwalDraftService {
     if (excludedDates.length === 0) return;
 
     const excluded = new Set(excludedDates);
-    const hasExcludedDate = suggestions.some((s) => excluded.has(s.tanggal));
-    if (hasExcludedDate) {
-      throw new APIError(
+    const hitDates = suggestions
+      .map((s) => s.tanggal)
+      .filter((t) => excluded.has(t));
+    if (hitDates.length > 0) {
+      throw JadwalDraftService.buildAIError(
         'AI menghasilkan jadwal pada tanggal yang dikecualikan. Silakan coba lagi.',
-        502
+        `tanggal ${[...new Set(hitDates)].join(', ')} termasuk daftar dikecualikan`,
+        {
+          reason: 'excluded_date_in_suggestions',
+          hitDates: [...new Set(hitDates)],
+          excludedDates,
+        }
       );
     }
   }
@@ -1342,6 +1436,33 @@ export default class JadwalDraftService {
     };
   }
 
+  // ===========================================================================
+  // Helper: bangun APIError dengan suffix "[Detail: <text>]" pada message dan
+  // field structured `details` agar log Worker / response API langsung memuat
+  // konteks kegagalan AI tanpa perlu cross-reference dua baris log.
+  // ===========================================================================
+  private static buildAIError(
+    message: string,
+    detailText: string,
+    details: Record<string, unknown>,
+    statusCode = 502
+  ): APIError {
+    const fullMessage = detailText
+      ? `${message} [Detail: ${detailText}]`
+      : message;
+    return new APIError(fullMessage, statusCode, details);
+  }
+
+  private static formatDraftDetail(summary: {
+    nim: string;
+    tanggal: string;
+    waktu_mulai: string;
+    waktu_selesai: string;
+    kode_ruangan: string;
+  }): string {
+    return `NIM ${summary.nim}, ${summary.tanggal} ${summary.waktu_mulai}-${summary.waktu_selesai}, ruangan ${summary.kode_ruangan}`;
+  }
+
   private static validateGeneratedDraftsHardConstraints(params: {
     drafts: CreateJadwalDraftInput[];
     existingBlockingSchedules: Array<{
@@ -1377,53 +1498,58 @@ export default class JadwalDraftService {
       };
 
       if (!params.activeRoomCodes.has(draft.kode_ruangan)) {
-        logger.error('Hard constraint failed: ruangan tidak tersedia', {
-          draft: draftSummary,
-          activeRoomCodes: [...params.activeRoomCodes],
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal pada ruangan yang tidak tersedia. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, ruangan tidak aktif`,
+          {
+            reason: 'inactive_room',
+            draft: draftSummary,
+            activeRoomCodes: [...params.activeRoomCodes],
+          }
         );
       }
       if (excludedDates.has(tanggal)) {
-        logger.error('Hard constraint failed: tanggal dikecualikan', {
-          draft: draftSummary,
-          excludedDates: [...excludedDates],
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal pada tanggal yang dikecualikan. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, tanggal dikecualikan`,
+          {
+            reason: 'excluded_date',
+            draft: draftSummary,
+            excludedDates: [...excludedDates],
+          }
         );
       }
       if (tanggal < minDate || tanggal > maxDate) {
-        logger.error('Hard constraint failed: tanggal di luar rentang', {
-          draft: draftSummary,
-          minDate,
-          maxDate,
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal di luar rentang tanggal generate. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, di luar ${minDate}..${maxDate}`,
+          {
+            reason: 'out_of_range_date',
+            draft: draftSummary,
+            minDate,
+            maxDate,
+          }
         );
       }
       if (draft.waktu_mulai >= draft.waktu_selesai) {
-        logger.error('Hard constraint failed: waktu selesai tidak valid', {
-          draft: draftSummary,
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal dengan waktu selesai tidak valid. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, waktu mulai >= selesai`,
+          {
+            reason: 'invalid_time_range',
+            draft: draftSummary,
+          }
         );
       }
       if (waktuMulai < '08:00' || waktuSelesai > '17:00') {
-        logger.error('Hard constraint failed: di luar jam kerja', {
-          draft: draftSummary,
-          batas: '08:00–17:00 WIB',
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal di luar jam kerja. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, di luar 08:00-17:00 WIB`,
+          {
+            reason: 'outside_working_hours',
+            draft: draftSummary,
+            batas: '08:00–17:00 WIB',
+          }
         );
       }
 
@@ -1434,25 +1560,27 @@ export default class JadwalDraftService {
         waktuSelesai
       );
       if (actualDuration !== expectedDuration) {
-        logger.error('Hard constraint failed: durasi seminar tidak sesuai', {
-          draft: draftSummary,
-          expectedDuration,
-          actualDuration,
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan durasi jadwal yang tidak sesuai jenis seminar. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, durasi ${actualDuration} menit (harus ${expectedDuration} menit)`,
+          {
+            reason: 'wrong_duration',
+            draft: draftSummary,
+            expectedDuration,
+            actualDuration,
+          }
         );
       }
 
       if (JadwalDraftService.overlapsBreakTime(waktuMulai, waktuSelesai)) {
-        logger.error('Hard constraint failed: overlap jam istirahat', {
-          draft: draftSummary,
-          breakTime: `${BREAK_TIME.start}–${BREAK_TIME.end} WIB`,
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal pada jam istirahat. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, overlap istirahat ${BREAK_TIME.start}-${BREAK_TIME.end} WIB`,
+          {
+            reason: 'break_time_overlap',
+            draft: draftSummary,
+            breakTime: `${BREAK_TIME.start}–${BREAK_TIME.end} WIB`,
+          }
         );
       }
 
@@ -1466,13 +1594,15 @@ export default class JadwalDraftService {
           constraintList: params.constraintList,
         })
       ) {
-        logger.error('Hard constraint failed: constraint dosen', {
-          draft: draftSummary,
-          nips: [...draftNips],
-        });
-        throw new APIError(
+        const nipsArr = [...draftNips];
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal yang melanggar constraint dosen. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, dosen ${nipsArr.join(', ')}`,
+          {
+            reason: 'dosen_constraint_violation',
+            draft: draftSummary,
+            nips: nipsArr,
+          }
         );
       }
 
@@ -1487,13 +1617,14 @@ export default class JadwalDraftService {
           'Jumat',
           'Sabtu',
         ];
-        logger.error('Hard constraint failed: akhir pekan', {
-          draft: draftSummary,
-          dayName: dayNames[day],
-        });
-        throw new APIError(
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal pada akhir pekan. Silakan coba lagi.',
-          502
+          `${JadwalDraftService.formatDraftDetail(draftSummary)}, hari ${dayNames[day]}`,
+          {
+            reason: 'weekend',
+            draft: draftSummary,
+            dayName: dayNames[day],
+          }
         );
       }
 
@@ -1511,19 +1642,20 @@ export default class JadwalDraftService {
         }
 
         if (schedule.kode_ruangan === draft.kode_ruangan) {
-          logger.error('Hard constraint failed: konflik ruangan existing', {
-            draft: draftSummary,
-            existingSchedule: {
-              tanggal: schedule.tanggal,
-              waktu_mulai: schedule.waktu_mulai,
-              waktu_selesai: schedule.waktu_selesai,
-              kode_ruangan: schedule.kode_ruangan,
-              dosen_terlibat: schedule.dosen_terlibat,
-            },
-          });
-          throw new APIError(
+          throw JadwalDraftService.buildAIError(
             'AI menghasilkan jadwal dengan konflik ruangan existing. Silakan coba lagi.',
-            502
+            `${JadwalDraftService.formatDraftDetail(draftSummary)}, bentrok dengan jadwal existing ${schedule.tanggal} ${schedule.waktu_mulai}-${schedule.waktu_selesai} ruangan ${schedule.kode_ruangan}`,
+            {
+              reason: 'existing_room_conflict',
+              draft: draftSummary,
+              existingSchedule: {
+                tanggal: schedule.tanggal,
+                waktu_mulai: schedule.waktu_mulai,
+                waktu_selesai: schedule.waktu_selesai,
+                kode_ruangan: schedule.kode_ruangan,
+                dosen_terlibat: schedule.dosen_terlibat,
+              },
+            }
           );
         }
 
@@ -1531,20 +1663,21 @@ export default class JadwalDraftService {
           draftNips.has(nip)
         );
         if (conflictingNips.length > 0) {
-          logger.error('Hard constraint failed: konflik dosen existing', {
-            draft: draftSummary,
-            existingSchedule: {
-              tanggal: schedule.tanggal,
-              waktu_mulai: schedule.waktu_mulai,
-              waktu_selesai: schedule.waktu_selesai,
-              kode_ruangan: schedule.kode_ruangan,
-              dosen_terlibat: schedule.dosen_terlibat,
-            },
-            conflictingNips,
-          });
-          throw new APIError(
+          throw JadwalDraftService.buildAIError(
             'AI menghasilkan jadwal dengan konflik dosen existing. Silakan coba lagi.',
-            502
+            `${JadwalDraftService.formatDraftDetail(draftSummary)}, bentrok dosen ${conflictingNips.join(', ')} dengan jadwal existing ${schedule.tanggal} ${schedule.waktu_mulai}-${schedule.waktu_selesai}`,
+            {
+              reason: 'existing_dosen_conflict',
+              draft: draftSummary,
+              existingSchedule: {
+                tanggal: schedule.tanggal,
+                waktu_mulai: schedule.waktu_mulai,
+                waktu_selesai: schedule.waktu_selesai,
+                kode_ruangan: schedule.kode_ruangan,
+                dosen_terlibat: schedule.dosen_terlibat,
+              },
+              conflictingNips,
+            }
           );
         }
       }
@@ -1558,9 +1691,15 @@ export default class JadwalDraftService {
     for (const draft of drafts) {
       const key = `${draft.nim}|${draft.id_jenis_seminar}`;
       if (mahasiswaKeys.has(key)) {
-        throw new APIError(
+        const summary = JadwalDraftService.summarizeDraftForLog(draft);
+        throw JadwalDraftService.buildAIError(
           'AI menghasilkan jadwal duplikat untuk mahasiswa yang sama. Silakan coba lagi.',
-          502
+          `NIM ${draft.nim} muncul lebih dari sekali untuk jenis ${draft.id_jenis_seminar}`,
+          {
+            reason: 'duplicate_mahasiswa',
+            duplicate: summary,
+            id_jenis_seminar: draft.id_jenis_seminar,
+          }
         );
       }
       mahasiswaKeys.add(key);
@@ -1581,21 +1720,35 @@ export default class JadwalDraftService {
           continue;
         }
 
+        const firstSummary = JadwalDraftService.summarizeDraftForLog(first);
+        const secondSummary = JadwalDraftService.summarizeDraftForLog(second);
+
         if (first.kode_ruangan === second.kode_ruangan) {
-          throw new APIError(
+          throw JadwalDraftService.buildAIError(
             'AI menghasilkan jadwal dengan konflik ruangan. Silakan coba lagi.',
-            502
+            `${JadwalDraftService.formatDraftDetail(firstSummary)} bentrok dengan ${JadwalDraftService.formatDraftDetail(secondSummary)}`,
+            {
+              reason: 'room_conflict',
+              first: firstSummary,
+              second: secondSummary,
+            }
           );
         }
 
         const firstNips = new Set(first.list_dosen.map((d) => d.nip));
-        const hasSameDosen = second.list_dosen.some((d) =>
-          firstNips.has(d.nip)
-        );
-        if (hasSameDosen) {
-          throw new APIError(
+        const sharedNips = second.list_dosen
+          .map((d) => d.nip)
+          .filter((nip) => firstNips.has(nip));
+        if (sharedNips.length > 0) {
+          throw JadwalDraftService.buildAIError(
             'AI menghasilkan jadwal dengan konflik dosen. Silakan coba lagi.',
-            502
+            `${JadwalDraftService.formatDraftDetail(firstSummary)} bentrok dosen ${sharedNips.join(', ')} dengan ${JadwalDraftService.formatDraftDetail(secondSummary)}`,
+            {
+              reason: 'dosen_conflict',
+              first: firstSummary,
+              second: secondSummary,
+              sharedNips,
+            }
           );
         }
       }
