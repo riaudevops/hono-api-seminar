@@ -32,27 +32,24 @@ const penilaiSchema = z.object({
   }),
 });
 
-function getJakartaDateTimeParts(date: Date) {
-  const parts = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Jakarta',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-    .formatToParts(date)
-    .reduce<Record<string, string>>((acc, part) => {
-      if (part.type !== 'literal') acc[part.type] = part.value;
-      return acc;
-    }, {});
-
+function getSubmittedJakartaDateTimeParts(date: Date) {
   return {
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    hour: Number(parts.hour),
-    minute: Number(parts.minute),
+    date: `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+      2,
+      '0'
+    )}-${String(date.getUTCDate()).padStart(2, '0')}`,
+    hour: date.getUTCHours(),
+    minute: date.getUTCMinutes(),
   };
+}
+
+function convertSubmittedJakartaWallTimeToUtc(date: Date) {
+  const parts = getSubmittedJakartaDateTimeParts(date);
+  return new Date(
+    `${parts.date}T${String(parts.hour).padStart(2, '0')}:${String(
+      parts.minute
+    ).padStart(2, '0')}:00.000+07:00`
+  );
 }
 
 const baseJadwalSchema = z.object({
@@ -82,9 +79,11 @@ function validateJadwalTime(data: {
 }) {
   if (!data.tanggal || !data.waktu_mulai || !data.waktu_selesai) return true;
 
-  const tanggal = getJakartaDateTimeParts(data.tanggal).date;
-  const mulaiTanggal = getJakartaDateTimeParts(data.waktu_mulai).date;
-  const selesaiTanggal = getJakartaDateTimeParts(data.waktu_selesai).date;
+  const tanggal = getSubmittedJakartaDateTimeParts(data.tanggal).date;
+  const mulaiTanggal = getSubmittedJakartaDateTimeParts(data.waktu_mulai).date;
+  const selesaiTanggal = getSubmittedJakartaDateTimeParts(
+    data.waktu_selesai
+  ).date;
 
   return tanggal === mulaiTanggal && tanggal === selesaiTanggal;
 }
@@ -95,8 +94,8 @@ function validateWorkingHours(data: {
 }) {
   if (!data.waktu_mulai || !data.waktu_selesai) return true;
 
-  const start = getJakartaDateTimeParts(data.waktu_mulai);
-  const end = getJakartaDateTimeParts(data.waktu_selesai);
+  const start = getSubmittedJakartaDateTimeParts(data.waktu_mulai);
+  const end = getSubmittedJakartaDateTimeParts(data.waktu_selesai);
   const startMinutes = start.hour * 60 + start.minute;
   const endMinutes = end.hour * 60 + end.minute;
 
@@ -115,7 +114,7 @@ function validateMinimumDuration(data: {
 
 function validateFutureSchedule(data: { waktu_mulai?: Date }) {
   if (!data.waktu_mulai) return true;
-  return data.waktu_mulai >= new Date();
+  return convertSubmittedJakartaWallTimeToUtc(data.waktu_mulai) >= new Date();
 }
 
 function validateUniquePenilai(data: {
@@ -154,6 +153,10 @@ const jadwalRules = <T extends z.ZodTypeAny>(schema: T) =>
         'Tanggal, waktu mulai, dan waktu selesai harus berada pada tanggal yang sama',
       path: ['tanggal'],
     })
+    .refine(validateWorkingHours, {
+      message: 'Jadwal harus berada pada jam kerja 08:00-17:00 WIB',
+      path: ['waktu_mulai'],
+    })
     .refine(validateFutureSchedule, {
       message: 'Jadwal tidak boleh dibuat di masa lalu',
       path: ['waktu_mulai'],
@@ -166,11 +169,9 @@ const jadwalRules = <T extends z.ZodTypeAny>(schema: T) =>
 export const postJadwalSchema = jadwalRules(baseJadwalSchema);
 
 export const putJadwalSchema = jadwalRules(
-  baseJadwalSchema
-    .partial()
-    .refine((data) => Object.keys(data).length > 0, {
-      message: 'Minimal satu field harus diisi',
-    })
+  baseJadwalSchema.partial().refine((data) => Object.keys(data).length > 0, {
+    message: 'Minimal satu field harus diisi',
+  })
 );
 
 export const jadwalIdParamSchema = z.object({

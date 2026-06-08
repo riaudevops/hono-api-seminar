@@ -63,7 +63,7 @@ export default class JadwalDraftHandler {
     return streamWorkerJob(c, {
       jobId: job.id,
       connectedMessage: 'Stream generate jadwal terhubung ke worker',
-      heartbeatMessage: 'Generate jadwal masih diproses ai',
+      heartbeatMessage: '🪄 Para penyihir masih meracik jadwalmu...',
     });
   }
 

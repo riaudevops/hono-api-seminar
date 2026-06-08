@@ -107,17 +107,13 @@ export default class JadwalDraftService {
     const batchId = generateBatchId();
     await sendProgress('batch:start', {
       batch_id: batchId,
-      message: 'Batch generate jadwal draft dimulai',
+      message: '🔮 Membuka gerbang mantra penjadwalan...',
     });
 
-    // Resolve kode_jenis → id_jenis_seminar sekali di depan
-    await sendProgress('jenis:resolving', {
-      message: 'Mencocokkan jenis seminar',
-    });
     // Resolve kode_jenis → id_jenis_seminar paralel agar tidak serial-await
     // tiap kode ke DB.
     await sendProgress('jenis:resolving', {
-      message: 'Mencocokkan jenis seminar',
+      message: '📜 Membaca gulungan jenis seminar...',
     });
     const kodeSet = new Set<string>();
     for (const mhs of data.list_mahasiswa) kodeSet.add(mhs.kode_jenis);
@@ -138,7 +134,7 @@ export default class JadwalDraftService {
     const totalMhs = data.list_mahasiswa.length;
     await sendProgress('validating:start', {
       total: totalMhs,
-      message: `Memvalidasi ${totalMhs} mahasiswa`,
+      message: `🪄 Merapal mantra pemeriksaan untuk ${totalMhs} mahasiswa...`,
     });
 
     let validatedCount = 0;
@@ -171,7 +167,7 @@ export default class JadwalDraftService {
           current: validatedCount,
           total: totalMhs,
           nim: mhs.nim,
-          message: `Memvalidasi mahasiswa ${mhs.nim}`,
+          message: `✨ Memeriksa aura mahasiswa ${mhs.nim}...`,
         });
       })
     );
@@ -191,7 +187,7 @@ export default class JadwalDraftService {
     });
 
     await sendProgress('context:loading', {
-      message: 'Mengambil data ruangan, jadwal existing, dan constraint dosen',
+      message: '🧙 Memanggil arwah ruangan, jadwal lampau, dan ikrar dosen...',
     });
 
     const [ruanganList, existingJadwal] = await Promise.all([
@@ -243,7 +239,7 @@ export default class JadwalDraftService {
       total_chunks: mahasiswaChunks.length,
       chunk_size: GENERATE_CHUNK_SIZE,
       total_mahasiswa: data.list_mahasiswa.length,
-      message: `Generate akan diproses dalam ${mahasiswaChunks.length} chunk`,
+      message: `🌀 Ramuan jadwal akan diracik dalam ${mahasiswaChunks.length} kuali...`,
     });
 
     for (const [chunkIndex, mahasiswaChunk] of mahasiswaChunks.entries()) {
@@ -264,7 +260,7 @@ export default class JadwalDraftService {
         chunk: currentChunk,
         total_chunks: mahasiswaChunks.length,
         mahasiswa_count: mahasiswaChunk.length,
-        message: `Memproses chunk ${currentChunk}/${mahasiswaChunks.length}`,
+        message: `⚗️ Mengaduk kuali ${currentChunk}/${mahasiswaChunks.length}...`,
       });
 
       const chunkNips = new Set<string>();
@@ -299,7 +295,7 @@ export default class JadwalDraftService {
         batch_id: batchId,
         chunk: currentChunk,
         total_chunks: mahasiswaChunks.length,
-        message: `AI sedang menyusun jadwal draft chunk ${currentChunk}/${mahasiswaChunks.length}`,
+        message: `🔮 Sang peramal AI merangkai takdir jadwal kuali ${currentChunk}/${mahasiswaChunks.length}...`,
       });
 
       logger.info('AI request started', {
@@ -347,7 +343,7 @@ export default class JadwalDraftService {
         batch_id: batchId,
         chunk: currentChunk,
         total_chunks: mahasiswaChunks.length,
-        message: `Memproses hasil generate AI chunk ${currentChunk}/${mahasiswaChunks.length}`,
+        message: `📖 Menerjemahkan mantra ramuan kuali ${currentChunk}/${mahasiswaChunks.length}...`,
       });
 
       const chunkDrafts = await JadwalDraftService.mapSuggestionsToDrafts({
@@ -411,7 +407,7 @@ export default class JadwalDraftService {
         total_chunks: mahasiswaChunks.length,
         generated_count: chunkDrafts.length,
         total_generated: drafts.length,
-        message: `Chunk ${currentChunk}/${mahasiswaChunks.length} selesai`,
+        message: `🎇 Kuali ${currentChunk}/${mahasiswaChunks.length} telah matang sempurna!`,
       });
     }
 
@@ -447,7 +443,7 @@ export default class JadwalDraftService {
 
     await sendProgress('saving', {
       count: drafts.length,
-      message: 'Menyimpan jadwal draft',
+      message: '🗝️ Menyegel jadwal draft ke dalam grimoire...',
     });
 
     throwIfAborted();
@@ -480,7 +476,7 @@ export default class JadwalDraftService {
 
     const responseData = {
       response: true,
-      message: `${savedDrafts.length} jadwal draft berhasil di-generate`,
+      message: `🏆 Ritual selesai! ${savedDrafts.length} jadwal draft berhasil dimanifestasikan.`,
       data: {
         batch_id: batchId,
         drafts: savedDrafts.map((d) =>

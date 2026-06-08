@@ -186,7 +186,7 @@ export default class JadwalService {
         const penilaianList = await PenilaianRepository.findByDosenNip(
           dosen.nip
         );
-        const now = JadwalHelper.getCurrentJakartaTime();
+        const now = new Date();
         const mahasiswaBimbingan = new Set<string>();
         const mahasiswaUji = new Set<string>();
         let mahasiswaTerdekat: any = null;
@@ -204,12 +204,8 @@ export default class JadwalService {
             mahasiswaUji.add(nim);
           }
 
-          const waktuMulai = JadwalHelper.convertToJakartaTimezone(
-            j.waktu_mulai
-          );
-          const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
-            j.waktu_selesai
-          );
+          const waktuMulai = j.waktu_mulai;
+          const waktuSelesai = j.waktu_selesai;
 
           if (waktuMulai > now) {
             if (
@@ -221,9 +217,9 @@ export default class JadwalService {
                 nim,
                 nama: j.mahasiswa?.nama ?? null,
                 jenis_seminar: KODE_TO_FRONTEND[kode] || kode,
-                tanggal: waktuMulai.toISOString().slice(0, 10),
-                jam_mulai: waktuMulai.toISOString().slice(11, 16),
-                jam_selesai: waktuSelesai.toISOString().slice(11, 16),
+                tanggal: JadwalHelper.formatDateInJakarta(waktuMulai),
+                jam_mulai: JadwalHelper.formatTimeInJakarta(waktuMulai),
+                jam_selesai: JadwalHelper.formatTimeInJakarta(waktuSelesai),
                 ruangan: j.ruangan?.nama ?? null,
                 role,
                 waktu_mulai_raw: waktuMulai,
@@ -355,13 +351,13 @@ export default class JadwalService {
     JadwalService.validateUniquePenilaiAssignments(data.penilai);
     await JadwalService.validatePenilai(data.penilai, jenis);
 
-    const waktuMulaiServer = JadwalHelper.convertFromJakartaTimezone(
+    const waktuMulaiServer = JadwalHelper.createDateFromFrontendZAsJakarta(
       new Date(data.waktu_mulai)
     );
-    const waktuSelesaiServer = JadwalHelper.convertFromJakartaTimezone(
+    const waktuSelesaiServer = JadwalHelper.createDateFromFrontendZAsJakarta(
       new Date(data.waktu_selesai)
     );
-    const tanggalServer = JadwalHelper.convertFromJakartaTimezone(
+    const tanggalServer = JadwalHelper.createDateFromFrontendZAsJakarta(
       new Date(data.tanggal)
     );
 
@@ -476,13 +472,17 @@ export default class JadwalService {
     await JadwalService.validatePenilai(finalPenilai, jenis);
 
     const waktuMulaiServer = data.waktu_mulai
-      ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_mulai))
+      ? JadwalHelper.createDateFromFrontendZAsJakarta(
+          new Date(data.waktu_mulai)
+        )
       : existingJadwal.waktu_mulai;
     const waktuSelesaiServer = data.waktu_selesai
-      ? JadwalHelper.convertFromJakartaTimezone(new Date(data.waktu_selesai))
+      ? JadwalHelper.createDateFromFrontendZAsJakarta(
+          new Date(data.waktu_selesai)
+        )
       : existingJadwal.waktu_selesai;
     const tanggalServer = data.tanggal
-      ? JadwalHelper.convertFromJakartaTimezone(new Date(data.tanggal))
+      ? JadwalHelper.createDateFromFrontendZAsJakarta(new Date(data.tanggal))
       : existingJadwal.tanggal;
     const finalNim = data.nim ?? existingJadwal.nim;
     const finalKodeRuangan = data.kode_ruangan ?? existingJadwal.kode_ruangan;
@@ -954,11 +954,14 @@ export default class JadwalService {
     return {
       ...jadwal,
       penilai: JadwalService.formatPenilai(jadwal?.penilaian, false),
+      tanggal: jadwal?.tanggal
+        ? JadwalHelper.formatDateInJakarta(jadwal.tanggal)
+        : null,
       waktu_mulai: jadwal?.waktu_mulai
-        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
+        ? JadwalHelper.formatTimeInJakarta(jadwal.waktu_mulai)
         : null,
       waktu_selesai: jadwal?.waktu_selesai
-        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_selesai)
+        ? JadwalHelper.formatTimeInJakarta(jadwal.waktu_selesai)
         : null,
     };
   }
@@ -970,11 +973,14 @@ export default class JadwalService {
         ? TahunAjaranHelper.parseStringNameByCode(jadwal.kode_tahun_ajaran)
         : null,
       penilaian: Array.isArray(jadwal?.penilaian) ? jadwal.penilaian : [],
+      tanggal: jadwal?.tanggal
+        ? JadwalHelper.formatDateInJakarta(jadwal.tanggal)
+        : null,
       waktu_mulai: jadwal?.waktu_mulai
-        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_mulai)
+        ? JadwalHelper.formatTimeInJakarta(jadwal.waktu_mulai)
         : null,
       waktu_selesai: jadwal?.waktu_selesai
-        ? JadwalHelper.convertToJakartaTimezone(jadwal.waktu_selesai)
+        ? JadwalHelper.formatTimeInJakarta(jadwal.waktu_selesai)
         : null,
     };
   }

@@ -50,6 +50,13 @@ jadwalRoute.get(
 );
 
 jadwalRoute.get(
+  '/data-master/jadwal',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('query', getJadwalQuerySchema, zodError),
+  JadwalHandler.getAll
+);
+
+jadwalRoute.get(
   '/koordinator/jadwal/:id/logs',
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('param', jadwalIdParamSchema, zodError),

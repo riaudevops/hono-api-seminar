@@ -129,6 +129,23 @@ export default class JadwalHelper {
     return new Date(`${date}T${time}:00.000+07:00`);
   }
 
+  /**
+   * Frontend jadwal saat ini mengirim ISO dengan suffix Z, tetapi nilai
+   * tanggal/jam di dalamnya adalah jam dinding WIB (contoh: 08:00Z berarti
+   * 08:00 WIB, bukan 08:00 UTC). Ambil komponen UTC sebagai jam dinding WIB,
+   * lalu ubah menjadi instant UTC yang benar untuk disimpan di timestamptz.
+   */
+  public static createDateFromFrontendZAsJakarta(date: Date): Date {
+    const datePart = `${date.getUTCFullYear()}-${String(
+      date.getUTCMonth() + 1
+    ).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+    const timePart = `${String(date.getUTCHours()).padStart(2, '0')}:${String(
+      date.getUTCMinutes()
+    ).padStart(2, '0')}`;
+
+    return JadwalHelper.createDateFromJakartaDateTime(datePart, timePart);
+  }
+
   public static getCurrentJakartaTime(): Date {
     const today = new Date();
     const dateFormatter = new Intl.DateTimeFormat('sv-SE', {
