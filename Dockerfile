@@ -14,7 +14,10 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 # Generate Prisma Client
-RUN bunx prisma generate
+# DATABASE_URL placeholder hanya untuk memuaskan prisma.config.ts saat generate;
+# URL asli di-inject ke container lewat env runtime (compose/k8s) dan dipakai entrypoint.sh.
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+    bunx prisma generate
 
 # Copy and prepare entrypoint
 COPY entrypoint.sh /entrypoint.sh

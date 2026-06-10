@@ -9,7 +9,7 @@ export default class GlobalService {
       response: true,
       message: 'Selamat datang di API Seminar.',
       version: process.env.APP_VERSION || '1.0.0',
-      contributor: 'https://github.com/Gindra-o7/hono-api-seminar',
+      contributor: 'https://github.com/riaudevops/hono-api-seminar',
       timezone: `Asia/Jakarta ~ ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`,
     };
   }

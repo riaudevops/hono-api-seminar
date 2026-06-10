@@ -1,17 +1,15 @@
 #!/bin/sh
-set -e
 
-case "${APP_PROCESS:-server}" in
-worker)
-	echo "[INFO] Starting the worker! ⚙️"
-	exec bun run src/worker.ts
-	;;
-server | api)
-	echo "[INFO] Starting the server! 🚀"
-	exec bun run src/index.ts
-	;;
-*)
-	echo "[ERROR] APP_PROCESS must be 'server' or 'worker' (got: ${APP_PROCESS})" >&2
-	exit 1
-	;;
-esac
+# IF YOU WANT TO RESET THE DATABASE and APPLY New Migrations
+# echo "[INFO] Running Prisma migrations reset! 🔥"
+# bunx prisma migrate reset --force
+
+echo "[INFO] Running Prisma migrations! 🔥"
+
+bunx prisma migrate deploy
+
+echo "[INFO] Seeding the database! 🌱"
+bunx prisma db seed
+
+echo "[INFO] Starting the server! 🚀"
+bun start
