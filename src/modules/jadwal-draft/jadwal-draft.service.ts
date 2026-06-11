@@ -84,6 +84,8 @@ export default class JadwalDraftService {
       }>;
       tanggal_dikecualikan?: string[];
       catatan_tambahan?: string;
+      mode?: 'semua' | 'hanya_kp' | 'hanya_ta';
+      dengan_constraint?: boolean;
     },
     context: LogJadwalContext,
     emit?: GenerateProgressEmitter,
@@ -123,6 +125,24 @@ export default class JadwalDraftService {
       kodeArr.map((kode) => JenisSeminarHelper.resolveIdByKode(kode))
     );
     kodeArr.forEach((kode, i) => kodeToId.set(kode, idArr[i]));
+
+    // Filter list_mahasiswa berdasarkan mode
+    const mode = data.mode ?? 'semua';
+    if (mode === 'hanya_kp') {
+      data.list_mahasiswa = data.list_mahasiswa.filter(
+        (m) => m.kode_jenis === 'SEMKP'
+      );
+    } else if (mode === 'hanya_ta') {
+      data.list_mahasiswa = data.list_mahasiswa.filter(
+        (m) => m.kode_jenis !== 'SEMKP'
+      );
+    }
+    if (data.list_mahasiswa.length === 0) {
+      throw new APIError(
+        `Tidak ada mahasiswa yang sesuai dengan mode "${mode}".`,
+        400
+      );
+    }
 
     const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
@@ -213,6 +233,138 @@ export default class JadwalDraftService {
     const baseBlockingSchedules = JadwalDraftService.formatExistingJadwalForAi(
       existingJadwal as any[]
     );
+
+    // =========================================================================
+    // Path tanpa constraint: algorithmic scheduling tanpa LLM dan tanpa
+    // mempertimbangkan constraint dosen. Langsung loop tiap mahasiswa,
+    // cari slot pertama yang valid, simpan draft, dan return.
+    // =========================================================================
+    const dengan_constraint = data.dengan_constraint ?? true;
+    if (!dengan_constraint) {
+      await sendProgress('tanpa_constraint:start', {
+        batch_id: batchId,
+        total_mahasiswa: data.list_mahasiswa.length,
+        message: `⚡ Mode tanpa constraint: mencari slot untuk ${data.list_mahasiswa.length} mahasiswa...`,
+      });
+
+      const drafts: CreateJadwalDraftInput[] = [];
+      const blockingForAlgo = [...baseBlockingSchedules];
+      const activeRoomCodes = ruanganList.map((r: any) => r.kode);
+
+      for (const mhs of data.list_mahasiswa) {
+        const idJenis = kodeToId.get(mhs.kode_jenis)!;
+        const jenis = mhs.kode_jenis;
+        const durationMinutes = SEMINAR_DURATION_MINUTES[jenis] ?? 60;
+
+        const slot = JadwalDraftService.findFirstValidSlot({
+          draft: {
+            batch_id: batchId,
+            nim: mhs.nim,
+            id_jenis_seminar: idJenis,
+            tanggal: tanggalMulai,
+            waktu_mulai: tanggalMulai,
+            waktu_selesai: tanggalMulai,
+            kode_ruangan: activeRoomCodes[0] ?? '',
+            list_dosen: mhs.list_dosen,
+            llm_reasoning: { jenis },
+          },
+          durationMinutes,
+          blockingSchedules: blockingForAlgo,
+          activeRoomCodes,
+          excludedDates: data.tanggal_dikecualikan || [],
+          tanggalMulai,
+          endDate,
+          constraintList: [],
+        });
+
+        if (!slot) {
+          logger.warn('tanpa_constraint: no slot found', {
+            nim: mhs.nim,
+            jenis,
+          });
+          continue;
+        }
+
+        const draft: CreateJadwalDraftInput = {
+          batch_id: batchId,
+          nim: mhs.nim,
+          id_jenis_seminar: idJenis,
+          tanggal: JadwalHelper.createDateFromJakartaDate(slot.tanggal),
+          waktu_mulai: JadwalHelper.createDateFromJakartaDateTime(
+            slot.tanggal,
+            slot.waktu_mulai
+          ),
+          waktu_selesai: JadwalHelper.createDateFromJakartaDateTime(
+            slot.tanggal,
+            slot.waktu_selesai
+          ),
+          kode_ruangan: slot.kode_ruangan,
+          list_dosen: mhs.list_dosen,
+          llm_reasoning: { jenis, generated_by: 'tanpa_constraint' },
+          confidence: 1,
+        };
+
+        drafts.push(draft);
+        blockingForAlgo.push(
+          JadwalDraftService.formatGeneratedDraftForAi(draft)
+        );
+
+        await sendProgress('tanpa_constraint:progress', {
+          nim: mhs.nim,
+          slot,
+          message: `✅ Slot ditemukan untuk ${mhs.nim}`,
+        });
+      }
+
+      if (drafts.length === 0) {
+        throw new APIError(
+          'Tidak ditemukan slot yang tersedia untuk periode yang diminta.',
+          404
+        );
+      }
+
+      await sendProgress('saving', {
+        count: drafts.length,
+        message: '🗝️ Menyegel jadwal draft ke dalam grimoire...',
+      });
+
+      await JadwalDraftRepository.createMany(drafts);
+
+      const savedDrafts = await JadwalDraftRepository.findByBatchId(batchId);
+      await Promise.all(
+        savedDrafts.map((draft) =>
+          LogService.createEntityLog({
+            action: LogActionType.CREATE,
+            actor_type: context.actor_type,
+            actor_id: context.actor_id,
+            entity_type: LogEntityType.JADWAL_DRAFT,
+            entity_id: draft.id,
+            new_values: draft,
+          })
+        )
+      );
+
+      logger.info('tanpa_constraint batch generated', {
+        batchId,
+        draftCount: savedDrafts.length,
+        skipped: data.list_mahasiswa.length - savedDrafts.length,
+      });
+
+      const responseData = {
+        response: true,
+        message: `⚡ Selesai! ${savedDrafts.length} jadwal draft berhasil dibuat tanpa constraint.`,
+        data: {
+          batch_id: batchId,
+          drafts: savedDrafts.map((d) =>
+            JadwalDraftService.formatDraftResponse(d)
+          ),
+        },
+      };
+
+      await sendProgress('done', responseData);
+      return responseData;
+    }
+
     const sortedMahasiswa = JadwalDraftService.sortMahasiswaForScheduling(
       data.list_mahasiswa
     );

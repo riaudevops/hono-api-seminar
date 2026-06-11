@@ -64,7 +64,8 @@ async function processJob(job: WorkerJob) {
       const payload = job.payload as WorkerPendaftaranEmailPayload;
       const result = await PendaftaranEmailService.sendById(
         payload.pendaftaranId,
-        payload.event
+        payload.event,
+        payload.revisiData
       );
       await WorkerJobService.markCompleted(job.id, result);
       return;

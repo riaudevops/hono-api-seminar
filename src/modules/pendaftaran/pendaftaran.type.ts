@@ -70,8 +70,15 @@ export interface UpdatePendaftaranByMahasiswaType {
   dokumen?: DokumenNilaiPayload;
 }
 
+export interface DokumenRevisiItem {
+  nama_dokumen: string;
+  catatan: string;
+}
+
 export interface UpdateStatusBerkasType {
   status_berkas: StatusBerkas;
+  dokumen_revisi?: DokumenRevisiItem[];
+  catatan_umum?: string;
 }
 
 // Koordinator update — ganti dosen (skenario dosen berhalangan hadir)

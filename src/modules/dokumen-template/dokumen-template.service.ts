@@ -4,10 +4,10 @@ import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
 import DokumenTemplateRepository from './dokumen-template.repository';
 import {
-  CreateDokumenTemplateType,
+  type CreateDokumenTemplateType,
   DokumenTemplateWithJenisSeminar,
-  GetAllDokumenTemplateResponse,
-  UpdateDokumenTemplateType,
+  type GetAllDokumenTemplateResponse,
+  type UpdateDokumenTemplateType,
 } from './dokumen-template.type';
 
 export interface GetAllParams {
@@ -18,13 +18,10 @@ export interface GetAllParams {
 }
 
 export default class DokumenTemplateService {
-  public static async getAll(params: GetAllParams = {}): Promise<GetAllDokumenTemplateResponse> {
-    const {
-      jenis_seminar,
-      q,
-      page = 1,
-      limit = 10,
-    } = params;
+  public static async getAll(
+    params: GetAllParams = {}
+  ): Promise<GetAllDokumenTemplateResponse> {
+    const { jenis_seminar, q, page = 1, limit = 10 } = params;
 
     let templates = await DokumenTemplateRepository.findAllWithJenisSeminar();
 
@@ -114,7 +111,9 @@ export default class DokumenTemplateService {
     }
 
     if (payload.kode && payload.kode !== existing.kode) {
-      const duplicate = await DokumenTemplateRepository.findByKode(payload.kode);
+      const duplicate = await DokumenTemplateRepository.findByKode(
+        payload.kode
+      );
       if (duplicate) {
         throw new APIError(
           `Template dokumen dengan kode "${payload.kode}" sudah ada.`,
@@ -150,6 +149,15 @@ export default class DokumenTemplateService {
     if (usage > 0) {
       throw new APIError(
         `Tidak dapat menghapus: template dokumen ini digunakan oleh ${usage} jenis seminar. Hapus relasi terlebih dahulu.`,
+        409
+      );
+    }
+
+    const usagePendaftaran =
+      await DokumenTemplateRepository.countDataPendaftaran(id);
+    if (usagePendaftaran > 0) {
+      throw new APIError(
+        `Berkas ini tidak dapat dihapus karena sudah digunakan oleh ${usagePendaftaran} pendaftaran mahasiswa.`,
         409
       );
     }

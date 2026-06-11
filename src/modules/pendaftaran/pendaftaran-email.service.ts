@@ -39,18 +39,32 @@ export default class PendaftaranEmailService {
     void PendaftaranEmailService.enqueueById(pendaftaranId, 'updated');
   }
 
-  public static notifyStatusValidated(pendaftaranId: string) {
-    void PendaftaranEmailService.enqueueById(pendaftaranId, 'status_validated');
+  public static notifyStatusValidated(
+    pendaftaranId: string,
+    revisiData?: {
+      dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+      catatan_umum?: string;
+    }
+  ) {
+    void PendaftaranEmailService.enqueueById(
+      pendaftaranId,
+      'status_validated',
+      revisiData
+    );
   }
 
   public static async enqueueById(
     pendaftaranId: string,
-    event: PendaftaranEmailEvent
+    event: PendaftaranEmailEvent,
+    revisiData?: {
+      dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+      catatan_umum?: string;
+    }
   ) {
     try {
       const job = await WorkerJobService.enqueue(
         WorkerJobType.PENDAFTARAN_EMAIL_SEND,
-        { pendaftaranId, event },
+        { pendaftaranId, event, revisiData },
         { maxAttempts: 5 }
       );
       logger.info('Pendaftaran notification email queued', {
@@ -71,7 +85,11 @@ export default class PendaftaranEmailService {
 
   public static async sendById(
     pendaftaranId: string,
-    event: PendaftaranEmailEvent
+    event: PendaftaranEmailEvent,
+    revisiData?: {
+      dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+      catatan_umum?: string;
+    }
   ) {
     const pendaftaran =
       await PendaftaranRepository.findByIdWithRelations(pendaftaranId);
@@ -93,7 +111,10 @@ export default class PendaftaranEmailService {
     } else if (event === 'updated') {
       await PendaftaranEmailService.sendUpdated(pendaftaran);
     } else {
-      await PendaftaranEmailService.sendStatusValidated(pendaftaran);
+      await PendaftaranEmailService.sendStatusValidated(
+        pendaftaran,
+        revisiData
+      );
     }
 
     return {
@@ -120,7 +141,11 @@ export default class PendaftaranEmailService {
   }
 
   private static async sendStatusValidated(
-    pendaftaran: PendaftaranWithDataDokumen
+    pendaftaran: PendaftaranWithDataDokumen,
+    revisiData?: {
+      dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+      catatan_umum?: string;
+    }
   ) {
     const content = PendaftaranEmailService.getEventContent(
       'status_validated',
@@ -129,14 +154,19 @@ export default class PendaftaranEmailService {
     await PendaftaranEmailService.sendSafely(
       'status_validated',
       pendaftaran,
-      content
+      content,
+      revisiData
     );
   }
 
   private static async sendSafely(
     event: PendaftaranEmailEvent,
     pendaftaran: PendaftaranWithDataDokumen,
-    content: PendaftaranEmailContent
+    content: PendaftaranEmailContent,
+    revisiData?: {
+      dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+      catatan_umum?: string;
+    }
   ) {
     const recipient = pendaftaran.mahasiswa?.email?.trim();
 
@@ -154,7 +184,11 @@ export default class PendaftaranEmailService {
         to: recipient,
         subject: content.subject,
         text: PendaftaranEmailService.buildText(pendaftaran, content),
-        html: PendaftaranEmailService.buildHtml(pendaftaran, content),
+        html: PendaftaranEmailService.buildHtml(
+          pendaftaran,
+          content,
+          revisiData
+        ),
       });
     } catch (error) {
       logger.error('Pendaftaran notification email failed', {
@@ -251,7 +285,11 @@ export default class PendaftaranEmailService {
 
   private static buildHtml(
     pendaftaran: PendaftaranWithDataDokumen,
-    content: PendaftaranEmailContent
+    content: PendaftaranEmailContent,
+    revisiData?: {
+      dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+      catatan_umum?: string;
+    }
   ) {
     const statusMeta = PendaftaranEmailService.getStatusMeta(
       pendaftaran.status_berkas
@@ -279,6 +317,38 @@ export default class PendaftaranEmailService {
           <li style="margin:0 0 10px 0;color:#334155;font-size:14px;line-height:1.6;">${PendaftaranEmailService.escapeHtml(step)}</li>`
       )
       .join('');
+
+    const revisiSection =
+      revisiData && revisiData.dokumen_revisi.length > 0
+        ? `
+            <tr>
+              <td style="padding:0 32px 24px 32px;">
+                <div style="border:1px solid #fca5a5;background:#fff5f5;border-radius:14px;padding:18px 20px;">
+                  <div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#dc2626;margin-bottom:12px;">📋 Dokumen yang Perlu Direvisi</div>
+                  ${revisiData.catatan_umum ? `<p style="margin:0 0 14px 0;color:#334155;font-size:14px;line-height:1.7;"><strong>Catatan umum:</strong> ${PendaftaranEmailService.escapeHtml(revisiData.catatan_umum)}</p>` : ''}
+                  <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #fca5a5;border-radius:8px;overflow:hidden;">
+                    <thead>
+                      <tr style="background:#fee2e2;">
+                        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.04em;width:40%;">Dokumen</th>
+                        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.04em;">Catatan Revisi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${revisiData.dokumen_revisi
+                        .map(
+                          (item, i) => `
+                      <tr style="background:${i % 2 === 0 ? '#ffffff' : '#fff5f5'};">
+                        <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#0f172a;border-top:1px solid #fca5a5;">${PendaftaranEmailService.escapeHtml(item.nama_dokumen)}</td>
+                        <td style="padding:10px 14px;font-size:13px;color:#334155;border-top:1px solid #fca5a5;">${PendaftaranEmailService.escapeHtml(item.catatan)}</td>
+                      </tr>`
+                        )
+                        .join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>`
+        : '';
 
     return `<!doctype html>
 <html lang="id">
@@ -324,6 +394,7 @@ export default class PendaftaranEmailService {
                 </table>
               </td>
             </tr>
+            ${revisiSection}
             <tr>
               <td style="padding:0 32px 32px 32px;">
                 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;">

@@ -238,7 +238,15 @@ export default class PendaftaranService {
     await CacheInvalidation.invalidatePendaftaran();
 
     if (existing.status_berkas !== data.status_berkas) {
-      PendaftaranEmailService.notifyStatusValidated(data.id);
+      PendaftaranEmailService.notifyStatusValidated(
+        data.id,
+        payload.status_berkas === 'REVISI' && payload.dokumen_revisi?.length
+          ? {
+              dokumen_revisi: payload.dokumen_revisi,
+              catatan_umum: payload.catatan_umum,
+            }
+          : undefined
+      );
     }
 
     return {

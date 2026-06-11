@@ -89,9 +89,33 @@ export const putPendaftaranMahasiswaSchema = z
   });
 
 // Koordinator validasi status berkas
-export const patchStatusBerkasSchema = z.object({
-  status_berkas: z.nativeEnum(StatusBerkas),
+const dokumenRevisiSchema = z.object({
+  nama_dokumen: z.string().min(1, 'Nama dokumen tidak boleh kosong'),
+  catatan: z
+    .string()
+    .min(1, 'Catatan revisi tidak boleh kosong')
+    .max(500, 'Catatan revisi maksimal 500 karakter'),
 });
+
+export const patchStatusBerkasSchema = z
+  .object({
+    status_berkas: z.nativeEnum(StatusBerkas),
+    dokumen_revisi: z.array(dokumenRevisiSchema).optional(),
+    catatan_umum: z
+      .string()
+      .max(1000, 'Catatan umum maksimal 1000 karakter')
+      .optional(),
+  })
+  .refine(
+    (data) =>
+      data.status_berkas !== 'REVISI' ||
+      (data.dokumen_revisi && data.dokumen_revisi.length > 0),
+    {
+      message:
+        'Dokumen yang perlu direvisi harus diisi minimal 1 item ketika status adalah REVISI',
+      path: ['dokumen_revisi'],
+    }
+  );
 
 // Koordinator ganti dosen
 export const putDosenPenggantiSchema = z

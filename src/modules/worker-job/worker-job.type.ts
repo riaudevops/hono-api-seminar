@@ -41,6 +41,10 @@ export type WorkerPendaftaranEmailEvent =
 export type WorkerPendaftaranEmailPayload = {
   pendaftaranId: string;
   event: WorkerPendaftaranEmailEvent;
+  revisiData?: {
+    dokumen_revisi: { nama_dokumen: string; catatan: string }[];
+    catatan_umum?: string;
+  };
 };
 
 export type WorkerJadwalEmailAction = 'created' | 'updated';

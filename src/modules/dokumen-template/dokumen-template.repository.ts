@@ -129,4 +129,10 @@ export default class DokumenTemplateRepository {
       where: { id_dokumen_template: id },
     });
   }
+
+  public static async countDataPendaftaran(id: string) {
+    return prisma.data_pendaftaran.count({
+      where: { id_dokumen_template: id },
+    });
+  }
 }

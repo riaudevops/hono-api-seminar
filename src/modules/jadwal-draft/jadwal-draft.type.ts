@@ -1,4 +1,4 @@
-import { PenilaiRole, StatusJadwalDraft } from '@prisma/client';
+import type { PenilaiRole } from '@prisma/client';
 
 export interface DosenAssignmentInput {
   nip: string;
@@ -16,6 +16,8 @@ export interface GenerateJadwalInput {
   list_mahasiswa: MahasiswaScheduleInput[];
   tanggal_dikecualikan?: string[];
   catatan_tambahan?: string;
+  mode?: 'semua' | 'hanya_kp' | 'hanya_ta';
+  dengan_constraint?: boolean;
 }
 
 export interface UpdateDraftInput {

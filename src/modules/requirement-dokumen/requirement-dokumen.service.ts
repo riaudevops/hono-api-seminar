@@ -2,8 +2,9 @@ import Fuse from 'fuse.js';
 import { LogActionType, LogActorType, LogEntityType } from '@prisma/client';
 import { LogService } from '../log';
 import { APIError } from '../../utils/api-error.util';
+import CacheInvalidation from '../../utils/cache-invalidation.util';
 import RequirementDokumenRepository from './requirement-dokumen.repository';
-import {
+import type {
   CreateRequirementDokumenType,
   GetAllRequirementDokumenResponse,
   UpdateRequirementDokumenType,
@@ -31,7 +32,8 @@ export default class RequirementDokumenService {
       limit = 10,
     } = params;
 
-    let requirements = await RequirementDokumenRepository.findAllWithRelations();
+    let requirements =
+      await RequirementDokumenRepository.findAllWithRelations();
 
     if (jenis_seminar) {
       requirements = requirements.filter(
@@ -98,7 +100,7 @@ export default class RequirementDokumenService {
   }
 
   public static async create(payload: CreateRequirementDokumenType) {
-    await this.ensureForeignKeysExist(
+    await RequirementDokumenService.ensureForeignKeysExist(
       payload.id_jenis_seminar,
       payload.id_dokumen_template
     );
@@ -123,6 +125,7 @@ export default class RequirementDokumenService {
       entity_id: data.id,
       new_values: data,
     });
+    await CacheInvalidation.invalidateJenisSeminar();
     return {
       response: true,
       message: 'Requirement dokumen berhasil ditambahkan.',
@@ -191,6 +194,7 @@ export default class RequirementDokumenService {
       old_values: existing,
       new_values: data,
     });
+    await CacheInvalidation.invalidateJenisSeminar();
     return {
       response: true,
       message: 'Requirement dokumen berhasil diperbarui.',
@@ -213,6 +217,7 @@ export default class RequirementDokumenService {
       entity_id: existing.id,
       old_values: existing,
     });
+    await CacheInvalidation.invalidateJenisSeminar();
     return {
       response: true,
       message: 'Requirement dokumen berhasil dihapus.',

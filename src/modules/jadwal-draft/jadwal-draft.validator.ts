@@ -54,6 +54,16 @@ export const generateJadwalSchema = z
       .string()
       .max(1000, 'Catatan tambahan maksimal 1000 karakter')
       .optional(),
+    mode: z
+      .enum(['semua', 'hanya_kp', 'hanya_ta'], {
+        errorMap: () => ({
+          message:
+            'Mode tidak valid. Pilih salah satu: semua, hanya_kp, hanya_ta',
+        }),
+      })
+      .optional()
+      .default('semua'),
+    dengan_constraint: z.boolean().optional().default(true),
   })
   .refine(
     (data) => {
