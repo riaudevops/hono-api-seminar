@@ -435,10 +435,23 @@ export default class ConstraintDosenService {
       throw new APIError('Proses chat constraint dibatalkan oleh client', 499);
     }
 
+    // Sertakan tanggal referensi dan timezone WIB agar LLM mengonversi waktu
+    // dengan benar ke UTC. Tanpa ini LLM mengasumsikan jam yang disebutkan
+    // sudah UTC, sehingga "pagi" (08:00 WIB) tersimpan sebagai 08:00 UTC
+    // yang bila ditampilkan kembali ke WIB menjadi 15:00 WIB.
+    const nowWIB = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })
+    );
+    const refDate = nowWIB.toISOString().slice(0, 10); // YYYY-MM-DD
+    const userMessageWithContext =
+      `[Tanggal referensi: ${refDate}, Timezone input: WIB (UTC+7). ` +
+      `Semua jam yang disebutkan user adalah WIB — kurangi 7 jam saat mengisi waktu_mulai/waktu_selesai (UTC).]` +
+      `\n\n${message}`;
+
     const response = await openRouterService.chatCompletion({
       messages: [
         textMessage('system', PARSE_CONSTRAINT_PROMPT),
-        textMessage('user', message),
+        textMessage('user', userMessageWithContext),
       ],
       temperature: 0.3,
       maxTokens: 2048,
