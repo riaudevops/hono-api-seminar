@@ -329,6 +329,7 @@ model dokumen_template {
 
   format_file  String?          @db.VarChar(50)
   max_size_mb  Int?
+  can_view_dosen Boolean          @default(false)
 
   is_special   Boolean          @default(false)
 
@@ -367,7 +368,6 @@ model pendaftaran {
   nip_pembimbing_2  String?      @db.VarChar(18)
   nip_penguji_1     String?      @db.VarChar(18)
   nip_penguji_2     String?      @db.VarChar(18)
-  nip_ketua_sidang  String?      @db.VarChar(18)
 
   status_berkas     StatusBerkas @default(PENDING)
   status_jadwal     StatusJadwal @default(BELUM_JADWAL)
