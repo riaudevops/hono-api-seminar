@@ -203,6 +203,40 @@ async function main() {
         tipe_input: 'TEXT',
       },
       {
+        kode: 'NAMA_INSTANSI_KP',
+        nama: 'Nama Instansi/Perusahaan KP',
+        deskripsi:
+          'Tuliskan nama instansi/perusahaan tujuan pelaksanaan KP dengan BENAR dan TANPA DISINGKAT',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'ALAMAT_INSTANSI_KP',
+        nama: 'Alamat Instansi/Perusahaan Tujuan KP',
+        deskripsi:
+          'Tuliskan alamat instansi/perusahaan tujuan pelaksanaan KP dengan BENAR',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'NAMA_PEMBIMBING_INSTANSI',
+        nama: 'Nama Pembimbing Instansi/Perusahaan',
+        deskripsi:
+          'Tuliskan nama pembimbing instansi/perusahaan dengan benar beserta gelar.',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'JABATAN_PEMBIMBING_INSTANSI',
+        nama: 'Jabatan Pembimbing Instansi/Perusahaan',
+        deskripsi:
+          'Tuliskan jabatan pembimbing instansi/perusahaan dengan benar.',
+        tipe_input: 'TEXT',
+      },
+      {
+        kode: 'TELP_PEMBIMBING_INSTANSI',
+        nama: 'No. Telp/WA Pembimbing Instansi',
+        deskripsi: 'Tuliskan no. telp/WA pembimbing instansi.',
+        tipe_input: 'TEXT',
+      },
+      {
         kode: 'TANGGAL_MULAI_KP',
         nama: 'Tanggal Mulai KP',
         tipe_input: 'DATE',
@@ -270,6 +304,41 @@ async function main() {
         tipe_input: 'FILE_UPLOAD',
         format_file: 'pdf',
         max_size_mb: 10,
+      },
+      {
+        kode: 'SCAN_PERNYATAAN_SELESAI_KP',
+        nama: 'Scan Lembar Pernyataan Selesai Melaksanakan KP',
+        deskripsi:
+          'Scan lembar pernyataan telah selesai melaksanakan KP, dapat di download pada link: https://s.id/pernyataan-selesai-kp',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'SCAN_FORM_BIMBINGAN_KP',
+        nama: 'Scan Lembar Form Bimbingan KP',
+        deskripsi:
+          'Scan Lembar form bimbingan KP, minimal sudah melakukan 5 kali bimbingan',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'SCAN_BUKTI_SETORAN_HAFALAN',
+        nama: 'Scan Bukti Setoran Hafalan Surat 1-16',
+        deskripsi: 'Scan Bukti setoran hafalan surat 1 - 16',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'SCAN_FORM_PENDAFTARAN_DISEMINASI_KP',
+        nama: 'Scan Form Pengajuan Pendaftaran Diseminasi KP',
+        deskripsi:
+          'Scan form Pengajuan Pendaftaran Diseminasi KP, dapat di download pada link: https://s.id/form-diseminasi-kp',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
       },
       {
         kode: 'LAPORAN_HASIL_TA',
@@ -429,14 +498,21 @@ async function main() {
   };
   const requirements: Req[] = [
     { jenis: 'SEMKP', dokumen: 'JUDUL_KP', urutan: 1 },
-    { jenis: 'SEMKP', dokumen: 'NAMA_INSTANSI', urutan: 2 },
-    { jenis: 'SEMKP', dokumen: 'TANGGAL_MULAI_KP', urutan: 3 },
-    { jenis: 'SEMKP', dokumen: 'TANGGAL_SELESAI_KP', urutan: 4 },
-    { jenis: 'SEMKP', dokumen: 'SURAT_KET_INSTANSI', urutan: 5 },
-    { jenis: 'SEMKP', dokumen: 'LAPORAN_KP', urutan: 6 },
-    { jenis: 'SEMKP', dokumen: 'FORM_NILAI_INSTANSI', urutan: 7 },
-    { jenis: 'SEMKP', dokumen: 'BERKAS_SYARAT', urutan: 8 },
-    { jenis: 'SEMKP', dokumen: 'LINK_REPOSITORY', urutan: 9, wajib: false },
+    { jenis: 'SEMKP', dokumen: 'NAMA_INSTANSI_KP', urutan: 2 },
+    { jenis: 'SEMKP', dokumen: 'ALAMAT_INSTANSI_KP', urutan: 3 },
+    { jenis: 'SEMKP', dokumen: 'NAMA_PEMBIMBING_INSTANSI', urutan: 4 },
+    { jenis: 'SEMKP', dokumen: 'JABATAN_PEMBIMBING_INSTANSI', urutan: 5 },
+    { jenis: 'SEMKP', dokumen: 'TELP_PEMBIMBING_INSTANSI', urutan: 6 },
+    { jenis: 'SEMKP', dokumen: 'TANGGAL_MULAI_KP', urutan: 7 },
+    { jenis: 'SEMKP', dokumen: 'TANGGAL_SELESAI_KP', urutan: 8 },
+    { jenis: 'SEMKP', dokumen: 'SCAN_PERNYATAAN_SELESAI_KP', urutan: 9 },
+    { jenis: 'SEMKP', dokumen: 'SCAN_FORM_BIMBINGAN_KP', urutan: 10 },
+    { jenis: 'SEMKP', dokumen: 'SCAN_BUKTI_SETORAN_HAFALAN', urutan: 11 },
+    {
+      jenis: 'SEMKP',
+      dokumen: 'SCAN_FORM_PENDAFTARAN_DISEMINASI_KP',
+      urutan: 12,
+    },
 
     { jenis: 'SEMPRO', dokumen: 'JUDUL_TA', urutan: 1 },
     { jenis: 'SEMPRO', dokumen: 'PROPOSAL_TA', urutan: 2 },
