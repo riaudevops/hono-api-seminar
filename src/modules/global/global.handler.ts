@@ -1,10 +1,10 @@
-import { Context } from 'hono';
-import { BlankEnv, BlankInput, HTTPResponseError } from 'hono/types';
-import GlobalService from '../services/global.service';
-import {
+import type { Context } from 'hono';
+import type { BlankEnv, BlankInput, HTTPResponseError } from 'hono/types';
+import GlobalService from './global.service';
+import type {
   GlobalServiceHealthResponse,
   GlobalServiceIntroduceResponse,
-} from '../types/global.type';
+} from './global.type';
 
 export default class GlobalHandler {
   public static async introduce(c: Context<BlankEnv, '/', BlankInput>) {

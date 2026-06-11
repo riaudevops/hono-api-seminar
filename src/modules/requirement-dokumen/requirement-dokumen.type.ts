@@ -1,4 +1,4 @@
-import type { PaginatedResponse } from '../../types/global.type';
+import type { PaginatedResponse } from '../../modules/global/global.type';
 
 export interface RequirementDokumenType {
   id: string;

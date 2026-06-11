@@ -260,17 +260,11 @@ export default class PendaftaranService {
       throw new APIError('Pendaftaran tidak ditemukan.', 404);
     }
 
-    await PendaftaranService.ensureKetuaSidangAllowed(
-      existing.id_jenis_seminar,
-      payload.nip_ketua_sidang
-    );
-
     await PendaftaranService.ensureDosenListExists([
       payload.nip_pembimbing_1,
       payload.nip_pembimbing_2,
       payload.nip_penguji_1,
       payload.nip_penguji_2,
-      payload.nip_ketua_sidang,
     ]);
 
     const data = await PendaftaranRepository.updateDosenByKoordinator(
@@ -510,17 +504,11 @@ export default class PendaftaranService {
       }
     }
 
-    await PendaftaranService.ensureKetuaSidangAllowed(
-      payload.id_jenis_seminar ?? existing.id_jenis_seminar,
-      payload.nip_ketua_sidang
-    );
-
     await PendaftaranService.ensureDosenListExists([
       payload.nip_pembimbing_1,
       payload.nip_pembimbing_2,
       payload.nip_penguji_1,
       payload.nip_penguji_2,
-      payload.nip_ketua_sidang,
     ]);
 
     const data = await PendaftaranRepository.update(id, payload);
@@ -569,7 +557,6 @@ export default class PendaftaranService {
       payload.nip_pembimbing_2,
       payload.nip_penguji_1,
       payload.nip_penguji_2,
-      payload.nip_ketua_sidang,
     ]);
   }
 
@@ -582,26 +569,6 @@ export default class PendaftaranService {
       if (!exists) {
         throw new APIError(`Dosen dengan NIP "${nip}" tidak ditemukan.`, 404);
       }
-    }
-  }
-
-  private static async ensureKetuaSidangAllowed(
-    idJenisSeminar: string,
-    nipKetuaSidang: string | null | undefined
-  ) {
-    if (!nipKetuaSidang) return;
-
-    const jenisSeminar =
-      await PendaftaranRepository.findJenisSeminarById(idJenisSeminar);
-    if (!jenisSeminar) {
-      throw new APIError('Jenis seminar tidak ditemukan.', 404);
-    }
-
-    if (!jenisSeminar.ada_ketua_sidang) {
-      throw new APIError(
-        'Jenis seminar ini tidak menggunakan ketua sidang.',
-        400
-      );
     }
   }
 

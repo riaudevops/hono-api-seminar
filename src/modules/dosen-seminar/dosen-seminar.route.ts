@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
 import { zValidator } from '@hono/zod-validator';
-import { zodError } from '../utils/zod-error.util';
-import AuthMiddleware from '../middlewares/auth.middleware';
-import DosenSeminarHandler from '../handlers/dosen-seminar.handler';
+import { zodError } from '../../utils/zod-error.util';
+import AuthMiddleware from '../../middlewares/auth.middleware';
+import DosenSeminarHandler from './dosen-seminar.handler';
 import {
   submitNilaiSchema,
   postConstraintSchema,
-} from '../validators/dosen-seminar.validator';
+} from './dosen-seminar.validator';
 
 const dosenSeminarRoute = new Hono({ router: new RegExpRouter() });
 

@@ -14,8 +14,7 @@ WITH demo_pendaftaran (
   "nip_pembimbing_1",
   "nip_pembimbing_2",
   "nip_penguji_1",
-  "nip_penguji_2",
-  "nip_ketua_sidang"
+  "nip_penguji_2"
 ) AS (
   VALUES
     -- Seminar Kerja Praktek: 1 pembimbing + 1 penguji
@@ -196,7 +195,6 @@ INSERT INTO "pendaftaran" (
   "nip_pembimbing_2",
   "nip_penguji_1",
   "nip_penguji_2",
-  "nip_ketua_sidang",
   "status_berkas",
   "status_jadwal",
   "created_at",
@@ -212,7 +210,6 @@ SELECT
   demo_pendaftaran."nip_pembimbing_2",
   demo_pendaftaran."nip_penguji_1",
   demo_pendaftaran."nip_penguji_2",
-  demo_pendaftaran."nip_ketua_sidang",
   'APPROVED'::"StatusBerkas",
   'BELUM_JADWAL'::"StatusJadwal",
   NOW(),
@@ -230,7 +227,6 @@ ON CONFLICT ("id") DO UPDATE SET
   "nip_pembimbing_2" = EXCLUDED."nip_pembimbing_2",
   "nip_penguji_1" = EXCLUDED."nip_penguji_1",
   "nip_penguji_2" = EXCLUDED."nip_penguji_2",
-  "nip_ketua_sidang" = EXCLUDED."nip_ketua_sidang",
   "status_berkas" = EXCLUDED."status_berkas",
   "status_jadwal" = EXCLUDED."status_jadwal",
   "updated_at" = NOW();

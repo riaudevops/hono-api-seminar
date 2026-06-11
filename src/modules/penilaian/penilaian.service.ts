@@ -1,9 +1,9 @@
-import PenilaianRepository from '../repositories/penilaian.repository';
-import { JadwalRepository, LogJadwalContext } from '../modules/jadwal';
-import { APIError } from '../utils/api-error.util';
-import prisma from '../infrastructures/db.infrastructure';
+import PenilaianRepository from './penilaian.repository';
+import { JadwalRepository, type LogJadwalContext } from '../jadwal';
+import { APIError } from '../../utils/api-error.util';
+import prisma from '../../infrastructures/db.infrastructure';
 import { LogActionType } from '@prisma/client';
-import { LogService } from '../modules/log';
+import { LogService } from '../log';
 
 export interface SubmitPenilaianItem {
   id_komponen: string;
@@ -67,57 +67,33 @@ export default class PenilaianService {
     id_penilaian: string,
     nip: string,
     details: SubmitPenilaianItem[],
-    context: LogJadwalContext
+    context: { actor_id: string; actor_type: any }
   ) {
     const penilaian = await PenilaianRepository.findById(id_penilaian);
     if (!penilaian) {
       throw new APIError(
-        `Data penilaian dengan ID ${id_penilaian} tidak ditemukan`,
+        `Penilaian dengan ID ${id_penilaian} tidak ditemukan`,
         404
       );
     }
 
     if (penilaian.nip !== nip) {
-      throw new APIError(
-        `Anda tidak memiliki akses untuk mengisi nilai pada sesi ini (NIP tidak sesuai)`,
-        403
-      );
+      throw new APIError('Anda tidak berhak mengisi penilaian ini.', 403);
     }
 
     const jadwal = await JadwalRepository.findById(penilaian.id_jadwal);
     if (!jadwal) {
-      throw new APIError(`Data jadwal referensi tidak ditemukan`, 404);
+      throw new APIError('Jadwal tidak ditemukan.', 404);
     }
 
-    const waktuSelesai = new Date(jadwal.waktu_selesai);
-    const waktuSekarang = new Date();
+    const logContext: LogJadwalContext = {
+      actor_id: context.actor_id,
+      actor_type: context.actor_type,
+    };
 
-    if (waktuSekarang < waktuSelesai) {
-      throw new APIError(
-        `Penilaian hanya dapat dilakukan setelah seminar selesai pada ${waktuSelesai.toLocaleString()}`,
-        400
-      );
-    }
-
-    const activeComponents = await prisma.komponen_penilaian.findMany({
-      where: { role: penilaian.role, is_aktif: true },
-    });
-
-    const activeComponentIds = activeComponents.map((c) => c.id);
-
-    for (const item of details) {
-      if (!activeComponentIds.includes(item.id_komponen)) {
-        throw new APIError(
-          `Komponen dengan ID ${item.id_komponen} tidak valid atau tidak aktif untuk Role ${penilaian.role}`,
-          400
-        );
-      }
-    }
-
-    const transactionResults = await prisma.$transaction(async (tx) => {
-      const results = [];
+    await prisma.$transaction(async (tx) => {
       for (const item of details) {
-        const existingDetail = await tx.detail_penilaian.findUnique({
+        const existing = await tx.detail_penilaian.findUnique({
           where: {
             id_penilaian_id_komponen: {
               id_penilaian,
@@ -126,42 +102,37 @@ export default class PenilaianService {
           },
         });
 
-        const upserted = await tx.detail_penilaian.upsert({
+        await tx.detail_penilaian.upsert({
           where: {
             id_penilaian_id_komponen: {
-              id_penilaian: id_penilaian,
+              id_penilaian,
               id_komponen: item.id_komponen,
             },
           },
-          update: {
-            nilai: item.nilai,
-          },
+          update: { nilai: item.nilai },
           create: {
-            id_penilaian: id_penilaian,
+            id_penilaian,
             id_komponen: item.id_komponen,
             nilai: item.nilai,
           },
         });
 
         await LogService.createPenilaianLogTx(tx, {
-          action: existingDetail ? LogActionType.UPDATE : LogActionType.CREATE,
-          actor_type: context.actor_type,
-          actor_id: context.actor_id,
+          action: existing ? LogActionType.UPDATE : LogActionType.CREATE,
+          actor_type: logContext.actor_type,
+          actor_id: logContext.actor_id,
           id_jadwal: penilaian.id_jadwal,
           id_komponen_penilaian: item.id_komponen,
-          old_nilai: existingDetail ? existingDetail.nilai : null,
+          old_nilai: existing ? existing.nilai : null,
           new_nilai: item.nilai,
         });
-
-        results.push(upserted);
       }
-      return results;
     });
 
     return {
       response: true,
-      message: 'Nilai berhasil disimpan',
-      data: transactionResults,
+      message: 'Penilaian berhasil disimpan.',
+      data: { id_penilaian },
     };
   }
 }

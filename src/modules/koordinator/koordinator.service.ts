@@ -1,7 +1,7 @@
-import prisma from '../infrastructures/db.infrastructure';
-import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
-import JadwalHelper from '../helpers/jadwal.helper';
-import { APIError } from '../utils/api-error.util';
+import prisma from '../../infrastructures/db.infrastructure';
+import { DosenModuleRepository as DosenRepository } from '../dosen';
+import JadwalHelper from '../../helpers/jadwal.helper';
+import { APIError } from '../../utils/api-error.util';
 import { PenilaiRole, LogEntityType } from '@prisma/client';
 
 // ─── Mapping ───────────────────────────────────────────────────────

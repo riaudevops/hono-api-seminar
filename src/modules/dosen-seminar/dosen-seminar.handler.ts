@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
-import DosenSeminarService from '../services/dosen-seminar.service';
-import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
-import { APIError } from '../utils/api-error.util';
+import DosenSeminarService from './dosen-seminar.service';
+import { DosenModuleRepository as DosenRepository } from '../dosen';
+import { APIError } from '../../utils/api-error.util';
 
 async function extractNip(c: Context): Promise<string> {
   const userPayload = c.get('user');
@@ -26,24 +26,20 @@ async function extractNip(c: Context): Promise<string> {
 }
 
 export default class DosenSeminarHandler {
-  /** #1 GET /api/dosen/seminar/jadwal */
   public static async getJadwalSeminar(c: Context) {
     const nip = await extractNip(c);
     return c.json(await DosenSeminarService.getJadwalSeminar(nip));
   }
 
-  /** #2 GET /api/dosen/seminar/stats */
   public static async getStats(c: Context) {
     const nip = await extractNip(c);
     return c.json(await DosenSeminarService.getStats(nip));
   }
 
-  /** #3 GET /api/dosen/seminar/komponen-penilaian */
   public static async getKomponenPenilaian(c: Context) {
     return c.json(await DosenSeminarService.getKomponenPenilaian());
   }
 
-  /** #4 GET /api/dosen/seminar/penilaian?jadwal_id= */
   public static async getPenilaianByJadwal(c: Context) {
     const jadwal_id = c.req.query('jadwal_id');
     if (!jadwal_id) {
@@ -52,26 +48,22 @@ export default class DosenSeminarHandler {
     return c.json(await DosenSeminarService.getPenilaianByJadwal(jadwal_id));
   }
 
-  /** #5 POST /api/dosen/seminar/penilaian */
   public static async submitNilai(c: Context) {
     const nip = await extractNip(c);
     const body = await c.req.json();
     return c.json(await DosenSeminarService.submitNilai(nip, body));
   }
 
-  /** #6 GET /api/dosen/seminar/log-penilaian */
   public static async getLogPenilaian(c: Context) {
     const nip = await extractNip(c);
     return c.json(await DosenSeminarService.getLogPenilaian(nip));
   }
 
-  /** #7 GET /api/dosen/constraints */
   public static async getConstraints(c: Context) {
     const nip = await extractNip(c);
     return c.json(await DosenSeminarService.getConstraints(nip));
   }
 
-  /** #8 POST /api/dosen/constraints */
   public static async createConstraint(c: Context) {
     const nip = await extractNip(c);
     const data = await c.req.json();

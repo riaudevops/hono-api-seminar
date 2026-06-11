@@ -1,7 +1,7 @@
-import {
+import type {
   GlobalServiceHealthResponse,
   GlobalServiceIntroduceResponse,
-} from '../types/global.type';
+} from './global.type';
 
 export default class GlobalService {
   public static async introduce(): Promise<GlobalServiceIntroduceResponse> {

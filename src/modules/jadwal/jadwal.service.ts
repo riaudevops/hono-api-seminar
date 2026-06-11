@@ -14,7 +14,7 @@ import RuanganHelper from '../ruangan/ruangan.helper';
 import DosenHelper from '../../helpers/dosen.helper';
 import { MahasiswaModuleRepository as MahasiswaRepository } from '../mahasiswa';
 import { DosenModuleRepository as DosenRepository } from '../dosen';
-import PenilaianRepository from '../../repositories/penilaian.repository';
+import PenilaianRepository from '../penilaian/penilaian.repository';
 import RuanganRepository from '../ruangan/ruangan.repository';
 import PendaftaranRepository from '../pendaftaran/pendaftaran.repository';
 import prisma from '../../infrastructures/db.infrastructure';

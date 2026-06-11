@@ -1,8 +1,8 @@
-import { Context } from 'hono';
-import PenilaianService from '../services/penilaian.service';
-import { APIError } from '../utils/api-error.util';
+import type { Context } from 'hono';
+import PenilaianService from './penilaian.service';
+import { APIError } from '../../utils/api-error.util';
 import { LogActorType, LogEntityType } from '@prisma/client';
-import { LogService } from '../modules/log';
+import { LogService } from '../log';
 
 export default class PenilaianHandler {
   public static async getJadwalToAssess(c: Context) {

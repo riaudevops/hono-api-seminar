@@ -161,7 +161,6 @@ export default class PendaftaranRepository {
       pendaftaran.nip_pembimbing_2,
       pendaftaran.nip_penguji_1,
       pendaftaran.nip_penguji_2,
-      pendaftaran.nip_ketua_sidang,
     ].filter((nip): nip is string => !!nip);
 
     const [jenisSeminar, mahasiswa, dataPendaftaran, dosens] =
@@ -230,7 +229,6 @@ export default class PendaftaranRepository {
           nip_pembimbing_2: data.nip_pembimbing_2 ?? null,
           nip_penguji_1: data.nip_penguji_1 ?? null,
           nip_penguji_2: data.nip_penguji_2 ?? null,
-          nip_ketua_sidang: data.nip_ketua_sidang ?? null,
           status_berkas: 'PENDING',
           updated_at: new Date(),
         },
@@ -285,8 +283,6 @@ export default class PendaftaranRepository {
         updateData.nip_penguji_1 = data.nip_penguji_1;
       if (data.nip_penguji_2 !== undefined)
         updateData.nip_penguji_2 = data.nip_penguji_2;
-      if (data.nip_ketua_sidang !== undefined)
-        updateData.nip_ketua_sidang = data.nip_ketua_sidang;
 
       const pendaftaran = await tx.pendaftaran.update({
         where: { id },
@@ -370,9 +366,6 @@ export default class PendaftaranRepository {
         }),
         ...(data.nip_penguji_2 !== undefined && {
           nip_penguji_2: data.nip_penguji_2,
-        }),
-        ...(data.nip_ketua_sidang !== undefined && {
-          nip_ketua_sidang: data.nip_ketua_sidang,
         }),
       },
     });
@@ -502,10 +495,6 @@ export default class PendaftaranRepository {
       nip_penguji_2: pendaftaran.nip_penguji_2,
       nama_penguji_2: pendaftaran.nip_penguji_2
         ? (dosenByNip.get(pendaftaran.nip_penguji_2)?.nama ?? null)
-        : null,
-      nip_ketua_sidang: pendaftaran.nip_ketua_sidang,
-      nama_ketua_sidang: pendaftaran.nip_ketua_sidang
-        ? (dosenByNip.get(pendaftaran.nip_ketua_sidang)?.nama ?? null)
         : null,
       status_berkas: pendaftaran.status_berkas,
       status_jadwal: pendaftaran.status_jadwal,

@@ -1,5 +1,5 @@
-import { Context } from 'hono';
-import KoordinatorService from '../services/koordinator.service';
+import type { Context } from 'hono';
+import KoordinatorService from './koordinator.service';
 
 export default class KoordinatorHandler {
   /** #1 GET /api/koordinator/dashboard/stats */

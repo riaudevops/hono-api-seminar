@@ -1,5 +1,5 @@
 import prisma from '../../infrastructures/db.infrastructure';
-import {
+import type {
   CreateDokumenTemplateType,
   DokumenTemplateWithJenisSeminar,
   UpdateDokumenTemplateType,
@@ -24,18 +24,15 @@ export default class DokumenTemplateRepository {
     const jenisSeminarById = new Map(
       jenisSeminars.map((jenisSeminar) => [jenisSeminar.id, jenisSeminar])
     );
-    const requirementsByTemplate = requirements.reduce(
-      (acc, requirement) => {
-        const jenisSeminar = jenisSeminarById.get(requirement.id_jenis_seminar);
-        if (!jenisSeminar) return acc;
+    const requirementsByTemplate = requirements.reduce((acc, requirement) => {
+      const jenisSeminar = jenisSeminarById.get(requirement.id_jenis_seminar);
+      if (!jenisSeminar) return acc;
 
-        const items = acc.get(requirement.id_dokumen_template) ?? [];
-        items.push(jenisSeminar);
-        acc.set(requirement.id_dokumen_template, items);
-        return acc;
-      },
-      new Map<string, { id: string; nama: string; kode: string }[]>()
-    );
+      const items = acc.get(requirement.id_dokumen_template) ?? [];
+      items.push(jenisSeminar);
+      acc.set(requirement.id_dokumen_template, items);
+      return acc;
+    }, new Map<string, { id: string; nama: string; kode: string }[]>());
 
     return templates.map((template) => ({
       id: template.id,
@@ -47,6 +44,7 @@ export default class DokumenTemplateRepository {
       format_file: template.format_file,
       max_size_mb: template.max_size_mb,
       is_special: template.is_special,
+      can_view_dosen: template.can_view_dosen,
       jenis_seminars: requirementsByTemplate.get(template.id) ?? [],
     }));
   }
@@ -92,6 +90,7 @@ export default class DokumenTemplateRepository {
         format_file: data.format_file,
         max_size_mb: data.max_size_mb,
         is_special: data.is_special ?? false,
+        can_view_dosen: data.can_view_dosen ?? false,
       },
     });
   }
@@ -105,9 +104,13 @@ export default class DokumenTemplateRepository {
     if (data.tipe_input !== undefined) updateData.tipe_input = data.tipe_input;
     if (data.opsi !== undefined)
       updateData.opsi = data.opsi ? JSON.stringify(data.opsi) : null;
-    if (data.format_file !== undefined) updateData.format_file = data.format_file;
-    if (data.max_size_mb !== undefined) updateData.max_size_mb = data.max_size_mb;
+    if (data.format_file !== undefined)
+      updateData.format_file = data.format_file;
+    if (data.max_size_mb !== undefined)
+      updateData.max_size_mb = data.max_size_mb;
     if (data.is_special !== undefined) updateData.is_special = data.is_special;
+    if (data.can_view_dosen !== undefined)
+      updateData.can_view_dosen = data.can_view_dosen;
 
     return prisma.dokumen_template.update({
       where: { id },

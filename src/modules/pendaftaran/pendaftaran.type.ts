@@ -1,5 +1,5 @@
 import type { StatusBerkas, StatusJadwal } from '@prisma/client';
-import type { PaginatedResponse } from '../../types/global.type';
+import type { PaginatedResponse } from '../../modules/global/global.type';
 
 export interface PendaftaranType {
   id: string;
@@ -15,8 +15,6 @@ export interface PendaftaranType {
   nama_penguji_1?: string | null;
   nip_penguji_2: string | null;
   nama_penguji_2?: string | null;
-  nip_ketua_sidang: string | null;
-  nama_ketua_sidang?: string | null;
   status_berkas: StatusBerkas;
   status_jadwal: StatusJadwal;
   created_at: Date;
@@ -58,7 +56,6 @@ export interface CreatePendaftaranByMahasiswaType {
   nip_pembimbing_2?: string | null;
   nip_penguji_1?: string | null;
   nip_penguji_2?: string | null;
-  nip_ketua_sidang?: string | null;
   dokumen?: DokumenNilaiPayload;
 }
 
@@ -70,7 +67,6 @@ export interface UpdatePendaftaranByMahasiswaType {
   nip_pembimbing_2?: string | null;
   nip_penguji_1?: string | null;
   nip_penguji_2?: string | null;
-  nip_ketua_sidang?: string | null;
   dokumen?: DokumenNilaiPayload;
 }
 
@@ -84,17 +80,6 @@ export interface UpdateDosenByKoordinatorType {
   nip_pembimbing_2?: string | null;
   nip_penguji_1?: string | null;
   nip_penguji_2?: string | null;
-  nip_ketua_sidang?: string | null;
-  alasan_penggantian: string;
-}
-
-// Koordinator update — ganti dosen (skenario dosen berhalangan hadir)
-export interface UpdateDosenByKoordinatorType {
-  nip_pembimbing_1?: string;
-  nip_pembimbing_2?: string | null;
-  nip_penguji_1?: string | null;
-  nip_penguji_2?: string | null;
-  nip_ketua_sidang?: string | null;
   alasan_penggantian: string;
 }
 

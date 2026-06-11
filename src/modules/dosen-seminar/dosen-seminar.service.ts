@@ -1,13 +1,13 @@
-import PenilaianRepository from '../repositories/penilaian.repository';
-import { KomponenPenilaianRepository } from '../modules/komponen-penilaian';
-import { ConstraintDosenRepository } from '../modules/constraint-dosen';
-import { DosenModuleRepository as DosenRepository } from '../modules/dosen';
-import { JadwalRepository } from '../modules/jadwal';
-import { LogRepository, LogService } from '../modules/log';
-import JadwalHelper from '../helpers/jadwal.helper';
-import TahunAjaranHelper from '../helpers/tahun-ajaran.helper';
-import { APIError } from '../utils/api-error.util';
-import prisma from '../infrastructures/db.infrastructure';
+import PenilaianRepository from '../penilaian/penilaian.repository';
+import { KomponenPenilaianRepository } from '../komponen-penilaian';
+import { ConstraintDosenRepository } from '../constraint-dosen';
+import { DosenModuleRepository as DosenRepository } from '../dosen';
+import { JadwalRepository } from '../jadwal';
+import { LogRepository, LogService } from '../log';
+import JadwalHelper from '../../helpers/jadwal.helper';
+import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
+import { APIError } from '../../utils/api-error.util';
+import prisma from '../../infrastructures/db.infrastructure';
 import {
   PenilaiRole,
   LogActionType,
@@ -74,7 +74,6 @@ function computeStatusJadwal(waktuMulai: Date, waktuSelesai: Date): string {
 }
 
 function jenisKodeFromJadwal(j: any): string {
-  // jadwal now includes relation jenis_seminar
   return j.jenis_seminar?.kode || '';
 }
 

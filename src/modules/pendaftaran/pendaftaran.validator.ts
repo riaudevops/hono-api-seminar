@@ -48,14 +48,12 @@ const uniqueNipRefinement = (data: {
   nip_pembimbing_2?: string | null;
   nip_penguji_1?: string | null;
   nip_penguji_2?: string | null;
-  nip_ketua_sidang?: string | null;
 }) => {
   const nips = [
     data.nip_pembimbing_1,
     data.nip_pembimbing_2,
     data.nip_penguji_1,
     data.nip_penguji_2,
-    data.nip_ketua_sidang,
   ].filter((nip): nip is string => !!nip);
   return new Set(nips).size === nips.length;
 };
@@ -69,11 +67,10 @@ export const postPendaftaranMahasiswaSchema = z
     nip_pembimbing_2: nipNullableSchema,
     nip_penguji_1: nipNullableSchema,
     nip_penguji_2: nipNullableSchema,
-    nip_ketua_sidang: nipNullableSchema,
     dokumen: dokumenNilaiSchema.optional(),
   })
   .refine(uniqueNipRefinement, {
-    message: 'NIP pembimbing, penguji, dan ketua sidang tidak boleh sama',
+    message: 'NIP pembimbing dan penguji tidak boleh sama',
   });
 
 // Mahasiswa update — hanya field yang boleh direvisi mahasiswa
@@ -85,11 +82,10 @@ export const putPendaftaranMahasiswaSchema = z
     nip_pembimbing_2: nipNullableSchema,
     nip_penguji_1: nipNullableSchema,
     nip_penguji_2: nipNullableSchema,
-    nip_ketua_sidang: nipNullableSchema,
     dokumen: dokumenNilaiSchema.optional(),
   })
   .refine(uniqueNipRefinement, {
-    message: 'NIP pembimbing, penguji, dan ketua sidang tidak boleh sama',
+    message: 'NIP pembimbing dan penguji tidak boleh sama',
   });
 
 // Koordinator validasi status berkas
@@ -104,12 +100,11 @@ export const putDosenPenggantiSchema = z
     nip_pembimbing_2: nipNullableSchema,
     nip_penguji_1: nipNullableSchema,
     nip_penguji_2: nipNullableSchema,
-    nip_ketua_sidang: nipNullableSchema,
     alasan_penggantian: z
       .string()
       .min(10, 'Alasan penggantian minimal 10 karakter')
       .max(500, 'Alasan penggantian maksimal 500 karakter'),
   })
   .refine(uniqueNipRefinement, {
-    message: 'NIP pembimbing, penguji, dan ketua sidang tidak boleh sama',
+    message: 'NIP pembimbing dan penguji tidak boleh sama',
   });

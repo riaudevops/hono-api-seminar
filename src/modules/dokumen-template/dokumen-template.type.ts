@@ -1,5 +1,5 @@
-import { TipeInputDokumen } from '@prisma/client';
-import type { PaginatedResponse } from '../../types/global.type';
+import type { TipeInputDokumen } from '@prisma/client';
+import type { PaginatedResponse } from '../../modules/global/global.type';
 
 export interface DokumenTemplateType {
   id: string;
@@ -11,6 +11,7 @@ export interface DokumenTemplateType {
   format_file: string | null;
   max_size_mb: number | null;
   is_special: boolean;
+  can_view_dosen: boolean;
 }
 
 export interface DokumenTemplateJenisSeminar {
@@ -35,6 +36,7 @@ export interface CreateDokumenTemplateType {
   format_file?: string;
   max_size_mb?: number;
   is_special?: boolean;
+  can_view_dosen?: boolean;
 }
 
 export interface UpdateDokumenTemplateType {
@@ -46,4 +48,5 @@ export interface UpdateDokumenTemplateType {
   format_file?: string | null;
   max_size_mb?: number | null;
   is_special?: boolean;
+  can_view_dosen?: boolean;
 }

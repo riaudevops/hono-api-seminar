@@ -37,10 +37,7 @@ export const postConstraintSchema = z
   })
   .refine(
     (data) => {
-      if (
-        data.type === 'AVAILABLE_TIME' ||
-        data.type === 'UNAVAILABLE_TIME'
-      ) {
+      if (data.type === 'AVAILABLE_TIME' || data.type === 'UNAVAILABLE_TIME') {
         return data.hari != null && data.waktu_mulai && data.waktu_selesai;
       }
       return true;

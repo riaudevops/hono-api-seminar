@@ -54,6 +54,7 @@ export const postDokumenTemplateSchema = z.object({
   format_file: formatFileSchema,
   max_size_mb: maxSizeMbSchema,
   is_special: z.boolean().optional(),
+  can_view_dosen: z.boolean().optional(),
 });
 
 export const putDokumenTemplateSchema = z.object({
@@ -65,4 +66,5 @@ export const putDokumenTemplateSchema = z.object({
   format_file: formatFileSchema,
   max_size_mb: maxSizeMbSchema,
   is_special: z.boolean().optional(),
+  can_view_dosen: z.boolean().optional(),
 });

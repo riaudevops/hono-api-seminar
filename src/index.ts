@@ -5,7 +5,7 @@ import { swaggerUI } from '@hono/swagger-ui';
 import { config } from './core';
 import { bootstrap, shutdown } from './core';
 import { createLogger } from './utils/logger.util';
-import GlobalHandler from './handlers/global.handler';
+import { GlobalHandler } from './modules/global';
 import LogMiddleware from './middlewares/log.middleware';
 import RateLimitMiddleware from './middlewares/rate-limit.middleware';
 import apiRouter from './api';

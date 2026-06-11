@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { RegExpRouter } from 'hono/router/reg-exp-router';
-import GlobalHandler from '../handlers/global.handler';
+import GlobalHandler from './global.handler';
 
 const globalRoute = new Hono({ router: new RegExpRouter() });
 
