@@ -404,7 +404,13 @@ export default class PendaftaranService {
         payload.id_jenis_seminar,
         kode_tahun_ajaran
       );
-    if (alreadyRegistered) {
+    if (
+      alreadyRegistered &&
+      !(
+        alreadyRegistered.status_berkas === 'APPROVED' &&
+        alreadyRegistered.status_jadwal === 'SUDAH_JADWAL'
+      )
+    ) {
       throw new APIError(
         `Anda sudah mendaftar seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(kode_tahun_ajaran)}.`,
         409

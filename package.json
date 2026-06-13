@@ -3,6 +3,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "start:worker": "bun run src/worker.ts",
+    "start:test": "bun test src/__tests__",
     "dev": "bun run --hot src/index.ts",
     "dev:worker": "bun run --hot src/worker.ts",
     "demo:reset-db": "bun scripts/reset-demo-db.ts"
