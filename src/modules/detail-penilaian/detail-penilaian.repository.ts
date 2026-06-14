@@ -1,6 +1,6 @@
-import { PenilaiRole, Prisma } from '@prisma/client';
+import type { PenilaiRole, Prisma } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
-import { DetailPenilaianItemInput } from './detail-penilaian.type';
+import type { DetailPenilaianItemInput } from './detail-penilaian.type';
 
 type PrismaClientOrTx = any;
 
@@ -22,6 +22,11 @@ const penilaianDetailInclude = {
 } as const;
 
 const penilaianRekapInclude = {
+  jadwal: {
+    select: {
+      id_jenis_seminar: true,
+    },
+  },
   dosen: true,
   detail_penilaian: {
     include: {
@@ -66,9 +71,12 @@ export default class DetailPenilaianRepository {
     }) as unknown as Promise<PenilaianDetailRecord[]>;
   }
 
-  public static async findActiveComponentsByRole(role: PenilaiRole) {
+  public static async findActiveComponentsByJenisAndRole(
+    id_jenis_seminar: string,
+    role: PenilaiRole
+  ) {
     return prisma.komponen_penilaian.findMany({
-      where: { role, is_aktif: true },
+      where: { id_jenis_seminar, role, is_aktif: true },
       orderBy: { id: 'asc' },
     });
   }

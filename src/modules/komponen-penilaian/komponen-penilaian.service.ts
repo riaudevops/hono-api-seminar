@@ -17,6 +17,7 @@ export interface CreateKomponenInput {
   persentase: number;
   is_aktif?: boolean;
   role: PenilaiRole;
+  id_jenis_seminar: string;
 }
 
 export interface UpdateKomponenInput {
@@ -24,6 +25,7 @@ export interface UpdateKomponenInput {
   persentase?: number;
   is_aktif?: boolean;
   role?: PenilaiRole;
+  id_jenis_seminar?: string;
 }
 
 export default class KomponenPenilaianService {
@@ -42,12 +44,50 @@ export default class KomponenPenilaianService {
     return prefixMap[role];
   }
 
-  private static async generateKomponenId(role: PenilaiRole): Promise<string> {
-    const prefix = KomponenPenilaianService.getIdPrefixByRole(role);
+  private static async getJenisSeminarOrThrow(id_jenis_seminar: string) {
+    const jenis = await prisma.jenis_seminar.findUnique({
+      where: { id: id_jenis_seminar },
+      select: { id: true, kode: true, nama: true },
+    });
+
+    if (!jenis) {
+      throw new APIError(
+        `Jenis seminar dengan id ${id_jenis_seminar} tidak ditemukan`,
+        404
+      );
+    }
+
+    return jenis;
+  }
+
+  private static buildJenisPrefix(kode: string) {
+    const explicitPrefix: Record<string, string> = {
+      SEMKP: 'SEMKP',
+      SEMPRO: 'SEMP',
+      SEMHAS_LAPORAN: 'SHL',
+      SEMHAS_PAPERBASED: 'SHP',
+      SIDANG_LAPORAN: 'SDL',
+      SIDANG_PAPERBASED: 'SDP',
+    };
+
+    return explicitPrefix[kode] ?? kode.replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  }
+
+  private static async generateKomponenId(
+    id_jenis_seminar: string,
+    role: PenilaiRole
+  ): Promise<string> {
+    const jenis =
+      await KomponenPenilaianService.getJenisSeminarOrThrow(id_jenis_seminar);
+    const prefix = `${KomponenPenilaianService.buildJenisPrefix(
+      jenis.kode
+    )}-${KomponenPenilaianService.getIdPrefixByRole(role)}`;
     const idPrefix = `${prefix}-`;
 
     const existingIds = await prisma.komponen_penilaian.findMany({
       where: {
+        id_jenis_seminar,
+        role,
         id: {
           startsWith: idPrefix,
         },
@@ -73,11 +113,12 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Mengambil semua komponen penilaian, opsional difilter berdasarkan role dan status aktif
+   * Mengambil semua komponen penilaian, opsional difilter berdasarkan jenis seminar, role, dan status aktif.
    */
   public static async getAll(
     filters: {
       role?: PenilaiRole;
+      id_jenis_seminar?: string;
       is_aktif?: boolean;
     } = {}
   ) {
@@ -86,11 +127,22 @@ export default class KomponenPenilaianService {
       const komponen = await prisma.komponen_penilaian.findMany({
         where: {
           ...(filters.role ? { role: filters.role } : {}),
+          ...(filters.id_jenis_seminar
+            ? { id_jenis_seminar: filters.id_jenis_seminar }
+            : {}),
           ...(filters.is_aktif !== undefined
             ? { is_aktif: filters.is_aktif }
             : {}),
         },
-        orderBy: [{ role: 'asc' }, { is_aktif: 'desc' }, { id: 'asc' }],
+        include: {
+          jenis_seminar: { select: { id: true, kode: true, nama: true } },
+        },
+        orderBy: [
+          { id_jenis_seminar: 'asc' },
+          { role: 'asc' },
+          { is_aktif: 'desc' },
+          { id: 'asc' },
+        ],
       });
 
       return {
@@ -102,12 +154,12 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Mengambil komponen penilaian berdasarkan role.
+   * Mengambil komponen penilaian berdasarkan role, opsional dipersempit dengan jenis seminar.
    * Default hanya komponen yang aktif; teruskan `is_aktif: false` untuk inklusif.
    */
   public static async getByRole(
     role: PenilaiRole,
-    options: { is_aktif?: boolean } = {}
+    options: { is_aktif?: boolean; id_jenis_seminar?: string } = {}
   ) {
     const cacheKey = `komponen-penilaian:by-role:${role}:${hashCacheKey(options)}`;
     return redisService.remember(cacheKey, 1_800, async () => {
@@ -115,58 +167,80 @@ export default class KomponenPenilaianService {
       const komponen = await prisma.komponen_penilaian.findMany({
         where: {
           role,
+          ...(options.id_jenis_seminar
+            ? { id_jenis_seminar: options.id_jenis_seminar }
+            : {}),
           ...(includeAll ? {} : { is_aktif: true }),
         },
-        orderBy: [{ is_aktif: 'desc' }, { id: 'asc' }],
+        include: {
+          jenis_seminar: { select: { id: true, kode: true, nama: true } },
+        },
+        orderBy: [
+          { id_jenis_seminar: 'asc' },
+          { is_aktif: 'desc' },
+          { id: 'asc' },
+        ],
       });
 
-      const total = komponen
-        .filter((k) => k.is_aktif)
-        .reduce((sum, k) => sum + k.persentase, 0);
+      const totalByJenis = komponen.reduce<Record<string, number>>((acc, k) => {
+        if (!k.is_aktif) return acc;
+        acc[k.id_jenis_seminar] = (acc[k.id_jenis_seminar] ?? 0) + k.persentase;
+        return acc;
+      }, {});
 
       return {
         response: true,
         message: `Data komponen penilaian untuk role ${role} berhasil diambil`,
         data: {
           role,
+          id_jenis_seminar: options.id_jenis_seminar,
           komponen,
-          total_persentase_aktif: total,
-          is_complete: total === 100,
+          total_persentase_aktif: options.id_jenis_seminar
+            ? (totalByJenis[options.id_jenis_seminar] ?? 0)
+            : totalByJenis,
+          is_complete: options.id_jenis_seminar
+            ? (totalByJenis[options.id_jenis_seminar] ?? 0) === 100
+            : Object.values(totalByJenis).every((total) => total === 100),
         },
       };
     });
   }
 
   /**
-   * Mengambil daftar komponen penilaian yang sedang aktif untuk suatu role
+   * Mengambil daftar komponen penilaian aktif untuk suatu jenis seminar + role.
    */
-  public static async getActiveByRole(role: PenilaiRole) {
-    const cacheKey = `komponen-penilaian:active-by-role:${role}`;
+  public static async getActiveByJenisAndRole(
+    id_jenis_seminar: string,
+    role: PenilaiRole
+  ) {
+    const cacheKey = `komponen-penilaian:active-by-jenis-role:${id_jenis_seminar}:${role}`;
     return redisService.remember(cacheKey, 1_800, async () => {
       const komponen = await prisma.komponen_penilaian.findMany({
-        where: { role, is_aktif: true },
+        where: { id_jenis_seminar, role, is_aktif: true },
         orderBy: { id: 'asc' },
       });
 
       return {
         response: true,
-        message: `Data komponen penilaian aktif untuk role ${role} berhasil diambil`,
+        message: `Data komponen penilaian aktif untuk jenis seminar ${id_jenis_seminar} dan role ${role} berhasil diambil`,
         data: komponen,
       };
     });
   }
 
   /**
-   * Validasi persentase komponen penilaian untuk suatu role.
+   * Validasi persentase komponen penilaian untuk suatu jenis seminar + role.
    * Total persentase dari komponen yang 'is_aktif = true' tidak boleh melebih 100%.
    */
   private static async validatePercentageLimit(
+    id_jenis_seminar: string,
     role: PenilaiRole,
     newPersentase: number,
     excludeId?: string
   ) {
     const activeComponents = await prisma.komponen_penilaian.findMany({
       where: {
+        id_jenis_seminar,
         role,
         is_aktif: true,
         ...(excludeId ? { id: { not: excludeId } } : {}),
@@ -181,7 +255,7 @@ export default class KomponenPenilaianService {
 
     if (newTotal > 100) {
       throw new APIError(
-        `Total persentase komponen aktif untuk role ${role} melebihi 100%. Saat ini sudah ${currentTotal}%, Anda mencoba menambah/mengubah menjadi ${newPersentase}%. (Total: ${newTotal}%)`,
+        `Total persentase komponen aktif untuk jenis seminar ${id_jenis_seminar} dan role ${role} melebihi 100%. Saat ini sudah ${currentTotal}%, Anda mencoba menambah/mengubah menjadi ${newPersentase}%. (Total: ${newTotal}%)`,
         400
       );
     }
@@ -190,12 +264,16 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Membuat komponen penilaian baru
+   * Membuat komponen penilaian baru.
    */
   public static async create(data: CreateKomponenInput) {
-    // Jika komponen akan langsung diaktifkan, validasi total persentasenya
+    await KomponenPenilaianService.getJenisSeminarOrThrow(
+      data.id_jenis_seminar
+    );
+
     if (data.is_aktif !== false) {
       await KomponenPenilaianService.validatePercentageLimit(
+        data.id_jenis_seminar,
         data.role,
         data.persentase
       );
@@ -207,6 +285,7 @@ export default class KomponenPenilaianService {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       const generatedId = await KomponenPenilaianService.generateKomponenId(
+        data.id_jenis_seminar,
         data.role
       );
 
@@ -218,6 +297,7 @@ export default class KomponenPenilaianService {
             persentase: data.persentase,
             is_aktif: data.is_aktif ?? true,
             role: data.role,
+            id_jenis_seminar: data.id_jenis_seminar,
           },
         });
         break;
@@ -257,7 +337,7 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Memperbarui komponen penilaian
+   * Memperbarui komponen penilaian.
    */
   public static async update(id: string, data: UpdateKomponenInput) {
     const existing = await prisma.komponen_penilaian.findUnique({
@@ -268,15 +348,22 @@ export default class KomponenPenilaianService {
       throw new APIError(`Komponen dengan ID ${id} tidak ditemukan`, 404);
     }
 
-    const persentaseToAsses = data.persentase ?? existing.persentase;
-    const isAktifToAsses = data.is_aktif ?? existing.is_aktif;
-    const roleToAsses = data.role ?? existing.role;
+    const idJenisToAssess = data.id_jenis_seminar ?? existing.id_jenis_seminar;
+    if (data.id_jenis_seminar) {
+      await KomponenPenilaianService.getJenisSeminarOrThrow(
+        data.id_jenis_seminar
+      );
+    }
 
-    // Jika komponen akan berakhir dalam status aktif, validasi total persentasenya
-    if (isAktifToAsses) {
+    const persentaseToAssess = data.persentase ?? existing.persentase;
+    const isAktifToAssess = data.is_aktif ?? existing.is_aktif;
+    const roleToAssess = data.role ?? existing.role;
+
+    if (isAktifToAssess) {
       await KomponenPenilaianService.validatePercentageLimit(
-        roleToAsses,
-        persentaseToAsses,
+        idJenisToAssess,
+        roleToAssess,
+        persentaseToAssess,
         id
       );
     }
@@ -288,6 +375,7 @@ export default class KomponenPenilaianService {
         persentase: data.persentase,
         is_aktif: data.is_aktif,
         role: data.role,
+        id_jenis_seminar: data.id_jenis_seminar,
       },
     });
     await LogService.createEntityLog({
@@ -310,7 +398,7 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Menghapus komponen penilaian
+   * Menghapus komponen penilaian.
    */
   public static async delete(id: string) {
     const existing = await prisma.komponen_penilaian.findUnique({
@@ -321,7 +409,6 @@ export default class KomponenPenilaianService {
       throw new APIError(`Komponen dengan ID ${id} tidak ditemukan`, 404);
     }
 
-    // Check if it's already used in detail_penilaian
     const usage = await prisma.detail_penilaian.findFirst({
       where: { id_komponen: id },
     });
@@ -354,7 +441,7 @@ export default class KomponenPenilaianService {
   }
 
   /**
-   * Mengubah status aktif komponen penilaian (Toggle)
+   * Mengubah status aktif komponen penilaian (Toggle).
    */
   public static async toggleStatus(id: string, is_aktif: boolean) {
     const existing = await prisma.komponen_penilaian.findUnique({
@@ -365,9 +452,9 @@ export default class KomponenPenilaianService {
       throw new APIError(`Komponen dengan ID ${id} tidak ditemukan`, 404);
     }
 
-    // Jika diaktifkan, pastikan totalnya tidak lebih dari 100%
     if (is_aktif) {
       await KomponenPenilaianService.validatePercentageLimit(
+        existing.id_jenis_seminar,
         existing.role,
         existing.persentase,
         id
@@ -388,11 +475,13 @@ export default class KomponenPenilaianService {
       new_values: updatedComponent,
     });
 
-    // Validasi apakah setelah toggle, totalnya menjadi kurang dari 100%
-    // (Peringatan saja, karena secara fungsional boleh dinonaktifkan sementara)
     let warningMsg = null;
     const activeComponents = await prisma.komponen_penilaian.findMany({
-      where: { role: existing.role, is_aktif: true },
+      where: {
+        id_jenis_seminar: existing.id_jenis_seminar,
+        role: existing.role,
+        is_aktif: true,
+      },
     });
     const currentTotal = activeComponents.reduce(
       (sum, comp) => sum + comp.persentase,
@@ -400,7 +489,7 @@ export default class KomponenPenilaianService {
     );
 
     if (currentTotal < 100) {
-      warningMsg = `Total persentase komponen aktif untuk role ${existing.role} sekarang adalah ${currentTotal}%. Anda perlu menambah atau mengaktifkan komponen lain agar mencapai 100%.`;
+      warningMsg = `Total persentase komponen aktif untuk jenis seminar ${existing.id_jenis_seminar} dan role ${existing.role} sekarang adalah ${currentTotal}%. Anda perlu menambah atau mengaktifkan komponen lain agar mencapai 100%.`;
     }
 
     await CacheInvalidation.invalidateKomponenPenilaian();

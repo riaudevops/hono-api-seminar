@@ -59,103 +59,6 @@ async function main() {
       : 'Data was inserted previously, no new data inserted.'
   );
 
-  const resultKomponenPenilaian = await prisma.komponen_penilaian.createMany({
-    data: [
-      {
-        id: 'KP-A-01',
-        nama: 'Kemampuan Penyelesaian Masalah',
-        persentase: 40,
-        is_aktif: true,
-        role: 'KP_PEMBIMBING',
-      },
-      {
-        id: 'KP-A-02',
-        nama: 'Keaktifan Bimbingan dan Sikap',
-        persentase: 35,
-        is_aktif: true,
-        role: 'KP_PEMBIMBING',
-      },
-      {
-        id: 'KP-A-03',
-        nama: 'Kualitas Laporan KP',
-        persentase: 25,
-        is_aktif: true,
-        role: 'KP_PEMBIMBING',
-      },
-      {
-        id: 'KP-B-01',
-        nama: 'Penguasaan Materi',
-        persentase: 40,
-        is_aktif: true,
-        role: 'KP_PENGUJI',
-      },
-      {
-        id: 'KP-B-02',
-        nama: 'Teknik Presentasi',
-        persentase: 20,
-        is_aktif: true,
-        role: 'KP_PENGUJI',
-      },
-      {
-        id: 'KP-B-03',
-        nama: 'Kesesuaian Laporan dan Presentasi',
-        persentase: 40,
-        is_aktif: true,
-        role: 'KP_PENGUJI',
-      },
-      {
-        id: 'KP-C-01',
-        nama: 'Deliverables',
-        persentase: 15,
-        is_aktif: true,
-        role: 'KP_INSTANSI',
-      },
-      {
-        id: 'KP-C-02',
-        nama: 'Ketepatan Waktu',
-        persentase: 10,
-        is_aktif: true,
-        role: 'KP_INSTANSI',
-      },
-      {
-        id: 'KP-C-03',
-        nama: 'Kedisiplinan',
-        persentase: 15,
-        is_aktif: true,
-        role: 'KP_INSTANSI',
-      },
-      {
-        id: 'KP-C-04',
-        nama: 'Attitude',
-        persentase: 15,
-        is_aktif: true,
-        role: 'KP_INSTANSI',
-      },
-      {
-        id: 'KP-C-05',
-        nama: 'Kerjasama Tim',
-        persentase: 25,
-        is_aktif: true,
-        role: 'KP_INSTANSI',
-      },
-      {
-        id: 'KP-C-06',
-        nama: 'Inisiatif',
-        persentase: 20,
-        is_aktif: true,
-        role: 'KP_INSTANSI',
-      },
-    ],
-    skipDuplicates: true,
-  });
-
-  console.log(
-    '[DEBUG] Result of inserted komponen_penilaian createMany:',
-    resultKomponenPenilaian.count > 0
-      ? resultKomponenPenilaian
-      : 'Data was inserted previously, no new data inserted.'
-  );
-
   const resultBidangKeahlian = await prisma.bidang_keahlian.createMany({
     data: [
       { nama: 'Software Engineering' },
@@ -260,6 +163,48 @@ async function main() {
       },
 
       {
+        kode: 'FORM_PENDAFTARAN_SEMPRO',
+        nama: 'Formulir Pendaftaran Seminar Proposal TA',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'TRANSKRIP_NILAI_SEMENTARA',
+        nama: 'Transkrip Nilai Sementara',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'KRS_AKTIF',
+        nama: 'KRS Aktif',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_MENGHADIRI_SEMPRO',
+        nama: 'Form Menghadiri Seminar Proposal TA',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_SETORAN_HAFALAN_JUZ_30',
+        nama: 'Form Setoran Hafalan Juz 30',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'LAPORAN_PROPOSAL_TA',
+        nama: 'Laporan Proposal TA',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 5,
+      },
+      {
         kode: 'SURAT_KET_INSTANSI',
         nama: 'Surat Keterangan Instansi',
         deskripsi: 'Surat balasan/penerimaan dari instansi tempat KP',
@@ -341,18 +286,187 @@ async function main() {
         max_size_mb: 1,
       },
       {
-        kode: 'LAPORAN_HASIL_TA',
-        nama: 'Draft Laporan Seminar Hasil',
+        kode: 'FORM_PENDAFTARAN_SEMHAS',
+        nama: 'Form Pendaftaran Seminar Hasil TA',
+        deskripsi:
+          'Form pendaftaran Seminar Hasil TA yang sudah ditandatangani oleh Dosen Pembimbing TA.',
         tipe_input: 'FILE_UPLOAD',
         format_file: 'pdf',
-        max_size_mb: 20,
+        max_size_mb: 1,
+      },
+      {
+        kode: 'LAPORAN_HASIL_TA',
+        nama: 'Laporan TA',
+        deskripsi:
+          'Salinan draf laporan TA terbaru yang telah disetujui pembimbing untuk Dosen Pembimbing dan Dosen Penguji.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 10,
+      },
+      {
+        kode: 'ARTIKEL_TA_SEMHAS',
+        nama: 'Artikel TA',
+        deskripsi:
+          'Salinan draf artikel TA terbaru yang telah disetujui pembimbing untuk Dosen Pembimbing dan Dosen Penguji.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'HASIL_PEMERIKSAAN_PLAGIARISME',
+        nama: 'Hasil Pemeriksaan Plagiarisme',
+        deskripsi:
+          'Hasil cek plagiarisme terhadap artikel atau laporan terbaru dengan tingkat kemiripan maksimal 25%.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_BIMBINGAN_TA',
+        nama: 'Form Bimbingan TA',
+        deskripsi:
+          'Bukti telah melakukan bimbingan minimal 5 kali setelah lulus seminar proposal.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_MENGHADIRI_SEMHAS',
+        nama: 'Form Menghadiri Seminar Hasil',
+        deskripsi:
+          'Bukti telah menghadiri seminar hasil mahasiswa lain minimal 5 kali.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_PENILAIAN_MANDIRI',
+        nama: 'Form Penilaian Mandiri',
+        deskripsi:
+          'Form penilaian mandiri yang sudah diisi dan diserahkan kepada Dosen Pembimbing dan Penguji.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_BERITA_ACARA_KELAYAKAN_ARTIKEL',
+        nama: 'Form Berita Acara Kelayakan TA Berbasis Artikel',
+        deskripsi: 'Form tambahan khusus TA berbasis artikel.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_PERSETUJUAN_PUBLIKASI',
+        nama: 'Form Persetujuan Publikasi',
+        deskripsi: 'Form tambahan khusus TA berbasis artikel.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'UNDANGAN_SEMINAR_SEBELUMNYA',
+        nama: 'Undangan Seminar Sebelumnya',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_PENDAFTARAN_SIDANG_TA',
+        nama: 'Form Pendaftaran Sidang TA',
+        deskripsi:
+          'Form pendaftaran Sidang TA yang dilengkapi dengan persetujuan Dosen Pembimbing.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
       },
       {
         kode: 'LAPORAN_AKHIR_TA',
-        nama: 'Draft Laporan Akhir (Sidang)',
+        nama: 'Laporan TA',
+        deskripsi:
+          'Salinan laporan TA terbaru yang diserahkan kepada Dosen Pembimbing dan Dosen Penguji.',
         tipe_input: 'FILE_UPLOAD',
         format_file: 'pdf',
-        max_size_mb: 20,
+        max_size_mb: 10,
+      },
+      {
+        kode: 'ARTIKEL_PUBLIKASI_TA',
+        nama: 'Artikel Publikasi TA',
+        deskripsi:
+          'Salinan artikel publikasi TA yang diserahkan kepada Dosen Pembimbing dan Dosen Penguji.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'SERTIFIKAT_TOEFL_TOAFL',
+        nama: 'Sertifikat TOEFL dan TOAFL',
+        deskripsi: 'Sertifikat TOEFL minimal 400 dan TOAFL minimal 350.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'SERTIFIKAT_PENDUKUNG_SIDANG',
+        nama: 'Sertifikat Pendukung',
+        deskripsi:
+          'Sertifikat PBAK/PNDKA, sertifikat Mentoring, dan sertifikat KKN.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'BUKTI_PUBLIKASI_ARTIKEL',
+        nama: 'Bukti Publikasi Artikel',
+        deskripsi:
+          'Bukti artikel sudah diterbitkan/dipublikasikan di jurnal MORAREF/SINTA/DOAJ, prosiding seminar, atau book chapter.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'BUKTI_SUBMIT_ARTIKEL',
+        nama: 'Bukti Submit Artikel',
+        deskripsi:
+          'Bukti telah mengirimkan artikel ke jurnal minimal SINTA 4 atau jurnal internasional terindeks.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FORM_BIMBINGAN_TA_SIDANG',
+        nama: 'Form Bimbingan TA',
+        deskripsi:
+          'Bukti bimbingan minimal 6 kali setelah lulus seminar proposal.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'HASIL_CEK_PLAGIARISME_LAPORAN',
+        nama: 'Hasil Cek Plagiarisme Laporan TA',
+        deskripsi:
+          'Hasil cek plagiarisme untuk Laporan TA terbaru dengan tingkat kemiripan maksimal 35%.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'PAS_FOTO_4X6',
+        nama: 'Pas Foto 4x6',
+        deskripsi: 'Pas foto ukuran 4x6 warna dalam format digital.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'jpg,jpeg,png,pdf',
+        max_size_mb: 1,
+      },
+      {
+        kode: 'FILE_DIGITAL_TA',
+        nama: 'File Digital TA',
+        deskripsi:
+          'Source code/aplikasi, poster TA ukuran A3, serta laporan dalam format Word dan PDF.',
+        tipe_input: 'FILE_UPLOAD',
+        format_file: 'zip,rar,pdf,doc,docx,jpg,jpeg,png',
+        max_size_mb: 1,
       },
       {
         kode: 'REVISI_SEMPRO',
@@ -415,6 +529,55 @@ async function main() {
       ? resultDokumenTemplate
       : 'Data was inserted previously, no new data inserted.'
   );
+
+  await Promise.all([
+    prisma.dokumen_template.updateMany({
+      where: { kode: 'LAPORAN_HASIL_TA' },
+      data: {
+        nama: 'Laporan TA',
+        deskripsi:
+          'Salinan draf laporan TA terbaru yang telah disetujui pembimbing untuk Dosen Pembimbing dan Dosen Penguji.',
+        max_size_mb: 10,
+      },
+    }),
+    prisma.dokumen_template.updateMany({
+      where: { kode: 'LAPORAN_AKHIR_TA' },
+      data: {
+        nama: 'Laporan TA',
+        deskripsi:
+          'Salinan laporan TA terbaru yang diserahkan kepada Dosen Pembimbing dan Dosen Penguji.',
+        max_size_mb: 10,
+      },
+    }),
+    prisma.dokumen_template.updateMany({
+      where: {
+        kode: {
+          in: [
+            'FORM_PENDAFTARAN_SEMHAS',
+            'ARTIKEL_TA_SEMHAS',
+            'HASIL_PEMERIKSAAN_PLAGIARISME',
+            'FORM_BIMBINGAN_TA',
+            'FORM_MENGHADIRI_SEMHAS',
+            'FORM_PENILAIAN_MANDIRI',
+            'FORM_BERITA_ACARA_KELAYAKAN_ARTIKEL',
+            'FORM_PERSETUJUAN_PUBLIKASI',
+            'UNDANGAN_SEMINAR_SEBELUMNYA',
+            'FORM_PENDAFTARAN_SIDANG_TA',
+            'ARTIKEL_PUBLIKASI_TA',
+            'SERTIFIKAT_TOEFL_TOAFL',
+            'SERTIFIKAT_PENDUKUNG_SIDANG',
+            'BUKTI_PUBLIKASI_ARTIKEL',
+            'BUKTI_SUBMIT_ARTIKEL',
+            'FORM_BIMBINGAN_TA_SIDANG',
+            'HASIL_CEK_PLAGIARISME_LAPORAN',
+            'PAS_FOTO_4X6',
+            'FILE_DIGITAL_TA',
+          ],
+        },
+      },
+      data: { max_size_mb: 1 },
+    }),
+  ]);
 
   const resultJenisSeminar = await prisma.jenis_seminar.createMany({
     data: [
@@ -490,6 +653,191 @@ async function main() {
   const jenisMap = new Map(jenisList.map((j) => [j.kode, j.id]));
   const dokumenMap = new Map(dokumenList.map((d) => [d.kode, d.id]));
 
+  const getJenisId = (kode: string) => {
+    const id = jenisMap.get(kode);
+    if (!id) {
+      throw new Error(`Jenis seminar ${kode} tidak ditemukan saat seed`);
+    }
+    return id;
+  };
+
+  const jenisPrefixMap: Record<string, string> = {
+    SEMP: 'SEMPRO',
+    SHL: 'SEMHAS_LAPORAN',
+    SHP: 'SEMHAS_PAPERBASED',
+    SDL: 'SIDANG_LAPORAN',
+    SDP: 'SIDANG_PAPERBASED',
+  };
+
+  const defaultTaComponents = [
+    {
+      role: 'TA_PEMBIMBING_1',
+      rolePrefix: 'TA-A',
+      components: [
+        { nama: 'Kualitas Bimbingan dan Metodologi', persentase: 35 },
+        { nama: 'Penguasaan Materi Tugas Akhir', persentase: 35 },
+        { nama: 'Kualitas Dokumen Tugas Akhir', persentase: 30 },
+      ],
+    },
+    {
+      role: 'TA_PEMBIMBING_2',
+      rolePrefix: 'TA-B',
+      components: [
+        { nama: 'Kualitas Bimbingan Pendamping', persentase: 35 },
+        { nama: 'Penguasaan Materi Pendukung', persentase: 35 },
+        { nama: 'Kualitas Dokumen Pendukung', persentase: 30 },
+      ],
+    },
+    {
+      role: 'TA_PENGUJI_1',
+      rolePrefix: 'TA-C',
+      components: [
+        { nama: 'Penguasaan Materi', persentase: 40 },
+        { nama: 'Kualitas Analisis dan Solusi', persentase: 35 },
+        { nama: 'Teknik Presentasi', persentase: 25 },
+      ],
+    },
+    {
+      role: 'TA_PENGUJI_2',
+      rolePrefix: 'TA-D',
+      components: [
+        { nama: 'Penguasaan Materi', persentase: 40 },
+        { nama: 'Kualitas Analisis dan Solusi', persentase: 35 },
+        { nama: 'Teknik Presentasi', persentase: 25 },
+      ],
+    },
+    {
+      role: 'TA_KETUA_SIDANG',
+      rolePrefix: 'TA-E',
+      components: [
+        { nama: 'Tata Laksana Sidang', persentase: 40 },
+        { nama: 'Validasi Proses Akademik', persentase: 35 },
+        { nama: 'Rekapitulasi Keputusan Sidang', persentase: 25 },
+      ],
+    },
+  ] as const;
+
+  const resultKomponenPenilaian = await prisma.komponen_penilaian.createMany({
+    data: [
+      {
+        id: 'KP-A-01',
+        nama: 'Kemampuan Penyelesaian Masalah',
+        persentase: 40,
+        is_aktif: true,
+        role: 'KP_PEMBIMBING',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-A-02',
+        nama: 'Keaktifan Bimbingan dan Sikap',
+        persentase: 35,
+        is_aktif: true,
+        role: 'KP_PEMBIMBING',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-A-03',
+        nama: 'Kualitas Laporan KP',
+        persentase: 25,
+        is_aktif: true,
+        role: 'KP_PEMBIMBING',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-B-01',
+        nama: 'Penguasaan Materi',
+        persentase: 40,
+        is_aktif: true,
+        role: 'KP_PENGUJI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-B-02',
+        nama: 'Teknik Presentasi',
+        persentase: 20,
+        is_aktif: true,
+        role: 'KP_PENGUJI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-B-03',
+        nama: 'Kesesuaian Laporan dan Presentasi',
+        persentase: 40,
+        is_aktif: true,
+        role: 'KP_PENGUJI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-C-01',
+        nama: 'Deliverables',
+        persentase: 15,
+        is_aktif: true,
+        role: 'KP_INSTANSI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-C-02',
+        nama: 'Ketepatan Waktu',
+        persentase: 10,
+        is_aktif: true,
+        role: 'KP_INSTANSI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-C-03',
+        nama: 'Kedisiplinan',
+        persentase: 15,
+        is_aktif: true,
+        role: 'KP_INSTANSI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-C-04',
+        nama: 'Attitude',
+        persentase: 15,
+        is_aktif: true,
+        role: 'KP_INSTANSI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-C-05',
+        nama: 'Kerjasama Tim',
+        persentase: 25,
+        is_aktif: true,
+        role: 'KP_INSTANSI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      {
+        id: 'KP-C-06',
+        nama: 'Inisiatif',
+        persentase: 20,
+        is_aktif: true,
+        role: 'KP_INSTANSI',
+        id_jenis_seminar: getJenisId('SEMKP'),
+      },
+      ...Object.entries(jenisPrefixMap).flatMap(([jenisPrefix, kode]) =>
+        defaultTaComponents.flatMap((roleConfig) =>
+          roleConfig.components.map((component, index) => ({
+            id: `${jenisPrefix}-${roleConfig.rolePrefix}-${String(index + 1).padStart(2, '0')}`,
+            nama: component.nama,
+            persentase: component.persentase,
+            is_aktif: true,
+            role: roleConfig.role,
+            id_jenis_seminar: getJenisId(kode),
+          }))
+        )
+      ),
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(
+    '[DEBUG] Result of inserted komponen_penilaian createMany:',
+    resultKomponenPenilaian.count > 0
+      ? resultKomponenPenilaian
+      : 'Data was inserted previously, no new data inserted.'
+  );
+
   type Req = {
     jenis: string;
     dokumen: string;
@@ -514,67 +862,149 @@ async function main() {
       urutan: 12,
     },
 
-    { jenis: 'SEMPRO', dokumen: 'JUDUL_TA', urutan: 1 },
-    { jenis: 'SEMPRO', dokumen: 'PROPOSAL_TA', urutan: 2 },
-    { jenis: 'SEMPRO', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
-    { jenis: 'SEMPRO', dokumen: 'BERKAS_SYARAT', urutan: 4 },
-    { jenis: 'SEMPRO', dokumen: 'UNDANGAN_SEBELUMNYA', urutan: 5 },
-    {
-      jenis: 'SEMPRO',
-      dokumen: 'MATA_KULIAH_PILIHAN',
-      urutan: 6,
-      wajib: false,
-    },
+    { jenis: 'SEMPRO', dokumen: 'FORM_PENDAFTARAN_SEMPRO', urutan: 1 },
+    { jenis: 'SEMPRO', dokumen: 'TRANSKRIP_NILAI_SEMENTARA', urutan: 2 },
+    { jenis: 'SEMPRO', dokumen: 'KRS_AKTIF', urutan: 3 },
+    { jenis: 'SEMPRO', dokumen: 'FORM_MENGHADIRI_SEMPRO', urutan: 4 },
+    { jenis: 'SEMPRO', dokumen: 'FORM_SETORAN_HAFALAN_JUZ_30', urutan: 5 },
+    { jenis: 'SEMPRO', dokumen: 'LAPORAN_PROPOSAL_TA', urutan: 6 },
 
-    { jenis: 'SEMHAS_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'FORM_PENDAFTARAN_SEMHAS', urutan: 1 },
     { jenis: 'SEMHAS_LAPORAN', dokumen: 'LAPORAN_HASIL_TA', urutan: 2 },
-    { jenis: 'SEMHAS_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
-    { jenis: 'SEMHAS_LAPORAN', dokumen: 'REVISI_SEMPRO', urutan: 4 },
-    { jenis: 'SEMHAS_LAPORAN', dokumen: 'BERKAS_SYARAT', urutan: 5 },
     {
       jenis: 'SEMHAS_LAPORAN',
-      dokumen: 'LINK_REPOSITORY',
-      urutan: 6,
-      wajib: false,
+      dokumen: 'TRANSKRIP_NILAI_SEMENTARA',
+      urutan: 3,
+    },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'KRS_AKTIF', urutan: 4 },
+    {
+      jenis: 'SEMHAS_LAPORAN',
+      dokumen: 'HASIL_PEMERIKSAAN_PLAGIARISME',
+      urutan: 5,
+    },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'FORM_BIMBINGAN_TA', urutan: 6 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'FORM_MENGHADIRI_SEMHAS', urutan: 7 },
+    { jenis: 'SEMHAS_LAPORAN', dokumen: 'FORM_PENILAIAN_MANDIRI', urutan: 8 },
+    {
+      jenis: 'SEMHAS_LAPORAN',
+      dokumen: 'UNDANGAN_SEMINAR_SEBELUMNYA',
+      urutan: 9,
     },
 
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'DRAFT_PAPER', urutan: 2 },
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'LINK_PAPER_SUBMISSION', urutan: 3 },
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'BUKTI_BIMBINGAN', urutan: 4 },
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'REVISI_SEMPRO', urutan: 5 },
-    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'BERKAS_SYARAT', urutan: 6 },
     {
       jenis: 'SEMHAS_PAPERBASED',
-      dokumen: 'LINK_REPOSITORY',
+      dokumen: 'FORM_PENDAFTARAN_SEMHAS',
+      urutan: 1,
+    },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'ARTIKEL_TA_SEMHAS', urutan: 2 },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'TRANSKRIP_NILAI_SEMENTARA',
+      urutan: 3,
+    },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'KRS_AKTIF', urutan: 4 },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'HASIL_PEMERIKSAAN_PLAGIARISME',
+      urutan: 5,
+    },
+    { jenis: 'SEMHAS_PAPERBASED', dokumen: 'FORM_BIMBINGAN_TA', urutan: 6 },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'FORM_MENGHADIRI_SEMHAS',
       urutan: 7,
-      wajib: false,
+    },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'FORM_PENILAIAN_MANDIRI',
+      urutan: 8,
+    },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'FORM_BERITA_ACARA_KELAYAKAN_ARTIKEL',
+      urutan: 9,
+    },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'FORM_PERSETUJUAN_PUBLIKASI',
+      urutan: 10,
+    },
+    {
+      jenis: 'SEMHAS_PAPERBASED',
+      dokumen: 'UNDANGAN_SEMINAR_SEBELUMNYA',
+      urutan: 11,
     },
 
-    { jenis: 'SIDANG_LAPORAN', dokumen: 'JUDUL_TA', urutan: 1 },
-    { jenis: 'SIDANG_LAPORAN', dokumen: 'LAPORAN_AKHIR_TA', urutan: 2 },
-    { jenis: 'SIDANG_LAPORAN', dokumen: 'BUKTI_BIMBINGAN', urutan: 3 },
-    { jenis: 'SIDANG_LAPORAN', dokumen: 'REVISI_SEMHAS', urutan: 4 },
-    { jenis: 'SIDANG_LAPORAN', dokumen: 'BERKAS_SYARAT', urutan: 5 },
     {
       jenis: 'SIDANG_LAPORAN',
-      dokumen: 'LINK_REPOSITORY',
-      urutan: 6,
-      wajib: false,
+      dokumen: 'FORM_PENDAFTARAN_SIDANG_TA',
+      urutan: 1,
     },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'LAPORAN_AKHIR_TA', urutan: 2 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'SERTIFIKAT_TOEFL_TOAFL', urutan: 3 },
+    {
+      jenis: 'SIDANG_LAPORAN',
+      dokumen: 'SERTIFIKAT_PENDUKUNG_SIDANG',
+      urutan: 4,
+    },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'BUKTI_SUBMIT_ARTIKEL', urutan: 5 },
+    {
+      jenis: 'SIDANG_LAPORAN',
+      dokumen: 'FORM_PERSETUJUAN_PUBLIKASI',
+      urutan: 6,
+    },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'FORM_BIMBINGAN_TA_SIDANG', urutan: 7 },
+    {
+      jenis: 'SIDANG_LAPORAN',
+      dokumen: 'HASIL_CEK_PLAGIARISME_LAPORAN',
+      urutan: 8,
+    },
+    {
+      jenis: 'SIDANG_LAPORAN',
+      dokumen: 'FORM_SETORAN_HAFALAN_JUZ_30',
+      urutan: 9,
+    },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'PAS_FOTO_4X6', urutan: 10 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'FILE_DIGITAL_TA', urutan: 11 },
 
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'JUDUL_TA', urutan: 1 },
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'DRAFT_PAPER', urutan: 2 },
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'LINK_PAPER_SUBMISSION', urutan: 3 },
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'BUKTI_BIMBINGAN', urutan: 4 },
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'REVISI_SEMHAS', urutan: 5 },
-    { jenis: 'SIDANG_PAPERBASED', dokumen: 'BERKAS_SYARAT', urutan: 6 },
     {
       jenis: 'SIDANG_PAPERBASED',
-      dokumen: 'LINK_REPOSITORY',
-      urutan: 7,
-      wajib: false,
+      dokumen: 'FORM_PENDAFTARAN_SIDANG_TA',
+      urutan: 1,
     },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'ARTIKEL_PUBLIKASI_TA', urutan: 2 },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'SERTIFIKAT_TOEFL_TOAFL',
+      urutan: 3,
+    },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'SERTIFIKAT_PENDUKUNG_SIDANG',
+      urutan: 4,
+    },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'BUKTI_PUBLIKASI_ARTIKEL',
+      urutan: 5,
+    },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'FORM_PERSETUJUAN_PUBLIKASI',
+      urutan: 6,
+    },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'FORM_BIMBINGAN_TA_SIDANG',
+      urutan: 7,
+    },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'FORM_SETORAN_HAFALAN_JUZ_30',
+      urutan: 8,
+    },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'PAS_FOTO_4X6', urutan: 9 },
+    { jenis: 'SIDANG_PAPERBASED', dokumen: 'FILE_DIGITAL_TA', urutan: 10 },
   ];
 
   const missingRefs = requirements.filter(
@@ -586,6 +1016,20 @@ async function main() {
       missingRefs
     );
   }
+
+  await prisma.requirement_dokumen.deleteMany({
+    where: {
+      id_jenis_seminar: {
+        in: [
+          getJenisId('SEMPRO'),
+          getJenisId('SEMHAS_LAPORAN'),
+          getJenisId('SEMHAS_PAPERBASED'),
+          getJenisId('SIDANG_LAPORAN'),
+          getJenisId('SIDANG_PAPERBASED'),
+        ],
+      },
+    },
+  });
 
   const resultRequirement = await prisma.requirement_dokumen.createMany({
     data: requirements

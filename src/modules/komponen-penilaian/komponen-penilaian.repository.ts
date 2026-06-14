@@ -1,5 +1,5 @@
 import prisma from '../../infrastructures/db.infrastructure';
-import { PenilaiRole } from '@prisma/client';
+import type { PenilaiRole } from '@prisma/client';
 
 export interface CreateKomponenPenilaianInput {
   id: string;
@@ -7,6 +7,7 @@ export interface CreateKomponenPenilaianInput {
   persentase: number;
   is_aktif?: boolean;
   role: PenilaiRole;
+  id_jenis_seminar: string;
 }
 
 export interface UpdateKomponenPenilaianInput {
@@ -14,12 +15,31 @@ export interface UpdateKomponenPenilaianInput {
   persentase?: number;
   is_aktif?: boolean;
   role?: PenilaiRole;
+  id_jenis_seminar?: string;
 }
 
 export default class KomponenPenilaianRepository {
-  public static async findAll() {
+  public static async findAll(
+    filters: {
+      role?: PenilaiRole;
+      id_jenis_seminar?: string;
+      is_aktif?: boolean;
+    } = {}
+  ) {
     return prisma.komponen_penilaian.findMany({
-      orderBy: [{ role: 'asc' }, { id: 'asc' }],
+      where: {
+        ...(filters.role ? { role: filters.role } : {}),
+        ...(filters.id_jenis_seminar
+          ? { id_jenis_seminar: filters.id_jenis_seminar }
+          : {}),
+        ...(filters.is_aktif !== undefined
+          ? { is_aktif: filters.is_aktif }
+          : {}),
+      },
+      include: {
+        jenis_seminar: { select: { id: true, kode: true, nama: true } },
+      },
+      orderBy: [{ id_jenis_seminar: 'asc' }, { role: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -29,16 +49,26 @@ export default class KomponenPenilaianRepository {
     });
   }
 
-  public static async findByRole(role: PenilaiRole) {
+  public static async findByJenisAndRole(
+    id_jenis_seminar: string,
+    role: PenilaiRole
+  ) {
     return prisma.komponen_penilaian.findMany({
-      where: { role },
+      where: { id_jenis_seminar, role },
+      include: {
+        jenis_seminar: { select: { id: true, kode: true, nama: true } },
+      },
       orderBy: { id: 'asc' },
     });
   }
 
-  public static async findAktifByRole(role: PenilaiRole) {
+  public static async findAktifByJenisAndRole(
+    id_jenis_seminar: string,
+    role: PenilaiRole
+  ) {
     return prisma.komponen_penilaian.findMany({
       where: {
+        id_jenis_seminar,
         role,
         is_aktif: true,
       },
@@ -46,10 +76,21 @@ export default class KomponenPenilaianRepository {
     });
   }
 
-  public static async findAktif() {
+  public static async findAktif(
+    filters: { id_jenis_seminar?: string; role?: PenilaiRole } = {}
+  ) {
     return prisma.komponen_penilaian.findMany({
-      where: { is_aktif: true },
-      orderBy: [{ role: 'asc' }, { id: 'asc' }],
+      where: {
+        is_aktif: true,
+        ...(filters.id_jenis_seminar
+          ? { id_jenis_seminar: filters.id_jenis_seminar }
+          : {}),
+        ...(filters.role ? { role: filters.role } : {}),
+      },
+      include: {
+        jenis_seminar: { select: { id: true, kode: true, nama: true } },
+      },
+      orderBy: [{ id_jenis_seminar: 'asc' }, { role: 'asc' }, { id: 'asc' }],
     });
   }
 
@@ -61,6 +102,7 @@ export default class KomponenPenilaianRepository {
         persentase: data.persentase,
         is_aktif: data.is_aktif ?? true,
         role: data.role,
+        id_jenis_seminar: data.id_jenis_seminar,
       },
     });
   }
@@ -73,6 +115,7 @@ export default class KomponenPenilaianRepository {
         persentase: item.persentase,
         is_aktif: item.is_aktif ?? true,
         role: item.role,
+        id_jenis_seminar: item.id_jenis_seminar,
       })),
     });
   }
@@ -90,9 +133,13 @@ export default class KomponenPenilaianRepository {
     });
   }
 
-  public static async getTotalPersentaseByRole(role: PenilaiRole) {
+  public static async getTotalPersentaseByJenisAndRole(
+    id_jenis_seminar: string,
+    role: PenilaiRole
+  ) {
     const result = await prisma.komponen_penilaian.aggregate({
       where: {
+        id_jenis_seminar,
         role,
         is_aktif: true,
       },

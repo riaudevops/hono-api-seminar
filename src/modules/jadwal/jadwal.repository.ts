@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma, StatusKelulusan } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 
 type PrismaClientOrTx = any;
@@ -38,6 +38,7 @@ export interface JadwalFilter {
   nim?: string;
   nip_dosen?: string;
   kode_tahun_ajaran?: string;
+  status_kelulusan?: StatusKelulusan;
 }
 
 export interface CreateJadwalInput {
@@ -60,6 +61,10 @@ export interface UpdateJadwalInput {
   kode_ruangan?: string;
 }
 
+export interface UpdateStatusKelulusanJadwalInput {
+  status_kelulusan: StatusKelulusan;
+}
+
 function buildWhere(filters: JadwalFilter): Prisma.jadwalWhereInput {
   return {
     ...(filters.id_jenis_seminar && {
@@ -69,6 +74,9 @@ function buildWhere(filters: JadwalFilter): Prisma.jadwalWhereInput {
     ...(filters.nim && { nim: filters.nim }),
     ...(filters.kode_tahun_ajaran && {
       kode_tahun_ajaran: filters.kode_tahun_ajaran,
+    }),
+    ...(filters.status_kelulusan && {
+      status_kelulusan: filters.status_kelulusan,
     }),
     ...(filters.nip_dosen && {
       penilaian: {
@@ -185,6 +193,18 @@ export default class JadwalRepository {
       where: { id },
       data,
       include: listInclude,
+    });
+  }
+
+  public static async updateStatusKelulusan(
+    id: string,
+    data: UpdateStatusKelulusanJadwalInput,
+    client: PrismaClientOrTx = prisma
+  ) {
+    return await client.jadwal.update({
+      where: { id },
+      data,
+      include: detailInclude,
     });
   }
 

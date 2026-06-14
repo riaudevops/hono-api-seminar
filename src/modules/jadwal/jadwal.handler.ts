@@ -84,6 +84,25 @@ export default class JadwalHandler {
     return c.json(await JadwalService.put(id, body, context));
   }
 
+  public static async patchStatusKelulusan(c: Context) {
+    const { id } = c.req.param();
+    const body = await c.req.json();
+    const userPayload = JadwalHandler.getUserPayload(c);
+    const context = {
+      ...LogService.getActorContext(userPayload),
+      actor_email: userPayload.email,
+      dosen_nip: userPayload.nip,
+    };
+
+    return c.json(
+      await JadwalService.patchStatusKelulusan(
+        id,
+        body.status_kelulusan,
+        context
+      )
+    );
+  }
+
   public static async delete(c: Context) {
     const { id } = c.req.param();
     const context = LogService.getActorContext(JadwalHandler.getUserPayload(c));

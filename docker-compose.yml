@@ -1,0 +1,36 @@
+version: "3.8"
+services:
+  api-seminar-tif:
+    container_name: api-seminar-tif
+    image: ghcr.io/riaudevops/hono-api-seminar:v1.0.2
+    # ports:
+    #   - "127.0.0.1:2319:5000"
+    restart: always
+    env_file:
+      - stack.env
+    environment:
+      - APP_PROCESS=server
+    networks: 
+      - postgres
+      - apisix
+
+  worker-seminar-tif:
+    container_name: worker-seminar-tif
+    image: ghcr.io/riaudevops/hono-api-seminar:v1.0.2
+    command: bun run src/worker.ts
+    restart: always
+    env_file:
+      - stack.env
+    environment:
+      - APP_PROCESS=worker
+    networks: 
+      - postgres
+      - apisix
+
+networks:
+  postgres:
+    external: true
+  redis_network:
+    external: true
+  apisix:
+    external: true

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LogActionType, PenilaiRole } from '@prisma/client';
+import { LogActionType, PenilaiRole, StatusKelulusan } from '@prisma/client';
 
 const kodeJenisSchema = z
   .string()
@@ -213,6 +213,11 @@ export const getJadwalQuerySchema = z
       .string()
       .max(5, 'Kode tahun ajaran maksimal 5 karakter')
       .optional(),
+    status_kelulusan: z
+      .nativeEnum(StatusKelulusan, {
+        errorMap: () => ({ message: 'Status kelulusan tidak valid' }),
+      })
+      .optional(),
     page: z.coerce
       .number()
       .int('Page harus bilangan bulat')
@@ -237,6 +242,12 @@ export const getJadwalQuerySchema = z
       path: ['tanggal_selesai'],
     }
   );
+
+export const patchStatusKelulusanJadwalSchema = z.object({
+  status_kelulusan: z.nativeEnum(StatusKelulusan, {
+    errorMap: () => ({ message: 'Status kelulusan tidak valid' }),
+  }),
+});
 
 export const getJadwalLogsQuerySchema = z.object({
   action: z.nativeEnum(LogActionType).optional(),

@@ -10,6 +10,7 @@ import {
   getJadwalLogsQuerySchema,
   getJadwalQuerySchema,
   jadwalIdParamSchema,
+  patchStatusKelulusanJadwalSchema,
   postJadwalSchema,
   putJadwalSchema,
 } from './jadwal.validator';
@@ -86,6 +87,24 @@ jadwalRoute.put(
   zValidator('param', jadwalIdParamSchema, zodError),
   zValidator('json', putJadwalSchema, zodError),
   JadwalHandler.put
+);
+
+jadwalRoute.patch(
+  '/koordinator/jadwal/:id/status-kelulusan',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  zValidator('param', jadwalIdParamSchema, zodError),
+  zValidator('json', patchStatusKelulusanJadwalSchema, zodError),
+  JadwalHandler.patchStatusKelulusan
+);
+
+jadwalRoute.patch(
+  '/dosen/jadwal/:id/status-kelulusan',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  zValidator('param', jadwalIdParamSchema, zodError),
+  zValidator('json', patchStatusKelulusanJadwalSchema, zodError),
+  JadwalHandler.patchStatusKelulusan
 );
 
 jadwalRoute.delete(

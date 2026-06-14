@@ -1,4 +1,8 @@
-import { LogActorType, PenilaiRole } from '@prisma/client';
+import type {
+  LogActorType,
+  PenilaiRole,
+  StatusKelulusan,
+} from '@prisma/client';
 
 export type JenisJadwalKode = string;
 
@@ -19,6 +23,11 @@ export interface UpdateJadwalType {
   id_jenis_seminar?: string;
   nim?: string;
   kode_ruangan?: string;
+  status_kelulusan?: StatusKelulusan;
+}
+
+export interface UpdateStatusKelulusanJadwalType {
+  status_kelulusan: StatusKelulusan;
 }
 
 export interface CreatePenilaianType {
@@ -38,6 +47,7 @@ export interface JadwalWithRelations {
   tanggal: Date;
   waktu_mulai: Date;
   waktu_selesai: Date;
+  status_kelulusan: StatusKelulusan;
   id_jenis_seminar: string;
   jenis_seminar?: {
     id: string;

@@ -1,12 +1,12 @@
-import { LogActionType, LogActorType, PenilaiRole } from '@prisma/client';
+import { LogActionType, type PenilaiRole } from '@prisma/client';
 import prisma from '../../infrastructures/db.infrastructure';
 import JadwalHelper from '../../helpers/jadwal.helper';
 import { APIError } from '../../utils/api-error.util';
 import { LogService } from '../log';
 import DetailPenilaianRepository, {
-  PenilaianDetailRecord,
+  type PenilaianDetailRecord,
 } from './detail-penilaian.repository';
-import {
+import type {
   DetailPenilaianActorContext,
   DetailPenilaianItemInput,
   DetailPenilaianStatus,
@@ -16,7 +16,9 @@ import {
 type PenilaianWithDetails = PenilaianDetailRecord;
 
 type ActiveComponent = Awaited<
-  ReturnType<typeof DetailPenilaianRepository.findActiveComponentsByRole>
+  ReturnType<
+    typeof DetailPenilaianRepository.findActiveComponentsByJenisAndRole
+  >
 >[number];
 
 export default class DetailPenilaianService {
@@ -29,7 +31,9 @@ export default class DetailPenilaianService {
     }
   }
 
-  private static assertJadwalSelesai(penilaian: NonNullable<PenilaianWithDetails>) {
+  private static assertJadwalSelesai(
+    penilaian: NonNullable<PenilaianWithDetails>
+  ) {
     if (!penilaian.jadwal) {
       throw new APIError('Jadwal penilaian tidak ditemukan', 404);
     }
@@ -40,7 +44,10 @@ export default class DetailPenilaianService {
     );
 
     if (now < waktuSelesai) {
-      throw new APIError('Penilaian hanya dapat dilakukan setelah seminar selesai', 400);
+      throw new APIError(
+        'Penilaian hanya dapat dilakukan setelah seminar selesai',
+        400
+      );
     }
   }
 
@@ -80,7 +87,9 @@ export default class DetailPenilaianService {
       return 'BELUM_DINILAI';
     }
 
-    const submittedComponentIds = new Set(details.map((detail) => detail.id_komponen));
+    const submittedComponentIds = new Set(
+      details.map((detail) => detail.id_komponen)
+    );
     const isComplete = activeComponents.every((component) =>
       submittedComponentIds.has(component.id)
     );
@@ -101,7 +110,11 @@ export default class DetailPenilaianService {
 
   private static formatSummary(
     penilaian: NonNullable<PenilaianWithDetails>,
-    details: { nilai: number; id_komponen: string; komponen: ActiveComponent }[],
+    details: {
+      nilai: number;
+      id_komponen: string;
+      komponen: ActiveComponent;
+    }[],
     activeComponents: ActiveComponent[]
   ) {
     return {
@@ -109,16 +122,18 @@ export default class DetailPenilaianService {
       id_jadwal: penilaian.id_jadwal,
       dosen_nip: penilaian.nip,
       role: penilaian.role,
-      status: this.getStatus(details, activeComponents),
-      total_nilai_weighted: this.calculateTotalNilaiWeighted(details),
+      status: DetailPenilaianService.getStatus(details, activeComponents),
+      total_nilai_weighted:
+        DetailPenilaianService.calculateTotalNilaiWeighted(details),
       details,
     };
   }
 
   public static async getPenilaianSaya(context: DetailPenilaianActorContext) {
-    const penilaianList = await DetailPenilaianRepository.findPenilaianByDosenNip(
-      context.nip as string
-    );
+    const penilaianList =
+      await DetailPenilaianRepository.findPenilaianByDosenNip(
+        context.nip as string
+      );
 
     const data = penilaianList.map((p) => {
       let totalNilai = 0;
@@ -129,15 +144,18 @@ export default class DetailPenilaianService {
         totalPersentase += detail.komponen.persentase;
       }
 
-      const nilaiAkhir = totalPersentase > 0 ? (totalNilai / totalPersentase) * 100 : 0;
-      const isSelesai = JadwalHelper.getCurrentJakartaTime() >
+      const nilaiAkhir =
+        totalPersentase > 0 ? (totalNilai / totalPersentase) * 100 : 0;
+      const isSelesai =
+        JadwalHelper.getCurrentJakartaTime() >
         JadwalHelper.convertToJakartaTimezone(p.jadwal.waktu_selesai);
 
       return {
         id_penilaian: p.id,
         role: p.role,
         jadwal: p.jadwal,
-        status: p.detail_penilaian.length > 0 ? 'Sudah Dinilai' : 'Belum Dinilai',
+        status:
+          p.detail_penilaian.length > 0 ? 'Sudah Dinilai' : 'Belum Dinilai',
         bisa_dinilai: isSelesai,
         nilai_akhir: Math.round(nilaiAkhir * 100) / 100,
       };
@@ -152,28 +170,36 @@ export default class DetailPenilaianService {
     };
   }
 
-  public static async getDetailPenilaianSaya(context: DetailPenilaianActorContext) {
-    const penilaianList = await DetailPenilaianRepository.findPenilaianByDosenNip(
-      context.nip as string
-    );
-    const activeComponentsByRole = new Map<PenilaiRole, ActiveComponent[]>();
+  public static async getDetailPenilaianSaya(
+    context: DetailPenilaianActorContext
+  ) {
+    const penilaianList =
+      await DetailPenilaianRepository.findPenilaianByDosenNip(
+        context.nip as string
+      );
+    const activeComponentsByJenisRole = new Map<string, ActiveComponent[]>();
 
     for (const penilaian of penilaianList) {
-      if (!activeComponentsByRole.has(penilaian.role)) {
-        activeComponentsByRole.set(
-          penilaian.role,
-          await DetailPenilaianRepository.findActiveComponentsByRole(penilaian.role)
+      const key = `${penilaian.jadwal.id_jenis_seminar}:${penilaian.role}`;
+      if (!activeComponentsByJenisRole.has(key)) {
+        activeComponentsByJenisRole.set(
+          key,
+          await DetailPenilaianRepository.findActiveComponentsByJenisAndRole(
+            penilaian.jadwal.id_jenis_seminar,
+            penilaian.role
+          )
         );
       }
     }
 
-    const data = penilaianList.map((penilaian) =>
-      this.formatSummary(
+    const data = penilaianList.map((penilaian) => {
+      const key = `${penilaian.jadwal.id_jenis_seminar}:${penilaian.role}`;
+      return DetailPenilaianService.formatSummary(
         penilaian,
         penilaian.detail_penilaian,
-        activeComponentsByRole.get(penilaian.role) ?? []
-      )
-    );
+        activeComponentsByJenisRole.get(key) ?? []
+      );
+    });
 
     return {
       response: true,
@@ -188,22 +214,28 @@ export default class DetailPenilaianService {
     id_penilaian: string,
     context: DetailPenilaianActorContext
   ) {
-    const penilaian = await DetailPenilaianRepository.findPenilaianById(id_penilaian);
+    const penilaian =
+      await DetailPenilaianRepository.findPenilaianById(id_penilaian);
 
     if (!penilaian) {
-      throw new APIError(`Penilaian dengan ID ${id_penilaian} tidak ditemukan`, 404);
+      throw new APIError(
+        `Penilaian dengan ID ${id_penilaian} tidak ditemukan`,
+        404
+      );
     }
 
-    this.assertCanAccessPenilaian(penilaian, context);
+    DetailPenilaianService.assertCanAccessPenilaian(penilaian, context);
 
-    const activeComponents = await DetailPenilaianRepository.findActiveComponentsByRole(
-      penilaian.role
-    );
+    const activeComponents =
+      await DetailPenilaianRepository.findActiveComponentsByJenisAndRole(
+        penilaian.jadwal.id_jenis_seminar,
+        penilaian.role
+      );
 
     return {
       response: true,
       message: 'Detail penilaian berhasil diambil',
-      data: this.formatSummary(
+      data: DetailPenilaianService.formatSummary(
         penilaian,
         penilaian.detail_penilaian,
         activeComponents
@@ -216,18 +248,28 @@ export default class DetailPenilaianService {
     data: UpsertDetailPenilaianInput,
     context: DetailPenilaianActorContext
   ) {
-    const penilaian = await DetailPenilaianRepository.findPenilaianById(id_penilaian);
+    const penilaian =
+      await DetailPenilaianRepository.findPenilaianById(id_penilaian);
 
     if (!penilaian) {
-      throw new APIError(`Penilaian dengan ID ${id_penilaian} tidak ditemukan`, 404);
+      throw new APIError(
+        `Penilaian dengan ID ${id_penilaian} tidak ditemukan`,
+        404
+      );
     }
 
-    this.assertJadwalSelesai(penilaian);
+    DetailPenilaianService.assertJadwalSelesai(penilaian);
 
-    const activeComponents = await DetailPenilaianRepository.findActiveComponentsByRole(
-      penilaian.role
+    const activeComponents =
+      await DetailPenilaianRepository.findActiveComponentsByJenisAndRole(
+        penilaian.jadwal.id_jenis_seminar,
+        penilaian.role
+      );
+    DetailPenilaianService.validateSubmittedComponents(
+      penilaian.role,
+      data.details,
+      activeComponents
     );
-    this.validateSubmittedComponents(penilaian.role, data.details, activeComponents);
 
     const componentIds = data.details.map((detail) => detail.id_komponen);
     const existingDetails = await DetailPenilaianRepository.findExistingDetails(
@@ -239,7 +281,7 @@ export default class DetailPenilaianService {
     );
 
     const savedDetails = await prisma.$transaction(async (tx) => {
-      const result = await DetailPenilaianRepository.upsertDetailsTx(
+      await DetailPenilaianRepository.upsertDetailsTx(
         tx,
         id_penilaian,
         data.details
@@ -267,14 +309,17 @@ export default class DetailPenilaianService {
     return {
       response: true,
       message: 'Detail penilaian berhasil disimpan',
-      data: this.formatSummary(penilaian, savedDetails, activeComponents),
+      data: DetailPenilaianService.formatSummary(
+        penilaian,
+        savedDetails,
+        activeComponents
+      ),
     };
   }
 
   public static async getRekapByJadwal(id_jadwal: string) {
-    const penilaianList = await DetailPenilaianRepository.findPenilaianByJadwalId(
-      id_jadwal
-    );
+    const penilaianList =
+      await DetailPenilaianRepository.findPenilaianByJadwalId(id_jadwal);
 
     if (penilaianList.length === 0) {
       throw new APIError(
@@ -283,19 +328,24 @@ export default class DetailPenilaianService {
       );
     }
 
-    const activeComponentsByRole = new Map<PenilaiRole, ActiveComponent[]>();
+    const activeComponentsByJenisRole = new Map<string, ActiveComponent[]>();
 
     for (const penilaian of penilaianList) {
-      if (!activeComponentsByRole.has(penilaian.role)) {
-        activeComponentsByRole.set(
-          penilaian.role,
-          await DetailPenilaianRepository.findActiveComponentsByRole(penilaian.role)
+      const key = `${id_jadwal}:${penilaian.role}`;
+      if (!activeComponentsByJenisRole.has(key)) {
+        activeComponentsByJenisRole.set(
+          key,
+          await DetailPenilaianRepository.findActiveComponentsByJenisAndRole(
+            penilaian.jadwal.id_jenis_seminar,
+            penilaian.role
+          )
         );
       }
     }
 
     const data = penilaianList.map((penilaian) => {
-      const activeComponents = activeComponentsByRole.get(penilaian.role) ?? [];
+      const key = `${id_jadwal}:${penilaian.role}`;
+      const activeComponents = activeComponentsByJenisRole.get(key) ?? [];
 
       return {
         id_penilaian: penilaian.id,
@@ -303,10 +353,14 @@ export default class DetailPenilaianService {
         dosen: penilaian.dosen,
         dosen_nip: penilaian.nip,
         role: penilaian.role,
-        status: this.getStatus(penilaian.detail_penilaian, activeComponents),
-        total_nilai_weighted: this.calculateTotalNilaiWeighted(
-          penilaian.detail_penilaian
+        status: DetailPenilaianService.getStatus(
+          penilaian.detail_penilaian,
+          activeComponents
         ),
+        total_nilai_weighted:
+          DetailPenilaianService.calculateTotalNilaiWeighted(
+            penilaian.detail_penilaian
+          ),
         details: penilaian.detail_penilaian,
       };
     });

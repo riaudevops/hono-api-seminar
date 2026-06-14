@@ -86,6 +86,24 @@ export default class PenilaianService {
       throw new APIError('Jadwal tidak ditemukan.', 404);
     }
 
+    const activeComponents = await prisma.komponen_penilaian.findMany({
+      where: {
+        id_jenis_seminar: jadwal.id_jenis_seminar,
+        role: penilaian.role,
+        is_aktif: true,
+      },
+    });
+    const activeComponentIds = new Set(activeComponents.map((c) => c.id));
+
+    for (const item of details) {
+      if (!activeComponentIds.has(item.id_komponen)) {
+        throw new APIError(
+          `Komponen ${item.id_komponen} tidak valid atau tidak aktif untuk role ${penilaian.role} pada jenis seminar ini`,
+          400
+        );
+      }
+    }
+
     const logContext: LogJadwalContext = {
       actor_id: context.actor_id,
       actor_type: context.actor_type,

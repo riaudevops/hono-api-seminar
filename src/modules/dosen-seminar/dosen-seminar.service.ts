@@ -198,8 +198,10 @@ export default class DosenSeminarService {
     };
   }
 
-  public static async getKomponenPenilaian() {
-    const komponenList = await KomponenPenilaianRepository.findAktif();
+  public static async getKomponenPenilaian(
+    filters: { id_jenis_seminar?: string } = {}
+  ) {
+    const komponenList = await KomponenPenilaianRepository.findAktif(filters);
 
     const data = komponenList.map((k) => ({
       id: k.id,
@@ -219,28 +221,25 @@ export default class DosenSeminarService {
 
   public static async getPenilaianByJadwal(jadwal_id: string) {
     const penilaianList = await PenilaianRepository.findByJadwalId(jadwal_id);
-    if (!penilaianList || penilaianList.length === 0) {
-      throw new APIError(
-        `Data penilaian untuk jadwal ${jadwal_id} tidak ditemukan`,
-        404
-      );
-    }
 
-    const data = penilaianList.flatMap((p) =>
-      p.detail_penilaian.map((d) => ({
-        jadwal_id: p.id_jadwal,
-        komponen_id: d.id_komponen,
-        dosen_nama: p.dosen.nama,
-        dosen_nip: p.dosen.nip,
-        peran_dosen: ROLE_TO_FRONTEND[p.role as PenilaiRole],
-        nilai: d.nilai,
-        submitted_at: d.nilai != null ? new Date().toISOString() : null,
-      }))
-    );
+    const data =
+      penilaianList?.flatMap((p) =>
+        p.detail_penilaian.map((d) => ({
+          jadwal_id: p.id_jadwal,
+          komponen_id: d.id_komponen,
+          dosen_nama: p.dosen.nama,
+          dosen_nip: p.dosen.nip,
+          peran_dosen: ROLE_TO_FRONTEND[p.role as PenilaiRole],
+          nilai: d.nilai,
+          submitted_at: d.nilai != null ? new Date().toISOString() : null,
+        }))
+      ) ?? [];
 
     return {
       response: true,
-      message: 'Berhasil mengambil data penilaian',
+      message: data.length
+        ? 'Berhasil mengambil data penilaian'
+        : 'Data penilaian untuk jadwal ini masih kosong',
       data,
     };
   }
@@ -296,7 +295,11 @@ export default class DosenSeminarService {
     }
 
     const activeComponents = await prisma.komponen_penilaian.findMany({
-      where: { role: penilaianRecord.role, is_aktif: true },
+      where: {
+        id_jenis_seminar: jadwal.id_jenis_seminar,
+        role: penilaianRecord.role,
+        is_aktif: true,
+      },
     });
     const activeComponentIds = activeComponents.map((c) => c.id);
 

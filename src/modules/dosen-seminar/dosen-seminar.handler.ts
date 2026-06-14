@@ -37,7 +37,11 @@ export default class DosenSeminarHandler {
   }
 
   public static async getKomponenPenilaian(c: Context) {
-    return c.json(await DosenSeminarService.getKomponenPenilaian());
+    return c.json(
+      await DosenSeminarService.getKomponenPenilaian({
+        id_jenis_seminar: c.req.query('id_jenis_seminar'),
+      })
+    );
   }
 
   public static async getPenilaianByJadwal(c: Context) {

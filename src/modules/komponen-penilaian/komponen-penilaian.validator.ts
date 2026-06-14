@@ -3,6 +3,10 @@ import { PenilaiRole } from '@prisma/client';
 
 export const getAllKomponenPenilaianQuerySchema = z.object({
   role: z.nativeEnum(PenilaiRole).optional(),
+  id_jenis_seminar: z
+    .string()
+    .min(1, 'ID jenis seminar wajib diisi')
+    .optional(),
   is_aktif: z
     .enum(['true', 'false'])
     .optional()
@@ -16,6 +20,10 @@ export const getKomponenByRoleParamSchema = z.object({
 });
 
 export const getKomponenByRoleQuerySchema = z.object({
+  id_jenis_seminar: z
+    .string()
+    .min(1, 'ID jenis seminar wajib diisi')
+    .optional(),
   is_aktif: z
     .enum(['true', 'false'])
     .optional()
@@ -36,6 +44,7 @@ export const createKomponenPenilaianSchema = z.object({
   role: z.nativeEnum(PenilaiRole, {
     errorMap: () => ({ message: 'Role penilai tidak valid' }),
   }),
+  id_jenis_seminar: z.string().min(1, 'ID jenis seminar wajib diisi'),
 });
 
 export const updateKomponenPenilaianSchema = z.object({
@@ -55,6 +64,10 @@ export const updateKomponenPenilaianSchema = z.object({
     .nativeEnum(PenilaiRole, {
       errorMap: () => ({ message: 'Role penilai tidak valid' }),
     })
+    .optional(),
+  id_jenis_seminar: z
+    .string()
+    .min(1, 'ID jenis seminar wajib diisi')
     .optional(),
 });
 

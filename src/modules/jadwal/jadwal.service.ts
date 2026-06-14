@@ -1,9 +1,11 @@
 import Fuse from 'fuse.js';
 import {
   LogActionType,
+  LogActorType,
   LogEntityType,
   PenilaiRole,
   StatusJadwal,
+  type StatusKelulusan,
 } from '@prisma/client';
 import JadwalRepository, { type JadwalFilter } from './jadwal.repository';
 import { APIError } from '../../utils/api-error.util';
@@ -52,6 +54,11 @@ type JadwalMutationInput = {
   penilai?: DosenAssignment[];
 };
 
+type UpdateStatusKelulusanContext = LogJadwalContext & {
+  actor_email?: string;
+  dosen_nip?: string;
+};
+
 type GetAllJadwalParams = {
   jenis?: string;
   tanggal_mulai?: string;
@@ -62,6 +69,7 @@ type GetAllJadwalParams = {
   nim?: string;
   nip_dosen?: string;
   tahun_ajaran?: string;
+  status_kelulusan?: StatusKelulusan;
   page?: number;
   limit?: number;
 };
@@ -275,6 +283,7 @@ export default class JadwalService {
           nim: params.nim,
           nip_dosen: params.nip_dosen,
           kode_tahun_ajaran: params.tahun_ajaran,
+          status_kelulusan: params.status_kelulusan,
           tanggal_mulai: tanggalMulai,
           tanggal_selesai: tanggalSelesai,
         };
@@ -607,6 +616,51 @@ export default class JadwalService {
     };
   }
 
+  public static async patchStatusKelulusan(
+    id: string,
+    status_kelulusan: StatusKelulusan,
+    context: UpdateStatusKelulusanContext
+  ) {
+    const existingJadwal = await JadwalRepository.findById(id);
+    if (!existingJadwal) {
+      throw new APIError('Jadwal tidak ditemukan', 404);
+    }
+
+    await JadwalService.authorizeUpdateStatusKelulusan(existingJadwal, context);
+
+    const jadwalWithTimezone = await prisma.$transaction(async (tx) => {
+      await JadwalRepository.updateStatusKelulusan(
+        id,
+        { status_kelulusan },
+        tx
+      );
+      const updatedJadwal = await JadwalRepository.findById(id, tx);
+      const formatted = JadwalService.formatJadwalTimezone(updatedJadwal);
+
+      await tx.log.create({
+        data: {
+          action: LogActionType.UPDATE,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          entity_type: LogEntityType.JADWAL,
+          entity_id: id,
+          old_values: JSON.parse(JSON.stringify(existingJadwal)),
+          new_values: JSON.parse(JSON.stringify(formatted)),
+        },
+      });
+
+      return formatted;
+    });
+
+    await CacheInvalidation.invalidateJadwal();
+
+    return {
+      response: true,
+      message: 'Status kelulusan jadwal berhasil diperbarui',
+      data: jadwalWithTimezone,
+    };
+  }
+
   private static async enqueueGoogleCalendarInvitation(
     jadwalId: string,
     action: WorkerJadwalEmailAction
@@ -667,6 +721,43 @@ export default class JadwalService {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    }
+  }
+
+  private static async authorizeUpdateStatusKelulusan(
+    jadwal: any,
+    context: UpdateStatusKelulusanContext
+  ) {
+    if (context.actor_type === LogActorType.KOORDINATOR) {
+      return;
+    }
+
+    if (context.actor_type !== LogActorType.DOSEN) {
+      throw new APIError(
+        'Hanya dosen atau koordinator yang dapat mengubah status kelulusan',
+        403
+      );
+    }
+
+    let dosenNip = context.dosen_nip;
+    if (!dosenNip && context.actor_email) {
+      const dosen = await DosenRepository.findByEmail(context.actor_email);
+      dosenNip = dosen?.nip;
+    }
+
+    if (!dosenNip) {
+      throw new APIError('Data dosen tidak ditemukan untuk akun ini', 404);
+    }
+
+    const isPenilai = Array.isArray(jadwal.penilaian)
+      ? jadwal.penilaian.some((penilaian: any) => penilaian.nip === dosenNip)
+      : false;
+
+    if (!isPenilai) {
+      throw new APIError(
+        'Dosen hanya dapat mengubah status kelulusan pada jadwal yang diampu',
+        403
+      );
     }
   }
 

@@ -23,6 +23,9 @@ CREATE TYPE "StatusBerkas" AS ENUM ('PENDING', 'REVISI', 'APPROVED', 'REJECTED',
 CREATE TYPE "StatusJadwal" AS ENUM ('BELUM_JADWAL', 'SUDAH_JADWAL');
 
 -- CreateEnum
+CREATE TYPE "StatusKelulusan" AS ENUM ('LULUS', 'TIDAK_LULUS', 'BELUM_DITENTUKAN');
+
+-- CreateEnum
 CREATE TYPE "TipeInputDokumen" AS ENUM ('FILE_UPLOAD', 'TEXT', 'URL', 'BOOLEAN', 'DATE', 'SELECT', 'MULTI_SELECT');
 
 -- CreateTable
@@ -82,6 +85,7 @@ CREATE TABLE "jadwal" (
     "id_jenis_seminar" TEXT NOT NULL,
     "nim" TEXT NOT NULL,
     "kode_ruangan" TEXT NOT NULL,
+    "status_kelulusan" "StatusKelulusan" NOT NULL DEFAULT 'BELUM_DITENTUKAN',
     "kode_tahun_ajaran" VARCHAR(5) NOT NULL,
 
     CONSTRAINT "jadwal_pkey" PRIMARY KEY ("id")
@@ -108,11 +112,12 @@ CREATE TABLE "jadwal_draft" (
 
 -- CreateTable
 CREATE TABLE "komponen_penilaian" (
-    "id" VARCHAR(7) NOT NULL,
+    "id" VARCHAR(40) NOT NULL,
     "nama" VARCHAR(50) NOT NULL,
     "persentase" INTEGER NOT NULL,
     "is_aktif" BOOLEAN NOT NULL DEFAULT true,
     "role" "PenilaiRole" NOT NULL,
+    "id_jenis_seminar" TEXT NOT NULL,
 
     CONSTRAINT "komponen_penilaian_pkey" PRIMARY KEY ("id")
 );
@@ -314,6 +319,15 @@ CREATE INDEX "jadwal_draft_status_idx" ON "jadwal_draft"("status");
 CREATE INDEX "jadwal_draft_id_jenis_seminar_idx" ON "jadwal_draft"("id_jenis_seminar");
 
 -- CreateIndex
+CREATE INDEX "komponen_penilaian_id_jenis_seminar_idx" ON "komponen_penilaian"("id_jenis_seminar");
+
+-- CreateIndex
+CREATE INDEX "komponen_penilaian_role_idx" ON "komponen_penilaian"("role");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "komponen_penilaian_id_jenis_seminar_role_nama_key" ON "komponen_penilaian"("id_jenis_seminar", "role", "nama");
+
+-- CreateIndex
 CREATE INDEX "penilaian_id_jadwal_idx" ON "penilaian"("id_jadwal");
 
 -- CreateIndex
@@ -408,6 +422,9 @@ ALTER TABLE "jadwal" ADD CONSTRAINT "jadwal_kode_ruangan_fkey" FOREIGN KEY ("kod
 
 -- AddForeignKey
 ALTER TABLE "jadwal_draft" ADD CONSTRAINT "jadwal_draft_id_jenis_seminar_fkey" FOREIGN KEY ("id_jenis_seminar") REFERENCES "jenis_seminar"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "komponen_penilaian" ADD CONSTRAINT "komponen_penilaian_id_jenis_seminar_fkey" FOREIGN KEY ("id_jenis_seminar") REFERENCES "jenis_seminar"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "penilaian" ADD CONSTRAINT "penilaian_id_jadwal_fkey" FOREIGN KEY ("id_jadwal") REFERENCES "jadwal"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

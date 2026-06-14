@@ -75,13 +75,19 @@ enum StatusJadwal {
   SUDAH_JADWAL
 }
 
-model dosen {
-  nip    String @id @db.VarChar(18)
-  nama   String @db.VarChar(255)
-  email  String @unique @db.VarChar(255)
-  no_hp  String? @unique @db.VarChar(14)
+enum StatusKelulusan {
+  LULUS
+  TIDAK_LULUS
+  BELUM_DITENTUKAN
+}
 
-  penilaian penilaian[]
+model dosen {
+  nip   String  @id @db.VarChar(18)
+  nama  String  @db.VarChar(255)
+  email String  @unique @db.VarChar(255)
+  no_hp String? @unique @db.VarChar(14)
+
+  penilaian        penilaian[]
   constraintDosens constraint_dosen[]
   keahlian_dosen   keahlian_dosen[]
 }
@@ -107,21 +113,21 @@ model keahlian_dosen {
 }
 
 model mahasiswa {
-  nim    String @id @db.VarChar(11)
-  nama   String @db.VarChar(255)
-  email  String @unique @db.VarChar(36)
-  aktif  Boolean @default(true)
-  no_hp  String? @unique @db.VarChar(14)
+  nim   String  @id @db.VarChar(11)
+  nama  String  @db.VarChar(255)
+  email String  @unique @db.VarChar(36)
+  aktif Boolean @default(true)
+  no_hp String? @unique @db.VarChar(14)
 
-  jadwal jadwal[]
+  jadwal      jadwal[]
   pendaftaran pendaftaran[]
 }
 
 model ruangan {
-  kode   String @id @db.VarChar(10)
-  nama   String @db.VarChar(50)
+  kode   String  @id @db.VarChar(10)
+  nama   String  @db.VarChar(50)
   status Boolean @default(true) @db.Boolean
-  urutan Int @default(0)
+  urutan Int     @default(0)
 
   jadwal jadwal[]
 }
@@ -135,11 +141,12 @@ model jadwal {
   id_jenis_seminar String
   jenis_seminar    jenis_seminar @relation(fields: [id_jenis_seminar], references: [id])
 
-  nim String
+  nim       String
   mahasiswa mahasiswa @relation(fields: [nim], references: [nim])
 
-  kode_ruangan String
-  ruangan ruangan @relation(fields: [kode_ruangan], references: [kode])
+  kode_ruangan     String
+  ruangan          ruangan         @relation(fields: [kode_ruangan], references: [kode])
+  status_kelulusan StatusKelulusan @default(BELUM_DITENTUKAN)
 
   kode_tahun_ajaran String @db.VarChar(5)
 
@@ -155,26 +162,26 @@ model jadwal {
 }
 
 model jadwal_draft {
-  id             String            @id @default(cuid())
-  batch_id       String            @db.VarChar(20)
-  nim            String
+  id       String @id @default(cuid())
+  batch_id String @db.VarChar(20)
+  nim      String
 
   id_jenis_seminar String
   jenis_seminar    jenis_seminar @relation(fields: [id_jenis_seminar], references: [id])
 
-  tanggal        DateTime          @db.Timestamptz
-  waktu_mulai    DateTime          @db.Timestamptz
-  waktu_selesai  DateTime          @db.Timestamptz
-  kode_ruangan   String            @db.VarChar(10)
+  tanggal       DateTime @db.Timestamptz
+  waktu_mulai   DateTime @db.Timestamptz
+  waktu_selesai DateTime @db.Timestamptz
+  kode_ruangan  String   @db.VarChar(10)
 
   // Format JSON: [{nip: "...", role: "TA_PEMBIMBING_1"}, {nip: "...", role: "TA_PENGUJI_1"}]
-  list_dosen   Json
+  list_dosen Json
 
-  llm_reasoning  Json?
-  confidence     Float?
-  status         StatusJadwalDraft @default(DRAFT)
+  llm_reasoning Json?
+  confidence    Float?
+  status        StatusJadwalDraft @default(DRAFT)
 
-  created_at     DateTime          @default(now()) @db.Timestamptz
+  created_at DateTime @default(now()) @db.Timestamptz
 
   @@index([batch_id])
   @@index([status])
@@ -182,17 +189,23 @@ model jadwal_draft {
 }
 
 model komponen_penilaian {
-  id         String  @id @db.VarChar(7)
-  nama       String  @db.VarChar(50)
-  persentase Int
-  is_aktif   Boolean @default(true)
-  role       PenilaiRole
+  id               String      @id @db.VarChar(40)
+  nama             String      @db.VarChar(50)
+  persentase       Int
+  is_aktif         Boolean     @default(true)
+  role             PenilaiRole
+  id_jenis_seminar String
 
+  jenis_seminar    jenis_seminar      @relation(fields: [id_jenis_seminar], references: [id], onDelete: Cascade)
   detail_penilaian detail_penilaian[]
+
+  @@unique([id_jenis_seminar, role, nama])
+  @@index([id_jenis_seminar])
+  @@index([role])
 }
 
 model penilaian {
-  id        String @id @default(cuid())
+  id        String      @id @default(cuid())
   id_jadwal String
   nip       String
   role      PenilaiRole
@@ -209,13 +222,13 @@ model penilaian {
 }
 
 model detail_penilaian {
-  id              String @id @default(cuid())
-  id_penilaian    String
-  id_komponen     String
-  nilai           Float
-  catatan         String? @db.Text
+  id           String  @id @default(cuid())
+  id_penilaian String
+  id_komponen  String
+  nilai        Float
+  catatan      String? @db.Text
 
-  penilaian penilaian @relation(fields: [id_penilaian], references: [id], onDelete: Cascade)
+  penilaian penilaian          @relation(fields: [id_penilaian], references: [id], onDelete: Cascade)
   komponen  komponen_penilaian @relation(fields: [id_komponen], references: [id])
 
   @@unique([id_penilaian, id_komponen])
@@ -228,9 +241,9 @@ model detail_penilaian {
 // context menyimpan metadata tambahan spesifik entity (misal id_komponen_penilaian untuk PENILAIAN).
 // ============================================================
 model log {
-  id         String        @id @default(cuid())
-  timestamp  DateTime      @default(now()) @db.Timestamptz
-  action     LogActionType
+  id        String        @id @default(cuid())
+  timestamp DateTime      @default(now()) @db.Timestamptz
+  action    LogActionType
 
   actor_type LogActorType
   actor_id   String
@@ -248,25 +261,25 @@ model log {
 }
 
 model constraint_dosen {
-  id          String         @id @default(cuid())
-  nip         String         @db.VarChar(18)
-  type        ConstraintType
+  id   String         @id @default(cuid())
+  nip  String         @db.VarChar(18)
+  type ConstraintType
 
-  hari        Int?
-  waktu_mulai  DateTime?      @db.Timestamptz
-  waktu_selesai DateTime?     @db.Timestamptz
+  hari          Int?
+  waktu_mulai   DateTime? @db.Timestamptz
+  waktu_selesai DateTime? @db.Timestamptz
 
-  keterangan  String?        @db.Text
+  keterangan String? @db.Text
 
-  priority    Int            @default(1)
+  priority Int @default(1)
 
-  is_active   Boolean        @default(true)
-  created_at  DateTime       @default(now()) @db.Timestamptz
-  updated_at  DateTime       @updatedAt @db.Timestamptz
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
 
-  dosen       dosen          @relation(fields: [nip], references: [nip])
+  dosen dosen @relation(fields: [nip], references: [nip])
 
-  raw_data   Json?
+  raw_data Json?
 
   @@index([nip])
   @@index([type])
@@ -274,21 +287,22 @@ model constraint_dosen {
 }
 
 model jenis_seminar {
-  id          String  @id @default(cuid())
-  kode        String  @unique @db.VarChar(20)
-  nama        String  @db.VarChar(100)
-  deskripsi   String? @db.Text
-  is_aktif    Boolean @default(true)
+  id        String  @id @default(cuid())
+  kode      String  @unique @db.VarChar(20)
+  nama      String  @db.VarChar(100)
+  deskripsi String? @db.Text
+  is_aktif  Boolean @default(true)
 
-  wajib_pembimbing Int @default(1)
-  wajib_penguji    Int @default(2)
-  ada_ketua_sidang  Boolean @default(false)
+  wajib_pembimbing Int     @default(1)
+  wajib_penguji    Int     @default(2)
+  ada_ketua_sidang Boolean @default(false)
 
   requirement_dokumen requirement_dokumen[]
-  pendaftaran   pendaftaran[]
-  jadwal        jadwal[]
-  jadwal_draft  jadwal_draft[]
-  bobot_penilai bobot_penilai[]
+  pendaftaran         pendaftaran[]
+  jadwal              jadwal[]
+  jadwal_draft        jadwal_draft[]
+  bobot_penilai       bobot_penilai[]
+  komponen_penilaian  komponen_penilaian[]
 
   @@index([kode])
 }
@@ -299,10 +313,10 @@ model bobot_penilai {
   role             PenilaiRole
   persentase       Int
 
-  jenis_seminar    jenis_seminar @relation(fields: [id_jenis_seminar], references: [id], onDelete: Cascade)
+  jenis_seminar jenis_seminar @relation(fields: [id_jenis_seminar], references: [id], onDelete: Cascade)
 
-  created_at       DateTime    @default(now()) @db.Timestamptz
-  updated_at       DateTime    @updatedAt @db.Timestamptz
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
 
   @@unique([id_jenis_seminar, role])
   @@index([id_jenis_seminar])
@@ -319,32 +333,32 @@ enum TipeInputDokumen {
 }
 
 model dokumen_template {
-  id          String            @id @default(cuid())
-  nama        String            @db.VarChar(150)
-  kode        String            @unique @db.VarChar(50)
-  deskripsi   String?           @db.Text
-  tipe_input  TipeInputDokumen
+  id         String           @id @default(cuid())
+  nama       String           @db.VarChar(150)
+  kode       String           @unique @db.VarChar(50)
+  deskripsi  String?          @db.Text
+  tipe_input TipeInputDokumen
 
-  opsi        Json?
+  opsi Json?
 
-  format_file  String?          @db.VarChar(50)
-  max_size_mb  Int?
-  can_view_dosen Boolean          @default(false)
+  format_file    String? @db.VarChar(50)
+  max_size_mb    Int?
+  can_view_dosen Boolean @default(false)
 
-  is_special   Boolean          @default(false)
+  is_special Boolean @default(false)
 
   requirement_dokumen requirement_dokumen[]
-  data_pendaftaran data_pendaftaran[]
+  data_pendaftaran    data_pendaftaran[]
 }
 
 model requirement_dokumen {
-  id                  String   @id @default(cuid())
+  id                  String @id @default(cuid())
   id_jenis_seminar    String
   id_dokumen_template String
 
-  urutan              Int      @default(0)
-  is_wajib            Boolean  @default(true)
-  keterangan_tambahan String?  @db.Text
+  urutan              Int     @default(0)
+  is_wajib            Boolean @default(true)
+  keterangan_tambahan String? @db.Text
 
   jenis_seminar    jenis_seminar    @relation(fields: [id_jenis_seminar], references: [id], onDelete: Cascade)
   dokumen_template dokumen_template @relation(fields: [id_dokumen_template], references: [id], onDelete: Cascade)
@@ -354,27 +368,27 @@ model requirement_dokumen {
 }
 
 model pendaftaran {
-  id                String       @id @default(cuid())
-  nim               String       @db.VarChar(11)
-  kode_tahun_ajaran      String       @db.VarChar(5)
-  id_pengajuan_fst  String       @unique @db.VarChar(50)
+  id                String @id @default(cuid())
+  nim               String @db.VarChar(11)
+  kode_tahun_ajaran String @db.VarChar(5)
+  id_pengajuan_fst  String @unique @db.VarChar(50)
 
-  id_jenis_seminar  String
-  jenis_seminar     jenis_seminar @relation(fields: [id_jenis_seminar], references: [id])
+  id_jenis_seminar String
+  jenis_seminar    jenis_seminar @relation(fields: [id_jenis_seminar], references: [id])
 
-  nim_mahasiswa     mahasiswa     @relation(fields: [nim], references: [nim])
+  nim_mahasiswa mahasiswa @relation(fields: [nim], references: [nim])
 
-  nip_pembimbing_1  String       @db.VarChar(18)
-  nip_pembimbing_2  String?      @db.VarChar(18)
-  nip_penguji_1     String?      @db.VarChar(18)
-  nip_penguji_2     String?      @db.VarChar(18)
+  nip_pembimbing_1 String  @db.VarChar(18)
+  nip_pembimbing_2 String? @db.VarChar(18)
+  nip_penguji_1    String? @db.VarChar(18)
+  nip_penguji_2    String? @db.VarChar(18)
 
-  status_berkas     StatusBerkas @default(PENDING)
-  status_jadwal     StatusJadwal @default(BELUM_JADWAL)
-  created_at        DateTime     @default(now()) @db.Timestamptz
-  updated_at        DateTime     @updatedAt @db.Timestamptz
+  status_berkas StatusBerkas @default(PENDING)
+  status_jadwal StatusJadwal @default(BELUM_JADWAL)
+  created_at    DateTime     @default(now()) @db.Timestamptz
+  updated_at    DateTime     @updatedAt @db.Timestamptz
 
-  data_pendaftaran  data_pendaftaran[]
+  data_pendaftaran data_pendaftaran[]
 
   @@index([nim])
   @@index([id_jenis_seminar])
@@ -383,12 +397,12 @@ model pendaftaran {
 }
 
 model data_pendaftaran {
-  id                  String  @id @default(cuid())
+  id                  String @id @default(cuid())
   id_pendaftaran      String
   id_dokumen_template String
 
-  nilai_text     String?  @db.Text
-  nilai_file_url String?  @db.Text
+  nilai_text     String?   @db.Text
+  nilai_file_url String?   @db.Text
   nilai_boolean  Boolean?
   nilai_date     DateTime? @db.Timestamptz
   nilai_json     Json?
