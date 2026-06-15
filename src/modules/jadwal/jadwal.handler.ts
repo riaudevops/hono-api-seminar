@@ -31,7 +31,12 @@ export default class JadwalHandler {
 
   public static async getJadwalDosenSaya(c: Context) {
     const email = JadwalHandler.getEmail(c);
-    return c.json(await JadwalService.getJadwalDosenSaya(email, c.req.query()));
+    return c.json(
+      await JadwalService.getJadwalDosenSaya(
+        email,
+        (c.req as any).valid('query')
+      )
+    );
   }
 
   public static async getStatistikDosenSaya(c: Context) {

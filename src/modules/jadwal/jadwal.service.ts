@@ -5,6 +5,7 @@ import {
   LogEntityType,
   PenilaiRole,
   StatusJadwal,
+  type StatusBerkas,
   type StatusKelulusan,
 } from '@prisma/client';
 import JadwalRepository, { type JadwalFilter } from './jadwal.repository';
@@ -78,6 +79,15 @@ type GetJadwalDosenSayaParams = {
   search?: string;
   jenis?: string;
   tahun_ajaran?: string;
+  tanggal_mulai?: string;
+  tanggal_selesai?: string;
+  kode_ruangan?: string;
+  nim?: string;
+  status_kelulusan?: StatusKelulusan;
+  status_berkas?: StatusBerkas;
+  status_jadwal?: StatusJadwal;
+  page?: number;
+  limit?: number;
 };
 
 const BIMBINGAN_ROLES: PenilaiRole[] = [
@@ -144,7 +154,11 @@ export default class JadwalService {
       300,
       async () => {
         const jadwal = await JadwalRepository.findByDosenEmail(email);
-        let data = JadwalService.formatJadwalListTimezone(jadwal);
+        const jadwalWithPendaftaran =
+          await JadwalService.attachPendaftaranDosen(jadwal);
+        let data = JadwalService.formatJadwalListTimezone(
+          jadwalWithPendaftaran
+        );
 
         if (params.jenis) {
           data = data.filter(
@@ -158,6 +172,48 @@ export default class JadwalService {
           );
         }
 
+        if (params.tanggal_mulai) {
+          data = data.filter(
+            (item: any) => item.tanggal >= params.tanggal_mulai!
+          );
+        }
+
+        if (params.tanggal_selesai) {
+          data = data.filter(
+            (item: any) => item.tanggal <= params.tanggal_selesai!
+          );
+        }
+
+        if (params.kode_ruangan) {
+          data = data.filter(
+            (item: any) => item.kode_ruangan === params.kode_ruangan
+          );
+        }
+
+        if (params.nim) {
+          data = data.filter((item: any) => item.nim === params.nim);
+        }
+
+        if (params.status_kelulusan) {
+          data = data.filter(
+            (item: any) => item.status_kelulusan === params.status_kelulusan
+          );
+        }
+
+        if (params.status_berkas) {
+          data = data.filter(
+            (item: any) =>
+              item.pendaftaran?.status_berkas === params.status_berkas
+          );
+        }
+
+        if (params.status_jadwal) {
+          data = data.filter(
+            (item: any) =>
+              item.pendaftaran?.status_jadwal === params.status_jadwal
+          );
+        }
+
         if (params.search) {
           const fuse = new Fuse(data, {
             threshold: 0.3,
@@ -167,12 +223,25 @@ export default class JadwalService {
           data = fuse.search(params.search).map((result) => result.item);
         }
 
+        const total = data.length;
+        const page = params.page ?? 1;
+        const limit = params.limit ?? 10;
+        const total_page = Math.ceil(total / limit);
+        const start = (page - 1) * limit;
+        const paginatedData = data.slice(start, start + limit);
+
         return {
           response: true,
-          message: data.length
+          message: paginatedData.length
             ? 'Data jadwal dosen berhasil diambil'
             : 'Data jadwal dosen masih kosong',
-          data,
+          data: paginatedData,
+          pagination: {
+            page,
+            limit,
+            total,
+            total_page,
+          },
         };
       }
     );
@@ -1037,6 +1106,85 @@ export default class JadwalService {
               return penilaianRingkas;
             })
           : [],
+      };
+    });
+  }
+
+  private static async attachPendaftaranDosen(jadwal: any[]) {
+    if (!Array.isArray(jadwal) || jadwal.length === 0) {
+      return jadwal;
+    }
+
+    const jadwalKeyMap = new Map<
+      string,
+      { nim: string; id_jenis_seminar: string; kode_tahun_ajaran: string }
+    >();
+
+    for (const item of jadwal) {
+      if (!item?.nim || !item?.id_jenis_seminar || !item?.kode_tahun_ajaran) {
+        continue;
+      }
+
+      const key = `${item.nim}|${item.id_jenis_seminar}|${item.kode_tahun_ajaran}`;
+      jadwalKeyMap.set(key, {
+        nim: item.nim,
+        id_jenis_seminar: item.id_jenis_seminar,
+        kode_tahun_ajaran: item.kode_tahun_ajaran,
+      });
+    }
+
+    const pendaftaranWhere = Array.from(jadwalKeyMap.values());
+    if (pendaftaranWhere.length === 0) {
+      return jadwal.map((item) => ({ ...item, pendaftaran: null }));
+    }
+
+    const pendaftaranList = await prisma.pendaftaran.findMany({
+      where: { OR: pendaftaranWhere },
+      include: {
+        jenis_seminar: true,
+        data_pendaftaran: {
+          where: {
+            dokumen_template: {
+              can_view_dosen: true,
+            },
+          },
+          include: {
+            dokumen_template: {
+              select: {
+                id: true,
+                kode: true,
+                nama: true,
+                tipe_input: true,
+                format_file: true,
+                max_size_mb: true,
+                can_view_dosen: true,
+                is_special: true,
+              },
+            },
+          },
+          orderBy: { id_dokumen_template: 'asc' },
+        },
+      },
+    });
+
+    const pendaftaranMap = new Map<string, (typeof pendaftaranList)[number]>();
+    for (const pendaftaran of pendaftaranList) {
+      const key = `${pendaftaran.nim}|${pendaftaran.id_jenis_seminar}|${pendaftaran.kode_tahun_ajaran}`;
+      pendaftaranMap.set(key, pendaftaran);
+    }
+
+    return jadwal.map((item) => {
+      const key = `${item.nim}|${item.id_jenis_seminar}|${item.kode_tahun_ajaran}`;
+      const pendaftaran = pendaftaranMap.get(key);
+
+      return {
+        ...item,
+        pendaftaran: pendaftaran
+          ? {
+              ...pendaftaran,
+              mahasiswa: item.mahasiswa ?? null,
+            }
+          : null,
       };
     });
   }

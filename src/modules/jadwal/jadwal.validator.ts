@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { LogActionType, PenilaiRole, StatusKelulusan } from '@prisma/client';
+import {
+  LogActionType,
+  PenilaiRole,
+  StatusBerkas,
+  StatusJadwal,
+  StatusKelulusan,
+} from '@prisma/client';
 
 const kodeJenisSchema = z
   .string()
@@ -185,6 +191,24 @@ export const getJadwalDosenSayaQuerySchema = z.object({
     .string()
     .max(5, 'Kode tahun ajaran maksimal 5 karakter')
     .optional(),
+  tanggal_mulai: z
+    .string()
+    .date('Format tanggal mulai harus YYYY-MM-DD')
+    .optional(),
+  tanggal_selesai: z
+    .string()
+    .date('Format tanggal selesai harus YYYY-MM-DD')
+    .optional(),
+  kode_ruangan: z
+    .string()
+    .max(10, 'Kode ruangan maksimal 10 karakter')
+    .optional(),
+  nim: z.string().max(11, 'NIM maksimal 11 karakter').optional(),
+  status_kelulusan: z.nativeEnum(StatusKelulusan).optional(),
+  status_berkas: z.nativeEnum(StatusBerkas).optional(),
+  status_jadwal: z.nativeEnum(StatusJadwal).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 export const getJadwalQuerySchema = z

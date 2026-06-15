@@ -30,6 +30,7 @@ export class CacheInvalidation {
     await Promise.all([
       redisService.delByPattern('pendaftaran:*'),
       redisService.delByPattern('mahasiswa:*'),
+      redisService.delByPattern('jadwal:*'),
     ]);
   }
 
