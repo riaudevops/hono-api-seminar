@@ -413,7 +413,7 @@ export default class JadwalService {
         tx
       );
 
-      await JadwalService.createPenilaianTx(tx, id, data.penilai);
+      await JadwalService.createPenilaianTx(tx, id, data.penilai, jenis.kode);
       await PendaftaranRepository.updateStatusJadwalByJadwalData(
         data.nim,
         jenis.id,
@@ -534,7 +534,7 @@ export default class JadwalService {
 
       if (data.penilai) {
         await tx.penilaian.deleteMany({ where: { id_jadwal: id } });
-        await JadwalService.createPenilaianTx(tx, id, data.penilai);
+        await JadwalService.createPenilaianTx(tx, id, data.penilai, jenis.kode);
       }
 
       const completeJadwal = await JadwalRepository.findById(id, tx);
@@ -862,14 +862,36 @@ export default class JadwalService {
   private static async createPenilaianTx(
     tx: any,
     id_jadwal: string,
-    penilai: DosenAssignment[]
+    penilai: DosenAssignment[],
+    kodeJenisSeminar: string
   ) {
-    await tx.penilaian.createMany({
-      data: penilai.map((item) => ({
+    const penilaianData = penilai.map((item) => ({
+      id_jadwal,
+      nip: item.nip,
+      role: item.role,
+    }));
+
+    if (kodeJenisSeminar === 'SIDANG_PAPERBASED') {
+      const ketuaSidang = penilai.find(
+        (item) => item.role === PenilaiRole.TA_KETUA_SIDANG
+      );
+
+      if (!ketuaSidang) {
+        throw new APIError(
+          'Sidang paperbased membutuhkan ketua sidang untuk input nilai Artikel TA',
+          400
+        );
+      }
+
+      penilaianData.push({
         id_jadwal,
-        nip: item.nip,
-        role: item.role,
-      })),
+        nip: ketuaSidang.nip,
+        role: PenilaiRole.ARTIKEL_TA,
+      });
+    }
+
+    await tx.penilaian.createMany({
+      data: penilaianData,
     });
   }
 

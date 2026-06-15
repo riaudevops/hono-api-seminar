@@ -39,6 +39,7 @@ export default class KomponenPenilaianService {
       TA_PENGUJI_1: 'TA-C',
       TA_PENGUJI_2: 'TA-D',
       TA_KETUA_SIDANG: 'TA-E',
+      ARTIKEL_TA: 'TA-F',
     };
 
     return prefixMap[role];

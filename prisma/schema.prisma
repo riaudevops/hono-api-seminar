@@ -15,6 +15,7 @@ enum PenilaiRole {
   TA_PENGUJI_1
   TA_PENGUJI_2
   TA_KETUA_SIDANG
+  ARTIKEL_TA
 }
 
 enum LogActionType {
@@ -215,7 +216,7 @@ model penilaian {
 
   detail_penilaian detail_penilaian[]
 
-  @@unique([id_jadwal, nip])
+  @@unique([id_jadwal, nip, role])
   @@unique([id_jadwal, role])
   @@index([id_jadwal])
   @@index([nip])

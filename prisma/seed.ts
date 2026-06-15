@@ -491,18 +491,10 @@ async function main() {
         max_size_mb: 10,
       },
       {
-        kode: 'UNDANGAN_SEBELUMNYA',
-        nama: 'Undangan Seminar Sebelumnya',
-        deskripsi: 'Bukti telah mengikuti seminar hasil teman (syarat SEMPRO)',
-        tipe_input: 'FILE_UPLOAD',
-        format_file: 'pdf',
-        max_size_mb: 5,
-      },
-
-      {
         kode: 'MATA_KULIAH_PILIHAN',
         nama: 'Mata Kuliah Pilihan',
-        deskripsi: 'Pilih mata kuliah pilihan yang relevan dengan topik TA',
+        deskripsi:
+          'Pilih tepat 5 mata kuliah pilihan yang relevan dengan topik TA. Jika mata kuliah tidak tersedia di opsi, mahasiswa dapat menginput nama mata kuliah secara custom.',
         tipe_input: 'MULTI_SELECT',
         opsi: [
           'Kriptografi',
@@ -517,6 +509,13 @@ async function main() {
           'Internet of Things',
           'Natural Language Processing',
           'Computer Vision',
+          'Sistem Temu Kembali Informasi',
+          'Data Warehouse',
+          'Manajemen Proyek Perangkat Lunak',
+          'Interaksi Manusia dan Komputer',
+          'Pengolahan Bahasa Alami',
+          'Forensik Digital',
+          'Lainnya / Custom Input',
         ],
       },
     ],
@@ -550,6 +549,36 @@ async function main() {
       },
     }),
     prisma.dokumen_template.updateMany({
+      where: { kode: 'MATA_KULIAH_PILIHAN' },
+      data: {
+        nama: 'Mata Kuliah Pilihan',
+        deskripsi:
+          'Pilih tepat 5 mata kuliah pilihan yang relevan dengan topik TA. Jika mata kuliah tidak tersedia di opsi, mahasiswa dapat menginput nama mata kuliah secara custom.',
+        tipe_input: 'MULTI_SELECT',
+        opsi: [
+          'Kriptografi',
+          'Jaringan Komputer Lanjut',
+          'Machine Learning',
+          'Data Mining',
+          'Pemrosesan Citra Digital',
+          'Sistem Terdistribusi',
+          'Keamanan Informasi',
+          'Pengembangan Game',
+          'Cloud Computing',
+          'Internet of Things',
+          'Natural Language Processing',
+          'Computer Vision',
+          'Sistem Temu Kembali Informasi',
+          'Data Warehouse',
+          'Manajemen Proyek Perangkat Lunak',
+          'Interaksi Manusia dan Komputer',
+          'Pengolahan Bahasa Alami',
+          'Forensik Digital',
+          'Lainnya / Custom Input',
+        ],
+      },
+    }),
+    prisma.dokumen_template.updateMany({
       where: {
         kode: {
           in: [
@@ -578,6 +607,61 @@ async function main() {
       data: { max_size_mb: 1 },
     }),
   ]);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      INSERT INTO "requirement_dokumen" (
+        "id",
+        "id_jenis_seminar",
+        "id_dokumen_template",
+        "urutan",
+        "is_wajib",
+        "keterangan_tambahan"
+      )
+      SELECT
+        gen_random_uuid()::text,
+        req."id_jenis_seminar",
+        target."id",
+        req."urutan",
+        req."is_wajib",
+        req."keterangan_tambahan"
+      FROM "requirement_dokumen" req
+      JOIN "dokumen_template" source ON source."id" = req."id_dokumen_template"
+      JOIN "dokumen_template" target ON target."kode" = 'UNDANGAN_SEMINAR_SEBELUMNYA'
+      WHERE source."kode" = 'UNDANGAN_SEBELUMNYA'
+      ON CONFLICT ("id_jenis_seminar", "id_dokumen_template") DO NOTHING
+    `;
+
+    await tx.$executeRaw`
+      DELETE FROM "data_pendaftaran" old_data
+      USING "dokumen_template" source, "dokumen_template" target, "data_pendaftaran" target_data
+      WHERE source."kode" = 'UNDANGAN_SEBELUMNYA'
+        AND target."kode" = 'UNDANGAN_SEMINAR_SEBELUMNYA'
+        AND old_data."id_dokumen_template" = source."id"
+        AND target_data."id_pendaftaran" = old_data."id_pendaftaran"
+        AND target_data."id_dokumen_template" = target."id"
+    `;
+
+    await tx.$executeRaw`
+      UPDATE "data_pendaftaran" data
+      SET "id_dokumen_template" = target."id"
+      FROM "dokumen_template" source, "dokumen_template" target
+      WHERE source."kode" = 'UNDANGAN_SEBELUMNYA'
+        AND target."kode" = 'UNDANGAN_SEMINAR_SEBELUMNYA'
+        AND data."id_dokumen_template" = source."id"
+    `;
+
+    await tx.$executeRaw`
+      DELETE FROM "requirement_dokumen" req
+      USING "dokumen_template" source
+      WHERE source."kode" = 'UNDANGAN_SEBELUMNYA'
+        AND req."id_dokumen_template" = source."id"
+    `;
+
+    await tx.dokumen_template.deleteMany({
+      where: { kode: 'UNDANGAN_SEBELUMNYA' },
+    });
+  });
 
   const resultJenisSeminar = await prisma.jenis_seminar.createMany({
     data: [
@@ -661,61 +745,87 @@ async function main() {
     return id;
   };
 
-  const jenisPrefixMap: Record<string, string> = {
-    SEMP: 'SEMPRO',
-    SHL: 'SEMHAS_LAPORAN',
-    SHP: 'SEMHAS_PAPERBASED',
+  const sidangJenisPrefixMap: Record<string, string> = {
     SDL: 'SIDANG_LAPORAN',
     SDP: 'SIDANG_PAPERBASED',
   };
 
-  const defaultTaComponents = [
+  const sidangKomponenPembimbingPenguji = [
+    { nama: 'Sikap (Attitude) Presentasi', persentase: 9 },
+    { nama: 'Kemampuan Presentasi', persentase: 9 },
+    { nama: 'Penguasaan Terhadap Materi', persentase: 9 },
+    { nama: 'Urgensi terhadap masalah penelitian', persentase: 9 },
+    { nama: 'Relevansi referensi dengan judul penelitian', persentase: 8 },
+    {
+      nama: 'Kesesuaian metodologi penelitian dengan pembahasan',
+      persentase: 8,
+    },
+    {
+      nama: 'Teknik pengumpulan data sesuai Standar Laporan TA',
+      persentase: 8,
+    },
+    { nama: 'Tahapan analisa sesuai Standar Laporan TA', persentase: 8 },
+    { nama: 'Tahapan perancangan sesuai Standar Laporan TA', persentase: 8 },
+    { nama: 'Produk penelitian sesuai Standar Laporan TA', persentase: 8 },
+    { nama: 'Tahapan pengujian sesuai Standar Laporan TA', persentase: 8 },
+    {
+      nama: 'Hubungan permasalahan dengan hasil penelitian',
+      persentase: 8,
+    },
+  ] as const;
+
+  const sidangRoleComponents = [
+    {
+      role: 'TA_KETUA_SIDANG',
+      rolePrefix: 'TA-E',
+      components: [{ nama: 'Kompetensi Dasar Keislaman', persentase: 100 }],
+    },
     {
       role: 'TA_PEMBIMBING_1',
       rolePrefix: 'TA-A',
-      components: [
-        { nama: 'Kualitas Bimbingan dan Metodologi', persentase: 35 },
-        { nama: 'Penguasaan Materi Tugas Akhir', persentase: 35 },
-        { nama: 'Kualitas Dokumen Tugas Akhir', persentase: 30 },
-      ],
+      components: sidangKomponenPembimbingPenguji,
     },
     {
       role: 'TA_PEMBIMBING_2',
       rolePrefix: 'TA-B',
-      components: [
-        { nama: 'Kualitas Bimbingan Pendamping', persentase: 35 },
-        { nama: 'Penguasaan Materi Pendukung', persentase: 35 },
-        { nama: 'Kualitas Dokumen Pendukung', persentase: 30 },
-      ],
+      components: sidangKomponenPembimbingPenguji,
     },
     {
       role: 'TA_PENGUJI_1',
       rolePrefix: 'TA-C',
-      components: [
-        { nama: 'Penguasaan Materi', persentase: 40 },
-        { nama: 'Kualitas Analisis dan Solusi', persentase: 35 },
-        { nama: 'Teknik Presentasi', persentase: 25 },
-      ],
+      components: sidangKomponenPembimbingPenguji,
     },
     {
       role: 'TA_PENGUJI_2',
       rolePrefix: 'TA-D',
-      components: [
-        { nama: 'Penguasaan Materi', persentase: 40 },
-        { nama: 'Kualitas Analisis dan Solusi', persentase: 35 },
-        { nama: 'Teknik Presentasi', persentase: 25 },
-      ],
-    },
-    {
-      role: 'TA_KETUA_SIDANG',
-      rolePrefix: 'TA-E',
-      components: [
-        { nama: 'Tata Laksana Sidang', persentase: 40 },
-        { nama: 'Validasi Proses Akademik', persentase: 35 },
-        { nama: 'Rekapitulasi Keputusan Sidang', persentase: 25 },
-      ],
+      components: sidangKomponenPembimbingPenguji,
     },
   ] as const;
+
+  const taRoles = [
+    'TA_PEMBIMBING_1',
+    'TA_PEMBIMBING_2',
+    'TA_PENGUJI_1',
+    'TA_PENGUJI_2',
+    'TA_KETUA_SIDANG',
+    'ARTIKEL_TA',
+  ] as const;
+
+  // Hapus detail penilaian lama yang menggunakan komponen TA sebelumnya
+  await prisma.detail_penilaian.deleteMany({
+    where: {
+      komponen: {
+        role: { in: [...taRoles] },
+      },
+    },
+  });
+
+  // Hapus komponen TA lama supaya tidak tumpang tindih
+  await prisma.komponen_penilaian.deleteMany({
+    where: {
+      role: { in: [...taRoles] },
+    },
+  });
 
   const resultKomponenPenilaian = await prisma.komponen_penilaian.createMany({
     data: [
@@ -815,8 +925,8 @@ async function main() {
         role: 'KP_INSTANSI',
         id_jenis_seminar: getJenisId('SEMKP'),
       },
-      ...Object.entries(jenisPrefixMap).flatMap(([jenisPrefix, kode]) =>
-        defaultTaComponents.flatMap((roleConfig) =>
+      ...Object.entries(sidangJenisPrefixMap).flatMap(([jenisPrefix, kode]) =>
+        sidangRoleComponents.flatMap((roleConfig) =>
           roleConfig.components.map((component, index) => ({
             id: `${jenisPrefix}-${roleConfig.rolePrefix}-${String(index + 1).padStart(2, '0')}`,
             nama: component.nama,
@@ -827,6 +937,31 @@ async function main() {
           }))
         )
       ),
+      // Komponen artikel TA khusus SIDANG_PAPERBASED
+      {
+        id: 'SDP-TA-F-01',
+        nama: 'Kualitas Penulisan Artikel',
+        persentase: 35,
+        is_aktif: true,
+        role: 'ARTIKEL_TA',
+        id_jenis_seminar: getJenisId('SIDANG_PAPERBASED'),
+      },
+      {
+        id: 'SDP-TA-F-02',
+        nama: 'Kelengkapan Referensi dan Sitasi',
+        persentase: 35,
+        is_aktif: true,
+        role: 'ARTIKEL_TA',
+        id_jenis_seminar: getJenisId('SIDANG_PAPERBASED'),
+      },
+      {
+        id: 'SDP-TA-F-03',
+        nama: 'Kesesuaian Format Jurnal',
+        persentase: 30,
+        is_aktif: true,
+        role: 'ARTIKEL_TA',
+        id_jenis_seminar: getJenisId('SIDANG_PAPERBASED'),
+      },
     ],
     skipDuplicates: true,
   });
@@ -966,6 +1101,7 @@ async function main() {
     },
     { jenis: 'SIDANG_LAPORAN', dokumen: 'PAS_FOTO_4X6', urutan: 10 },
     { jenis: 'SIDANG_LAPORAN', dokumen: 'FILE_DIGITAL_TA', urutan: 11 },
+    { jenis: 'SIDANG_LAPORAN', dokumen: 'MATA_KULIAH_PILIHAN', urutan: 12 },
 
     {
       jenis: 'SIDANG_PAPERBASED',
@@ -1005,6 +1141,11 @@ async function main() {
     },
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'PAS_FOTO_4X6', urutan: 9 },
     { jenis: 'SIDANG_PAPERBASED', dokumen: 'FILE_DIGITAL_TA', urutan: 10 },
+    {
+      jenis: 'SIDANG_PAPERBASED',
+      dokumen: 'MATA_KULIAH_PILIHAN',
+      urutan: 11,
+    },
   ];
 
   const missingRefs = requirements.filter(
@@ -1060,7 +1201,8 @@ async function main() {
       | 'TA_PEMBIMBING_2'
       | 'TA_PENGUJI_1'
       | 'TA_PENGUJI_2'
-      | 'TA_KETUA_SIDANG';
+      | 'TA_KETUA_SIDANG'
+      | 'ARTIKEL_TA';
     persentase: number;
   };
 
@@ -1069,32 +1211,18 @@ async function main() {
     { jenis: 'SEMKP', role: 'KP_PENGUJI', persentase: 30 },
     { jenis: 'SEMKP', role: 'KP_INSTANSI', persentase: 40 },
 
-    { jenis: 'SEMPRO', role: 'TA_PEMBIMBING_1', persentase: 30 },
-    { jenis: 'SEMPRO', role: 'TA_PEMBIMBING_2', persentase: 20 },
-    { jenis: 'SEMPRO', role: 'TA_PENGUJI_1', persentase: 25 },
-    { jenis: 'SEMPRO', role: 'TA_PENGUJI_2', persentase: 25 },
-
-    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 30 },
-    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 20 },
-    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PENGUJI_1', persentase: 25 },
-    { jenis: 'SEMHAS_LAPORAN', role: 'TA_PENGUJI_2', persentase: 25 },
-
-    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 30 },
-    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 20 },
-    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 25 },
-    { jenis: 'SEMHAS_PAPERBASED', role: 'TA_PENGUJI_2', persentase: 25 },
-
-    { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 25 },
-    { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 20 },
-    { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_1', persentase: 22 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_KETUA_SIDANG', persentase: 8 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_1', persentase: 23 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PEMBIMBING_2', persentase: 23 },
+    { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_1', persentase: 23 },
     { jenis: 'SIDANG_LAPORAN', role: 'TA_PENGUJI_2', persentase: 23 },
-    { jenis: 'SIDANG_LAPORAN', role: 'TA_KETUA_SIDANG', persentase: 10 },
 
-    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 25 },
-    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 20 },
-    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 22 },
-    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_2', persentase: 23 },
-    { jenis: 'SIDANG_PAPERBASED', role: 'TA_KETUA_SIDANG', persentase: 10 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_KETUA_SIDANG', persentase: 5 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_1', persentase: 14 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PEMBIMBING_2', persentase: 14 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_1', persentase: 13 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'TA_PENGUJI_2', persentase: 14 },
+    { jenis: 'SIDANG_PAPERBASED', role: 'ARTIKEL_TA', persentase: 40 },
   ];
 
   const totalsPerJenis = bobotSeed.reduce<Record<string, number>>(
@@ -1122,6 +1250,12 @@ async function main() {
       missingJenisRefs
     );
   }
+
+  await prisma.bobot_penilai.deleteMany({
+    where: {
+      role: { in: [...taRoles] },
+    },
+  });
 
   const resultBobotPenilai = await prisma.bobot_penilai.createMany({
     data: bobotSeed

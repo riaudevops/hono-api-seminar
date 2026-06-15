@@ -37,6 +37,7 @@ const ROLE_TO_FRONTEND: Record<PenilaiRole, string> = {
   [PenilaiRole.TA_PENGUJI_2]: 'PENGUJI_2',
   [PenilaiRole.TA_KETUA_SIDANG]: 'KETUA_SIDANG',
   [PenilaiRole.KP_INSTANSI]: 'INSTANSI',
+  [PenilaiRole.ARTIKEL_TA]: 'ARTIKEL_TA',
 };
 
 const BIMBINGAN_ROLES: PenilaiRole[] = [

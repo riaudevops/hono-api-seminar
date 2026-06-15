@@ -2,7 +2,7 @@ import PenilaianRepository from './penilaian.repository';
 import { JadwalRepository, type LogJadwalContext } from '../jadwal';
 import { APIError } from '../../utils/api-error.util';
 import prisma from '../../infrastructures/db.infrastructure';
-import { LogActionType } from '@prisma/client';
+import { LogActionType, LogActorType, PenilaiRole } from '@prisma/client';
 import { LogService } from '../log';
 
 export interface SubmitPenilaianItem {
@@ -77,7 +77,25 @@ export default class PenilaianService {
       );
     }
 
-    if (penilaian.nip !== nip) {
+    const isKoordinator = context.actor_type === LogActorType.KOORDINATOR;
+
+    if (penilaian.role === PenilaiRole.ARTIKEL_TA) {
+      const ketuaSidang = await prisma.penilaian.findFirst({
+        where: {
+          id_jadwal: penilaian.id_jadwal,
+          role: PenilaiRole.TA_KETUA_SIDANG,
+        },
+        select: { nip: true },
+      });
+
+      const isKetuaSidang = ketuaSidang?.nip === nip;
+      if (!isKoordinator && !isKetuaSidang) {
+        throw new APIError(
+          'Nilai Artikel TA hanya dapat diisi oleh ketua sidang atau koordinator.',
+          403
+        );
+      }
+    } else if (penilaian.nip !== nip) {
       throw new APIError('Anda tidak berhak mengisi penilaian ini.', 403);
     }
 

@@ -41,19 +41,16 @@ export default class PenilaianHandler {
     const data = await c.req.json();
 
     const userPayload = c.get('user');
-    if (
-      !userPayload ||
-      typeof userPayload !== 'object' ||
-      !('nip' in userPayload)
-    ) {
+    if (!userPayload || typeof userPayload !== 'object') {
+      throw new APIError('Informasi otentikasi tidak valid.', 403);
+    }
+
+    const context = LogService.getActorContext(userPayload as any);
+    const nip = 'nip' in userPayload ? (userPayload.nip as string) : '';
+
+    if (context.actor_type === LogActorType.DOSEN && !nip) {
       throw new APIError('Informasi otentikasi Dosen tidak valid.', 403);
     }
-    const nip = userPayload.nip as string;
-
-    const context = {
-      actor_id: nip,
-      actor_type: LogActorType.DOSEN,
-    };
 
     return c.json(
       await PenilaianService.submitPenilaian(id, nip, data.details, context)
