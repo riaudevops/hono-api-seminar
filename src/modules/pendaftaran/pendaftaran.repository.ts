@@ -212,6 +212,17 @@ export default class PendaftaranRepository {
     });
   }
 
+  public static async findJadwalKelulusanByNimJenisSeminarTahunAjaran(
+    nim: string,
+    id_jenis_seminar: string,
+    kode_tahun_ajaran: string
+  ) {
+    return prisma.jadwal.findFirst({
+      where: { nim, id_jenis_seminar, kode_tahun_ajaran },
+      select: { id: true, status_kelulusan: true },
+    });
+  }
+
   public static async findMahasiswaByEmail(email: string) {
     return prisma.mahasiswa.findUnique({ where: { email } });
   }

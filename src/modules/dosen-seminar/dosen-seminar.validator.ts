@@ -20,6 +20,11 @@ export const submitNilaiSchema = z
     { message: 'Semua item penilaian harus dari dosen yang sama (NIP sama)' }
   );
 
+export const getKomponenPenilaianSayaQuerySchema = z.object({
+  id_jenis_seminar: z.string().min(1, 'ID jenis seminar wajib diisi'),
+  jadwal_id: z.string().min(1, 'ID jadwal wajib diisi'),
+});
+
 export const postConstraintSchema = z
   .object({
     type: z.enum([

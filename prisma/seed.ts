@@ -515,7 +515,6 @@ async function main() {
           'Interaksi Manusia dan Komputer',
           'Pengolahan Bahasa Alami',
           'Forensik Digital',
-          'Lainnya / Custom Input',
         ],
       },
     ],
@@ -750,6 +749,30 @@ async function main() {
     SDP: 'SIDANG_PAPERBASED',
   };
 
+  const sidangKomponenPembimbing1 = [
+    { nama: 'Sikap (Attitude) Presentasi', persentase: 9 },
+    { nama: 'Kemampuan Presentasi', persentase: 9 },
+    { nama: 'Penguasaan Terhadap Materi', persentase: 9 },
+    { nama: 'Urgensi terhadap masalah penelitian', persentase: 9 },
+    { nama: 'Relevansi referensi dengan judul penelitian', persentase: 8 },
+    {
+      nama: 'Kesesuaian metodologi penelitian dengan pembahasan',
+      persentase: 8,
+    },
+    {
+      nama: 'Teknik pengumpulan data sesuai Standar Laporan TA',
+      persentase: 8,
+    },
+    { nama: 'Tahapan analisa sesuai Standar Laporan TA', persentase: 8 },
+    { nama: 'Tahapan perancangan sesuai Standar Laporan TA', persentase: 8 },
+    { nama: 'Produk penelitian sesuai Standar Laporan TA', persentase: 8 },
+    { nama: 'Tahapan pengujian sesuai Standar Laporan TA', persentase: 8 },
+    {
+      nama: 'Hubungan permasalahan dengan hasil penelitian',
+      persentase: 8,
+    },
+  ];
+
   const sidangKomponenPembimbingPenguji = [
     { nama: 'Sikap (Attitude) Presentasi', persentase: 9 },
     { nama: 'Kemampuan Presentasi', persentase: 9 },
@@ -783,7 +806,7 @@ async function main() {
     {
       role: 'TA_PEMBIMBING_1',
       rolePrefix: 'TA-A',
-      components: sidangKomponenPembimbingPenguji,
+      components: sidangKomponenPembimbing1,
     },
     {
       role: 'TA_PEMBIMBING_2',

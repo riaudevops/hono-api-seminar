@@ -37,10 +37,10 @@ describe('komponen penilaian validator — jenis seminar + role', () => {
     expect(result.success).toBe(true);
   });
 
-  test('query list menerima filter id_jenis_seminar', () => {
+  test('query list menerima filter jenis_seminar', () => {
     const result = getAllKomponenPenilaianQuerySchema.safeParse({
       role: PenilaiRole.TA_PENGUJI_1,
-      id_jenis_seminar: 'jenis-seminar-1',
+      jenis_seminar: 'SIDANG_LAPORAN',
       is_aktif: 'true',
     });
 
@@ -50,9 +50,9 @@ describe('komponen penilaian validator — jenis seminar + role', () => {
     }
   });
 
-  test('query role menerima filter id_jenis_seminar', () => {
+  test('query role menerima filter jenis_seminar', () => {
     const result = getKomponenByRoleQuerySchema.safeParse({
-      id_jenis_seminar: 'jenis-seminar-1',
+      jenis_seminar: 'SIDANG_LAPORAN',
     });
 
     expect(result.success).toBe(true);

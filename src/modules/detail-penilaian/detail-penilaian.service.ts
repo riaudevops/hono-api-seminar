@@ -31,26 +31,6 @@ export default class DetailPenilaianService {
     }
   }
 
-  private static assertJadwalSelesai(
-    penilaian: NonNullable<PenilaianWithDetails>
-  ) {
-    if (!penilaian.jadwal) {
-      throw new APIError('Jadwal penilaian tidak ditemukan', 404);
-    }
-
-    const now = JadwalHelper.getCurrentJakartaTime();
-    const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
-      penilaian.jadwal.waktu_selesai
-    );
-
-    if (now < waktuSelesai) {
-      throw new APIError(
-        'Penilaian hanya dapat dilakukan setelah seminar selesai',
-        400
-      );
-    }
-  }
-
   private static validateSubmittedComponents(
     role: PenilaiRole,
     details: DetailPenilaianItemInput[],
@@ -257,8 +237,6 @@ export default class DetailPenilaianService {
         404
       );
     }
-
-    DetailPenilaianService.assertJadwalSelesai(penilaian);
 
     const activeComponents =
       await DetailPenilaianRepository.findActiveComponentsByJenisAndRole(

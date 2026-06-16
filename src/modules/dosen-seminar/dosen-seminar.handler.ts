@@ -44,6 +44,20 @@ export default class DosenSeminarHandler {
     );
   }
 
+  public static async getKomponenPenilaianSaya(c: Context) {
+    const nip = await extractNip(c);
+    const query = c.req.query() as {
+      id_jenis_seminar?: string;
+      jadwal_id?: string;
+    };
+    return c.json(
+      await DosenSeminarService.getKomponenPenilaianSaya(nip, {
+        id_jenis_seminar: query.id_jenis_seminar ?? '',
+        jadwal_id: query.jadwal_id ?? '',
+      })
+    );
+  }
+
   public static async getPenilaianByJadwal(c: Context) {
     const jadwal_id = c.req.query('jadwal_id');
     if (!jadwal_id) {

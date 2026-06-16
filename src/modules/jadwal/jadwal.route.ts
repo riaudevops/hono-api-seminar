@@ -10,10 +10,12 @@ import {
   getJadwalLogsQuerySchema,
   getJadwalQuerySchema,
   jadwalIdParamSchema,
+  jadwalPenilaianRoleParamSchema,
   patchStatusKelulusanJadwalSchema,
   postJadwalSchema,
   putJadwalSchema,
 } from './jadwal.validator';
+import { submitPenilaianSchema } from '../penilaian/penilaian.validator';
 
 const jadwalRoute = new Hono({ router: new RegExpRouter() });
 
@@ -22,6 +24,13 @@ jadwalRoute.get(
   AuthMiddleware.JWTBearerTokenExtraction,
   zValidator('query', getJadwalDosenSayaQuerySchema, zodError),
   JadwalHandler.getJadwalDosenSaya
+);
+
+jadwalRoute.get(
+  '/dosen/jadwal-saya/:id',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('param', jadwalIdParamSchema, zodError),
+  JadwalHandler.getJadwalDosenSayaById
 );
 
 jadwalRoute.get(
@@ -63,6 +72,36 @@ jadwalRoute.get(
   zValidator('param', jadwalIdParamSchema, zodError),
   zValidator('query', getJadwalLogsQuerySchema, zodError),
   JadwalHandler.getLogs
+);
+
+jadwalRoute.get(
+  '/koordinator/jadwal/:id/penilaian',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('param', jadwalIdParamSchema, zodError),
+  JadwalHandler.getPenilaianByJadwal
+);
+
+jadwalRoute.post(
+  '/koordinator/jadwal/:id/penilaian/:role/submit',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  RateLimitMiddleware.write(),
+  zValidator('param', jadwalPenilaianRoleParamSchema, zodError),
+  zValidator('json', submitPenilaianSchema, zodError),
+  JadwalHandler.submitPenilaianByJadwalRole
+);
+
+jadwalRoute.get(
+  '/dosen/jadwal/penilaian/:id/detail',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('param', jadwalIdParamSchema, zodError),
+  JadwalHandler.getPenilaianByJadwal
+);
+
+jadwalRoute.get(
+  '/jadwal/:id/penilaian/detail',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  zValidator('param', jadwalIdParamSchema, zodError),
+  JadwalHandler.getPenilaianByJadwal
 );
 
 jadwalRoute.get(

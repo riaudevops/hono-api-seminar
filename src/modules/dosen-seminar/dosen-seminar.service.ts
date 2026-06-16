@@ -204,19 +204,104 @@ export default class DosenSeminarService {
   ) {
     const komponenList = await KomponenPenilaianRepository.findAktif(filters);
 
-    const data = komponenList.map((k) => ({
+    const data = komponenList.map((k: any) => ({
       id: k.id,
       nama_komponen: k.nama,
       bobot_persen: k.persentase,
       peran_penilai: [ROLE_TO_FRONTEND[k.role as PenilaiRole]],
       is_aktif: k.is_aktif,
       deskripsi: '',
+      id_jenis_seminar: k.id_jenis_seminar,
+      jenis_seminar: k.jenis_seminar
+        ? {
+            id: k.jenis_seminar.id,
+            kode: k.jenis_seminar.kode,
+            nama: k.jenis_seminar.nama,
+          }
+        : null,
     }));
 
     return {
       response: true,
       message: 'Berhasil mengambil komponen penilaian',
       data,
+    };
+  }
+
+  public static async getKomponenPenilaianSaya(
+    nip: string,
+    params: { id_jenis_seminar: string; jadwal_id: string }
+  ) {
+    const jadwal = await JadwalRepository.findById(params.jadwal_id);
+    if (!jadwal) {
+      throw new APIError(
+        `Jadwal dengan ID ${params.jadwal_id} tidak ditemukan`,
+        404
+      );
+    }
+
+    if (jadwal.id_jenis_seminar !== params.id_jenis_seminar) {
+      throw new APIError('ID jenis seminar tidak sesuai dengan jadwal', 400);
+    }
+
+    const penilaian = await PenilaianRepository.findByJadwalAndDosen(
+      params.jadwal_id,
+      nip
+    );
+    if (!penilaian) {
+      throw new APIError(
+        'Anda tidak ditugaskan sebagai penilai pada jadwal ini.',
+        403
+      );
+    }
+
+    const komponenList = await KomponenPenilaianRepository.findAktif({
+      id_jenis_seminar: params.id_jenis_seminar,
+      role: penilaian.role,
+    });
+
+    const komponen = komponenList.map((k: any) => ({
+      id: k.id,
+      nama_komponen: k.nama,
+      bobot_persen: k.persentase,
+      peran_penilai: [ROLE_TO_FRONTEND[k.role as PenilaiRole]],
+      is_aktif: k.is_aktif,
+      deskripsi: '',
+      id_jenis_seminar: k.id_jenis_seminar,
+      jenis_seminar: k.jenis_seminar
+        ? {
+            id: k.jenis_seminar.id,
+            kode: k.jenis_seminar.kode,
+            nama: k.jenis_seminar.nama,
+          }
+        : null,
+    }));
+    const totalPersentaseAktif = komponenList.reduce(
+      (total, item) => total + item.persentase,
+      0
+    );
+    const jenisSeminar = (jadwal as any).jenis_seminar
+      ? {
+          id: (jadwal as any).jenis_seminar.id,
+          kode: (jadwal as any).jenis_seminar.kode,
+          nama: (jadwal as any).jenis_seminar.nama,
+        }
+      : (komponen[0]?.jenis_seminar ?? null);
+
+    return {
+      response: true,
+      message: 'Berhasil mengambil komponen penilaian saya',
+      data: {
+        jadwal_id: params.jadwal_id,
+        dosen_nip: nip,
+        role: penilaian.role,
+        peran_dosen: ROLE_TO_FRONTEND[penilaian.role as PenilaiRole],
+        id_jenis_seminar: params.id_jenis_seminar,
+        jenis_seminar: jenisSeminar,
+        total_persentase_aktif: totalPersentaseAktif,
+        is_complete: totalPersentaseAktif === 100,
+        komponen,
+      },
     };
   }
 
@@ -228,8 +313,8 @@ export default class DosenSeminarService {
         p.detail_penilaian.map((d) => ({
           jadwal_id: p.id_jadwal,
           komponen_id: d.id_komponen,
-          dosen_nama: p.dosen.nama,
-          dosen_nip: p.dosen.nip,
+          dosen_nama: p.dosen?.nama ?? null,
+          dosen_nip: p.dosen?.nip ?? null,
           peran_dosen: ROLE_TO_FRONTEND[p.role as PenilaiRole],
           nilai: d.nilai,
           submitted_at: d.nilai != null ? new Date().toISOString() : null,
@@ -271,17 +356,6 @@ export default class DosenSeminarService {
     const jadwal = await JadwalRepository.findById(jadwal_id);
     if (!jadwal) {
       throw new APIError(`Jadwal dengan ID ${jadwal_id} tidak ditemukan`, 404);
-    }
-
-    const now = JadwalHelper.getCurrentJakartaTime();
-    const waktuSelesai = JadwalHelper.convertToJakartaTimezone(
-      jadwal.waktu_selesai
-    );
-    if (now < waktuSelesai) {
-      throw new APIError(
-        `Penilaian hanya dapat dilakukan setelah seminar selesai`,
-        400
-      );
     }
 
     const penilaianRecord = await PenilaianRepository.findByJadwalAndDosen(

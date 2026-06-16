@@ -208,11 +208,11 @@ model komponen_penilaian {
 model penilaian {
   id        String      @id @default(cuid())
   id_jadwal String
-  nip       String
+  nip       String?
   role      PenilaiRole
 
   jadwal jadwal @relation(fields: [id_jadwal], references: [id], onDelete: Restrict)
-  dosen  dosen  @relation(fields: [nip], references: [nip])
+  dosen  dosen? @relation(fields: [nip], references: [nip])
 
   detail_penilaian detail_penilaian[]
 

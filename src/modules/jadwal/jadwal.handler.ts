@@ -39,6 +39,12 @@ export default class JadwalHandler {
     );
   }
 
+  public static async getJadwalDosenSayaById(c: Context) {
+    const email = JadwalHandler.getEmail(c);
+    const { id } = c.req.param();
+    return c.json(await JadwalService.getJadwalDosenSayaById(email, id));
+  }
+
   public static async getStatistikDosenSaya(c: Context) {
     const email = JadwalHandler.getEmail(c);
     return c.json(await JadwalService.getStatistikDosenSaya(email));
@@ -73,6 +79,26 @@ export default class JadwalHandler {
         entity_id: id,
         ...query,
       })
+    );
+  }
+
+  public static async getPenilaianByJadwal(c: Context) {
+    const { id } = c.req.param();
+    return c.json(await JadwalService.getPenilaianByJadwal(id));
+  }
+
+  public static async submitPenilaianByJadwalRole(c: Context) {
+    const { id, role } = c.req.param();
+    const body = await c.req.json();
+    const context = LogService.getActorContext(JadwalHandler.getUserPayload(c));
+
+    return c.json(
+      await JadwalService.submitPenilaianByJadwalRole(
+        id,
+        role as any,
+        body.details,
+        context
+      )
     );
   }
 

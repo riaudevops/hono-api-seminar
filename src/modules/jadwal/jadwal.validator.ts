@@ -184,6 +184,13 @@ export const jadwalIdParamSchema = z.object({
   id: idSchema,
 });
 
+export const jadwalPenilaianRoleParamSchema = z.object({
+  id: idSchema,
+  role: z.nativeEnum(PenilaiRole, {
+    errorMap: () => ({ message: 'Role penilaian tidak valid' }),
+  }),
+});
+
 export const getJadwalDosenSayaQuerySchema = z.object({
   search: z.string().trim().optional(),
   jenis: kodeJenisSchema.optional(),

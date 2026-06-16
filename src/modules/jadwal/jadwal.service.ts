@@ -9,6 +9,7 @@ import {
   type StatusKelulusan,
 } from '@prisma/client';
 import JadwalRepository, { type JadwalFilter } from './jadwal.repository';
+import JadwalEmailService from './jadwal-email.service';
 import { APIError } from '../../utils/api-error.util';
 import type { DosenAssignment, LogJadwalContext } from './jadwal.type';
 import JadwalHelper from '../../helpers/jadwal.helper';
@@ -23,6 +24,7 @@ import PendaftaranRepository from '../pendaftaran/pendaftaran.repository';
 import prisma from '../../infrastructures/db.infrastructure';
 import redisService from '../../infrastructures/redis.infrastructure';
 import CacheInvalidation from '../../utils/cache-invalidation.util';
+import { LogService } from '../log';
 import { hashCacheKey } from '../../utils/cache-key.util';
 import googleCalendarService from '../../infrastructures/google-calendar.infrastructure';
 import WorkerJobService from '../worker-job/worker-job.service';
@@ -112,6 +114,18 @@ const KODE_TO_FRONTEND: Record<string, string> = {
   SIDANG_PAPERBASED: 'SIDANG_AKHIR',
 };
 
+const ROLE_TO_FRONTEND: Record<PenilaiRole, string> = {
+  [PenilaiRole.KP_PEMBIMBING]: 'PEMBIMBING_1',
+  [PenilaiRole.KP_PENGUJI]: 'PENGUJI_1',
+  [PenilaiRole.TA_PEMBIMBING_1]: 'PEMBIMBING_1',
+  [PenilaiRole.TA_PEMBIMBING_2]: 'PEMBIMBING_2',
+  [PenilaiRole.TA_PENGUJI_1]: 'PENGUJI_1',
+  [PenilaiRole.TA_PENGUJI_2]: 'PENGUJI_2',
+  [PenilaiRole.TA_KETUA_SIDANG]: 'KETUA_SIDANG',
+  [PenilaiRole.KP_INSTANSI]: 'INSTANSI',
+  [PenilaiRole.ARTIKEL_TA]: 'ARTIKEL_TA',
+};
+
 export default class JadwalService {
   public static async getJadwalMahasiswaSaya(email: string) {
     return redisService.remember(`jadwal:mahasiswa:${email}`, 300, async () => {
@@ -150,15 +164,13 @@ export default class JadwalService {
     params: GetJadwalDosenSayaParams = {}
   ) {
     return redisService.remember(
-      `jadwal:dosen:${email}:${hashCacheKey(params)}`,
+      `jadwal:dosen:ringkas:${email}:${hashCacheKey(params)}`,
       300,
       async () => {
         const jadwal = await JadwalRepository.findByDosenEmail(email);
         const jadwalWithPendaftaran =
           await JadwalService.attachPendaftaranDosen(jadwal);
-        let data = JadwalService.formatJadwalListTimezone(
-          jadwalWithPendaftaran
-        );
+        let data = jadwalWithPendaftaran;
 
         if (params.jenis) {
           data = data.filter(
@@ -173,15 +185,21 @@ export default class JadwalService {
         }
 
         if (params.tanggal_mulai) {
-          data = data.filter(
-            (item: any) => item.tanggal >= params.tanggal_mulai!
-          );
+          data = data.filter((item: any) => {
+            const tanggal = item.tanggal
+              ? JadwalHelper.formatDateInJakarta(item.tanggal)
+              : null;
+            return tanggal !== null && tanggal >= params.tanggal_mulai!;
+          });
         }
 
         if (params.tanggal_selesai) {
-          data = data.filter(
-            (item: any) => item.tanggal <= params.tanggal_selesai!
-          );
+          data = data.filter((item: any) => {
+            const tanggal = item.tanggal
+              ? JadwalHelper.formatDateInJakarta(item.tanggal)
+              : null;
+            return tanggal !== null && tanggal <= params.tanggal_selesai!;
+          });
         }
 
         if (params.kode_ruangan) {
@@ -214,21 +232,36 @@ export default class JadwalService {
           );
         }
 
+        let ringkasData = data.map((item: any) =>
+          JadwalService.formatJadwalDosenSayaRingkas(item, email)
+        );
+
         if (params.search) {
-          const fuse = new Fuse(data, {
+          const fuse = new Fuse(ringkasData, {
             threshold: 0.3,
             ignoreLocation: true,
-            keys: ['nim', 'mahasiswa.nim', 'mahasiswa.nama', 'mahasiswa.email'],
+            keys: [
+              'id',
+              'mahasiswa.nim',
+              'mahasiswa.nama',
+              'mahasiswa.email',
+              'dosen.role',
+              'dosen.peran_dosen',
+              'jenis_seminar.kode',
+              'jenis_seminar.nama',
+              'ruangan.kode',
+              'ruangan.nama',
+            ],
           });
-          data = fuse.search(params.search).map((result) => result.item);
+          ringkasData = fuse.search(params.search).map((result) => result.item);
         }
 
-        const total = data.length;
+        const total = ringkasData.length;
         const page = params.page ?? 1;
         const limit = params.limit ?? 10;
         const total_page = Math.ceil(total / limit);
         const start = (page - 1) * limit;
-        const paginatedData = data.slice(start, start + limit);
+        const paginatedData = ringkasData.slice(start, start + limit);
 
         return {
           response: true,
@@ -241,6 +274,55 @@ export default class JadwalService {
             limit,
             total,
             total_page,
+          },
+        };
+      }
+    );
+  }
+
+  public static async getJadwalDosenSayaById(email: string, id: string) {
+    return redisService.remember(
+      `jadwal:dosen:detail:${email}:${id}`,
+      300,
+      async () => {
+        const jadwal = await JadwalRepository.findById(id);
+
+        if (!jadwal) {
+          throw new APIError(`Jadwal dengan ID ${id} tidak ditemukan`, 404);
+        }
+
+        const penilaianLogin = JadwalService.findPenilaianDosenLogin(
+          jadwal,
+          email
+        );
+        if (!penilaianLogin) {
+          throw new APIError('Anda tidak memiliki akses ke jadwal ini', 403);
+        }
+
+        const [jadwalWithPendaftaran] =
+          await JadwalService.attachPendaftaranDosen([jadwal]);
+        const detail = JadwalService.formatJadwalDetailTimezone(
+          jadwalWithPendaftaran
+        );
+
+        return {
+          response: true,
+          message: 'Detail jadwal dosen berhasil diambil',
+          data: {
+            ...detail,
+            tahun_ajaran: detail?.kode_tahun_ajaran
+              ? TahunAjaranHelper.parseStringNameByCode(
+                  detail.kode_tahun_ajaran
+                )
+              : null,
+            angkatan: JadwalService.calculateAngkatanFromNim(
+              detail.mahasiswa?.nim ?? detail.nim
+            ),
+            semester: JadwalService.calculateSemesterFromNimAndTahunAjaran(
+              detail.mahasiswa?.nim ?? detail.nim,
+              detail.kode_tahun_ajaran
+            ),
+            dosen_login: JadwalService.formatDosenLoginRole(penilaianLogin),
           },
         };
       }
@@ -400,10 +482,178 @@ export default class JadwalService {
       throw new APIError('Jadwal tidak ditemukan', 404);
     }
 
+    const jadwalWithAllPenilaianRoles =
+      await JadwalService.attachAllPenilaianRoles(jadwal);
+
     return {
       response: true,
       message: 'Data jadwal berhasil diambil',
-      data: JadwalService.formatJadwalTimezone(jadwal),
+      data: JadwalService.formatJadwalTimezone(jadwalWithAllPenilaianRoles),
+    };
+  }
+
+  public static async getPenilaianByJadwal(id: string) {
+    const jadwal = await prisma.jadwal.findUnique({
+      where: { id },
+      include: {
+        mahasiswa: true,
+        jenis_seminar: true,
+        ruangan: true,
+      },
+    });
+
+    if (!jadwal) {
+      throw new APIError('Jadwal tidak ditemukan', 404);
+    }
+
+    const penilaianList = (await prisma.penilaian.findMany({
+      where: { id_jadwal: id },
+      include: {
+        dosen: true,
+        detail_penilaian: {
+          include: { komponen: true },
+        },
+      },
+      orderBy: { role: 'asc' },
+    })) as any[];
+
+    const penilaian = await JadwalService.buildAllPenilaianRoles(
+      jadwal.id_jenis_seminar,
+      penilaianList
+    );
+    const nilaiSummary = await JadwalService.buildNilaiSummary(
+      jadwal.id_jenis_seminar,
+      penilaian
+    );
+
+    if (!penilaian.length) {
+      throw new APIError(
+        `Jenis seminar pada jadwal ID ${id} belum memiliki komponen penilaian aktif.`,
+        404
+      );
+    }
+
+    return {
+      response: true,
+      message: 'Data penilaian jadwal berhasil diambil',
+      data: {
+        jadwal: JadwalService.formatJadwalTimezone(jadwal),
+        penilaian,
+        nilai_lengkap: nilaiSummary.nilai_lengkap,
+      },
+    };
+  }
+
+  public static async submitPenilaianByJadwalRole(
+    idJadwal: string,
+    role: PenilaiRole,
+    details: { id_komponen: string; nilai: number }[],
+    context: LogJadwalContext
+  ) {
+    if (context.actor_type !== LogActorType.KOORDINATOR) {
+      throw new APIError(
+        'Hanya koordinator yang dapat mengisi nilai role ini.',
+        403
+      );
+    }
+
+    const jadwal = await JadwalRepository.findById(idJadwal);
+    if (!jadwal) {
+      throw new APIError('Jadwal tidak ditemukan.', 404);
+    }
+
+    const activeComponents = await prisma.komponen_penilaian.findMany({
+      where: {
+        id_jenis_seminar: jadwal.id_jenis_seminar,
+        role,
+        is_aktif: true,
+      },
+    });
+
+    if (!activeComponents.length) {
+      throw new APIError(
+        `Komponen penilaian aktif untuk role ${role} pada jenis seminar ini tidak ditemukan.`,
+        404
+      );
+    }
+
+    const activeComponentIds = new Set(activeComponents.map((c) => c.id));
+    for (const item of details) {
+      if (!activeComponentIds.has(item.id_komponen)) {
+        throw new APIError(
+          `Komponen ${item.id_komponen} tidak valid atau tidak aktif untuk role ${role} pada jenis seminar ini`,
+          400
+        );
+      }
+    }
+
+    const idPenilaian = await prisma.$transaction(async (tx) => {
+      let penilaian = await tx.penilaian.findUnique({
+        where: {
+          id_jadwal_role: {
+            id_jadwal: idJadwal,
+            role,
+          },
+        },
+      });
+
+      if (!penilaian) {
+        penilaian = await tx.penilaian.create({
+          data: {
+            id_jadwal: idJadwal,
+            role,
+            nip: null,
+          } as any,
+        });
+      }
+
+      for (const item of details) {
+        const existing = await tx.detail_penilaian.findUnique({
+          where: {
+            id_penilaian_id_komponen: {
+              id_penilaian: penilaian.id,
+              id_komponen: item.id_komponen,
+            },
+          },
+        });
+
+        await tx.detail_penilaian.upsert({
+          where: {
+            id_penilaian_id_komponen: {
+              id_penilaian: penilaian.id,
+              id_komponen: item.id_komponen,
+            },
+          },
+          update: { nilai: item.nilai },
+          create: {
+            id_penilaian: penilaian.id,
+            id_komponen: item.id_komponen,
+            nilai: item.nilai,
+          },
+        });
+
+        await LogService.createPenilaianLogTx(tx, {
+          action: existing ? LogActionType.UPDATE : LogActionType.CREATE,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          id_jadwal: idJadwal,
+          id_komponen_penilaian: item.id_komponen,
+          old_nilai: existing ? existing.nilai : null,
+          new_nilai: item.nilai,
+        });
+      }
+
+      return penilaian.id;
+    });
+
+    return {
+      response: true,
+      message: 'Penilaian berhasil disimpan.',
+      data: {
+        id_penilaian: idPenilaian,
+        id_jadwal: idJadwal,
+        role,
+      },
     };
   }
 
@@ -512,12 +762,17 @@ export default class JadwalService {
 
     const googleCalendarJob =
       await JadwalService.enqueueGoogleCalendarInvitation(createdId, 'created');
+    const notificationEmailJob = await JadwalEmailService.enqueueById(
+      createdId,
+      'scheduled'
+    );
 
     return {
       response: true,
       message: 'Jadwal berhasil ditambahkan',
       data: jadwalWithTimezone,
       google_calendar: googleCalendarJob,
+      notification_email: notificationEmailJob,
     };
   }
 
@@ -540,12 +795,9 @@ export default class JadwalService {
         ? await JadwalService.validateJenisSeminar(data)
         : (existingJadwal.jenis_seminar as JenisSeminarConfig);
 
-    const finalPenilai =
-      data.penilai ??
-      existingJadwal.penilaian.map((item: any) => ({
-        nip: item.nip,
-        role: item.role,
-      }));
+    const finalPenilai = data.penilai
+      ? data.penilai
+      : JadwalService.getAssignablePenilai(existingJadwal.penilaian);
     JadwalService.validateUniquePenilaiAssignments(finalPenilai);
     await JadwalService.validatePenilai(finalPenilai, jenis);
 
@@ -722,11 +974,16 @@ export default class JadwalService {
     });
 
     await CacheInvalidation.invalidateJadwal();
+    const notificationEmailJob = await JadwalEmailService.enqueueById(
+      id,
+      'status_kelulusan_updated'
+    );
 
     return {
       response: true,
       message: 'Status kelulusan jadwal berhasil diperbarui',
       data: jadwalWithTimezone,
+      notification_email: notificationEmailJob,
     };
   }
 
@@ -868,6 +1125,25 @@ export default class JadwalService {
     return jenis;
   }
 
+  private static getAssignablePenilai(penilaian: any[]): DosenAssignment[] {
+    const assignableRoles = new Set<PenilaiRole>([
+      PenilaiRole.KP_PEMBIMBING,
+      PenilaiRole.KP_PENGUJI,
+      PenilaiRole.TA_PEMBIMBING_1,
+      PenilaiRole.TA_PEMBIMBING_2,
+      PenilaiRole.TA_PENGUJI_1,
+      PenilaiRole.TA_PENGUJI_2,
+      PenilaiRole.TA_KETUA_SIDANG,
+    ]);
+
+    return penilaian
+      .filter((item: any) => item.nip && assignableRoles.has(item.role))
+      .map((item: any) => ({
+        nip: item.nip,
+        role: item.role,
+      }));
+  }
+
   private static validateUniquePenilaiAssignments(penilai: DosenAssignment[]) {
     const duplicatedNip = penilai.find(
       (item, index) =>
@@ -945,18 +1221,13 @@ export default class JadwalService {
         (item) => item.role === PenilaiRole.TA_KETUA_SIDANG
       );
 
-      if (!ketuaSidang) {
-        throw new APIError(
-          'Sidang paperbased membutuhkan ketua sidang untuk input nilai Artikel TA',
-          400
-        );
+      if (ketuaSidang) {
+        penilaianData.push({
+          id_jadwal,
+          nip: ketuaSidang.nip,
+          role: PenilaiRole.ARTIKEL_TA,
+        });
       }
-
-      penilaianData.push({
-        id_jadwal,
-        nip: ketuaSidang.nip,
-        role: PenilaiRole.ARTIKEL_TA,
-      });
     }
 
     await tx.penilaian.createMany({
@@ -1058,9 +1329,9 @@ export default class JadwalService {
       );
     }
 
-    if (jenis.ada_ketua_sidang && ketuaCount !== 1) {
+    if (jenis.ada_ketua_sidang && ketuaCount > 1) {
       throw new APIError(
-        `Jenis seminar ${jenis.kode} membutuhkan 1 ketua sidang`,
+        `Jenis seminar ${jenis.kode} maksimal memiliki 1 ketua sidang`,
         400
       );
     }
@@ -1087,8 +1358,79 @@ export default class JadwalService {
     return ruangan;
   }
 
-  private static formatJadwalListTimezone(jadwal: any[]) {
-    return jadwal.map((item) => JadwalService.formatJadwalTimezone(item));
+  private static findPenilaianDosenLogin(jadwal: any, email: string) {
+    if (!Array.isArray(jadwal?.penilaian)) {
+      return null;
+    }
+
+    return (
+      jadwal.penilaian.find(
+        (item: any) => item?.dosen?.email?.toLowerCase() === email.toLowerCase()
+      ) ?? null
+    );
+  }
+
+  private static formatDosenLoginRole(penilaian: any) {
+    if (!penilaian) {
+      return null;
+    }
+
+    return {
+      nip: penilaian.nip ?? penilaian.dosen?.nip ?? null,
+      nama: penilaian.dosen?.nama ?? null,
+      email: penilaian.dosen?.email ?? null,
+      role: penilaian.role,
+      peran_dosen: ROLE_TO_FRONTEND[penilaian.role as PenilaiRole],
+    };
+  }
+
+  private static formatJadwalDosenSayaRingkas(jadwal: any, email: string) {
+    const penilaianLogin = JadwalService.findPenilaianDosenLogin(jadwal, email);
+    const jenisKode = jadwal?.jenis_seminar?.kode ?? null;
+
+    return {
+      id: jadwal.id,
+      mahasiswa: jadwal.mahasiswa
+        ? {
+            nim: jadwal.mahasiswa.nim,
+            nama: jadwal.mahasiswa.nama,
+            email: jadwal.mahasiswa.email,
+          }
+        : {
+            nim: jadwal.nim ?? null,
+            nama: null,
+            email: null,
+          },
+      dosen: JadwalService.formatDosenLoginRole(penilaianLogin),
+      jenis_seminar: jadwal.jenis_seminar
+        ? {
+            id: jadwal.jenis_seminar.id,
+            kode: jadwal.jenis_seminar.kode,
+            nama: jadwal.jenis_seminar.nama,
+            label: jenisKode ? KODE_TO_FRONTEND[jenisKode] || jenisKode : null,
+          }
+        : null,
+      tanggal: jadwal?.tanggal
+        ? JadwalHelper.formatDateInJakarta(jadwal.tanggal)
+        : null,
+      waktu_mulai: jadwal?.waktu_mulai
+        ? JadwalHelper.formatTimeInJakarta(jadwal.waktu_mulai)
+        : null,
+      waktu_selesai: jadwal?.waktu_selesai
+        ? JadwalHelper.formatTimeInJakarta(jadwal.waktu_selesai)
+        : null,
+      ruangan: jadwal.ruangan
+        ? {
+            kode: jadwal.ruangan.kode,
+            nama: jadwal.ruangan.nama,
+          }
+        : null,
+      status_kelulusan: jadwal.status_kelulusan,
+      kode_tahun_ajaran: jadwal.kode_tahun_ajaran,
+      tahun_ajaran_nama: jadwal?.kode_tahun_ajaran
+        ? TahunAjaranHelper.parseStringNameByCode(jadwal.kode_tahun_ajaran)
+        : null,
+    };
   }
 
   private static formatJadwalListRingkas(jadwal: any[]) {
@@ -1189,6 +1531,213 @@ export default class JadwalService {
     });
   }
 
+  private static async attachAllPenilaianRoles(jadwal: any) {
+    const penilaian = await JadwalService.buildAllPenilaianRoles(
+      jadwal.id_jenis_seminar,
+      jadwal.penilaian ?? []
+    );
+    const nilaiSummary = await JadwalService.buildNilaiSummary(
+      jadwal.id_jenis_seminar,
+      penilaian
+    );
+
+    return {
+      ...jadwal,
+      penilaian,
+      nilai_lengkap: nilaiSummary.nilai_lengkap,
+    };
+  }
+
+  private static async buildNilaiSummary(
+    idJenisSeminar: string,
+    penilaian: any[]
+  ) {
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const getNilaiHuruf = (nilai: number | null) => {
+      if (nilai == null) return null;
+      if (nilai >= 85) return 'A';
+      if (nilai >= 80) return 'A-';
+      if (nilai >= 75) return 'B+';
+      if (nilai >= 70) return 'B';
+      if (nilai >= 65) return 'B-';
+      if (nilai >= 60) return 'C+';
+      if (nilai >= 55) return 'C';
+      if (nilai >= 50) return 'D';
+      return 'E';
+    };
+    const nilaiFull = penilaian.map((item) => {
+      const totalPersentaseKomponen = (item.komponen ?? []).reduce(
+        (sum: number, komponen: any) => sum + (komponen.persentase ?? 0),
+        0
+      );
+      const totalPersentaseDinilai = (item.komponen ?? []).reduce(
+        (sum: number, komponen: any) =>
+          komponen.nilai != null ? sum + (komponen.persentase ?? 0) : sum,
+        0
+      );
+      const nilaiKalkulasi = (item.komponen ?? []).reduce(
+        (sum: number, komponen: any) =>
+          komponen.nilai != null
+            ? sum + komponen.nilai * ((komponen.persentase ?? 0) / 100)
+            : sum,
+        0
+      );
+
+      return {
+        id_penilaian: item.id_penilaian,
+        role: item.role,
+        nip: item.nip,
+        dosen: item.dosen,
+        has_penilaian: item.has_penilaian,
+        status: item.status,
+        total_persentase_komponen: totalPersentaseKomponen,
+        total_persentase_dinilai: totalPersentaseDinilai,
+        is_komponen_lengkap:
+          totalPersentaseKomponen > 0 &&
+          totalPersentaseDinilai >= totalPersentaseKomponen,
+        nilai_kalkulasi:
+          totalPersentaseDinilai > 0 ? round(nilaiKalkulasi) : null,
+        nilai_akhir: item.nilai_akhir != null ? round(item.nilai_akhir) : null,
+      };
+    });
+
+    const bobotList = await prisma.bobot_penilai.findMany({
+      where: { id_jenis_seminar: idJenisSeminar },
+      orderBy: { role: 'asc' },
+    });
+    const nilaiByRole = new Map<PenilaiRole, (typeof nilaiFull)[number]>(
+      nilaiFull.map((item) => [item.role as PenilaiRole, item])
+    );
+
+    let totalNilai = 0;
+    let totalBobot = 0;
+    const detail = bobotList.map((bobot) => {
+      const nilaiRole = nilaiByRole.get(bobot.role);
+      const nilaiKalkulasi = nilaiRole?.nilai_kalkulasi ?? null;
+      const kontribusi =
+        nilaiKalkulasi != null
+          ? round(nilaiKalkulasi * (bobot.persentase / 100))
+          : null;
+
+      totalBobot += bobot.persentase;
+      if (kontribusi != null) totalNilai += kontribusi;
+
+      return {
+        id_bobot_penilai: bobot.id,
+        role: bobot.role,
+        bobot_persentase: bobot.persentase,
+        id_penilaian: nilaiRole?.id_penilaian ?? null,
+        has_penilaian: nilaiRole?.has_penilaian ?? false,
+        status: nilaiRole?.status ?? 'Belum Ada Penilai',
+        nilai_role: nilaiKalkulasi,
+        kontribusi_nilai: kontribusi,
+      };
+    });
+
+    const totalNilaiAkhir = detail.length ? round(totalNilai) : null;
+
+    return {
+      nilai_lengkap: {
+        total_nilai: totalNilaiAkhir,
+        nilai_huruf: getNilaiHuruf(totalNilaiAkhir),
+        total_bobot_persentase: totalBobot,
+        is_bobot_lengkap: totalBobot === 100,
+        detail,
+      },
+    };
+  }
+
+  private static async buildAllPenilaianRoles(
+    idJenisSeminar: string,
+    penilaianList: any[]
+  ) {
+    const komponenList = await prisma.komponen_penilaian.findMany({
+      where: {
+        id_jenis_seminar: idJenisSeminar,
+        is_aktif: true,
+      },
+      orderBy: [{ role: 'asc' }, { id: 'asc' }],
+    });
+
+    const roles = Array.from(new Set(komponenList.map((item) => item.role)));
+    const komponenByRole = new Map<PenilaiRole, typeof komponenList>();
+    for (const role of roles) {
+      komponenByRole.set(
+        role,
+        komponenList.filter((komponen) => komponen.role === role)
+      );
+    }
+
+    const penilaianByRole = new Map<PenilaiRole, any>(
+      penilaianList.map((item) => [item.role, item])
+    );
+
+    return roles.map((role) => {
+      const item = penilaianByRole.get(role);
+      const detailPenilaian = item?.detail_penilaian ?? [];
+      const nilaiByKomponen = new Map<string, any>(
+        detailPenilaian.map((detail: any) => [detail.id_komponen, detail])
+      );
+      let nilaiAkhir = 0;
+      let totalPersentaseDinilai = 0;
+
+      const komponen = (komponenByRole.get(role) ?? []).map((komponenItem) => {
+        const detail = nilaiByKomponen.get(komponenItem.id);
+        if (detail) {
+          nilaiAkhir += detail.nilai * (komponenItem.persentase / 100);
+          totalPersentaseDinilai += komponenItem.persentase;
+        }
+
+        return {
+          id: komponenItem.id,
+          nama: komponenItem.nama,
+          persentase: komponenItem.persentase,
+          is_aktif: komponenItem.is_aktif,
+          nilai: detail?.nilai ?? null,
+          catatan: detail?.catatan ?? null,
+          id_detail_penilaian: detail?.id ?? null,
+        };
+      });
+
+      return {
+        id: item?.id ?? null,
+        id_penilaian: item?.id ?? null,
+        id_jadwal: item?.id_jadwal ?? null,
+        role,
+        nip: item?.nip ?? null,
+        dosen: item?.dosen
+          ? {
+              nip: item.dosen.nip,
+              nama: item.dosen.nama,
+              email: item.dosen.email,
+              no_hp: item.dosen.no_hp,
+            }
+          : null,
+        has_penilaian: Boolean(item),
+        status: !item
+          ? 'Belum Ada Penilai'
+          : detailPenilaian.length
+            ? 'Sudah Dinilai'
+            : 'Belum Dinilai',
+        nilai_akhir:
+          totalPersentaseDinilai > 0
+            ? (nilaiAkhir / totalPersentaseDinilai) * 100
+            : null,
+        detail_penilaian: detailPenilaian,
+        komponen,
+      };
+    });
+  }
+
+  private static calculateAngkatanFromNim(nim?: string) {
+    if (!nim || nim.length < 3) {
+      return null;
+    }
+
+    const angkatan = Number(`20${nim.slice(1, 3)}`);
+    return Number.isNaN(angkatan) ? null : angkatan;
+  }
+
   private static calculateSemesterFromNimAndTahunAjaran(
     nim?: string,
     tahunAjaran?: string
@@ -1197,11 +1746,11 @@ export default class JadwalService {
       return null;
     }
 
-    const angkatan = Number(`20${nim.slice(1, 3)}`);
+    const angkatan = JadwalService.calculateAngkatanFromNim(nim);
     const tahunMulaiAjaran = Number(tahunAjaran.slice(0, 4));
     const semesterTahunAjaran = Number(tahunAjaran.slice(4));
     if (
-      Number.isNaN(angkatan) ||
+      angkatan === null ||
       Number.isNaN(tahunMulaiAjaran) ||
       ![1, 2].includes(semesterTahunAjaran)
     ) {

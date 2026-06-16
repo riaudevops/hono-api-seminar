@@ -398,6 +398,12 @@ export default class PendaftaranService {
 
     const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
 
+    await PendaftaranService.assertBelumLulusSeminar(
+      mahasiswa.nim,
+      payload.id_jenis_seminar,
+      kode_tahun_ajaran
+    );
+
     const alreadyRegistered =
       await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
         mahasiswa.nim,
@@ -504,6 +510,12 @@ export default class PendaftaranService {
       );
       if (!exists) throw new APIError('Seminar tidak ditemukan.', 404);
 
+      await PendaftaranService.assertBelumLulusSeminar(
+        mahasiswa.nim,
+        payload.id_jenis_seminar,
+        existing.kode_tahun_ajaran
+      );
+
       const alreadyRegistered =
         await PendaftaranRepository.findByNimJenisSeminarTahunAjaran(
           mahasiswa.nim,
@@ -557,6 +569,26 @@ export default class PendaftaranService {
   // ===========================================================================
   // Private helpers
   // ===========================================================================
+  private static async assertBelumLulusSeminar(
+    nim: string,
+    idJenisSeminar: string,
+    kodeTahunAjaran: string
+  ) {
+    const jadwal =
+      await PendaftaranRepository.findJadwalKelulusanByNimJenisSeminarTahunAjaran(
+        nim,
+        idJenisSeminar,
+        kodeTahunAjaran
+      );
+
+    if (jadwal?.status_kelulusan === 'LULUS') {
+      throw new APIError(
+        `Anda sudah lulus seminar ini di tahun ajaran ${TahunAjaranHelper.parseStringNameByCode(kodeTahunAjaran)}, sehingga tidak dapat mendaftar ulang.`,
+        409
+      );
+    }
+  }
+
   private static async ensureForeignKeysExist(
     payload: CreatePendaftaranByMahasiswaType
   ) {

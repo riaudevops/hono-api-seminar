@@ -61,6 +61,24 @@ export default class KomponenPenilaianService {
     return jenis;
   }
 
+  private static async resolveJenisSeminarIdByKode(
+    kode: string
+  ): Promise<string> {
+    const jenis = await prisma.jenis_seminar.findUnique({
+      where: { kode },
+      select: { id: true },
+    });
+
+    if (!jenis) {
+      throw new APIError(
+        `Jenis seminar dengan kode ${kode} tidak ditemukan`,
+        404
+      );
+    }
+
+    return jenis.id;
+  }
+
   private static buildJenisPrefix(kode: string) {
     const explicitPrefix: Record<string, string> = {
       SEMKP: 'SEMKP',
@@ -119,18 +137,24 @@ export default class KomponenPenilaianService {
   public static async getAll(
     filters: {
       role?: PenilaiRole;
-      id_jenis_seminar?: string;
+      jenis_seminar?: string;
       is_aktif?: boolean;
     } = {}
   ) {
-    const cacheKey = `komponen-penilaian:list:${hashCacheKey(filters)}`;
+    let idJenisSeminar: string | undefined;
+    if (filters.jenis_seminar) {
+      idJenisSeminar =
+        await KomponenPenilaianService.resolveJenisSeminarIdByKode(
+          filters.jenis_seminar
+        );
+    }
+
+    const cacheKey = `komponen-penilaian:list:${hashCacheKey({ ...filters, jenis_seminar: filters.jenis_seminar })}`;
     return redisService.remember(cacheKey, 1_800, async () => {
       const komponen = await prisma.komponen_penilaian.findMany({
         where: {
           ...(filters.role ? { role: filters.role } : {}),
-          ...(filters.id_jenis_seminar
-            ? { id_jenis_seminar: filters.id_jenis_seminar }
-            : {}),
+          ...(idJenisSeminar ? { id_jenis_seminar: idJenisSeminar } : {}),
           ...(filters.is_aktif !== undefined
             ? { is_aktif: filters.is_aktif }
             : {}),
@@ -160,17 +184,23 @@ export default class KomponenPenilaianService {
    */
   public static async getByRole(
     role: PenilaiRole,
-    options: { is_aktif?: boolean; id_jenis_seminar?: string } = {}
+    options: { is_aktif?: boolean; jenis_seminar?: string } = {}
   ) {
+    let idJenisSeminar: string | undefined;
+    if (options.jenis_seminar) {
+      idJenisSeminar =
+        await KomponenPenilaianService.resolveJenisSeminarIdByKode(
+          options.jenis_seminar
+        );
+    }
+
     const cacheKey = `komponen-penilaian:by-role:${role}:${hashCacheKey(options)}`;
     return redisService.remember(cacheKey, 1_800, async () => {
       const includeAll = options.is_aktif === false;
       const komponen = await prisma.komponen_penilaian.findMany({
         where: {
           role,
-          ...(options.id_jenis_seminar
-            ? { id_jenis_seminar: options.id_jenis_seminar }
-            : {}),
+          ...(idJenisSeminar ? { id_jenis_seminar: idJenisSeminar } : {}),
           ...(includeAll ? {} : { is_aktif: true }),
         },
         include: {
@@ -194,13 +224,14 @@ export default class KomponenPenilaianService {
         message: `Data komponen penilaian untuk role ${role} berhasil diambil`,
         data: {
           role,
-          id_jenis_seminar: options.id_jenis_seminar,
+          jenis_seminar: options.jenis_seminar,
+          id_jenis_seminar: idJenisSeminar,
           komponen,
-          total_persentase_aktif: options.id_jenis_seminar
-            ? (totalByJenis[options.id_jenis_seminar] ?? 0)
+          total_persentase_aktif: idJenisSeminar
+            ? (totalByJenis[idJenisSeminar] ?? 0)
             : totalByJenis,
-          is_complete: options.id_jenis_seminar
-            ? (totalByJenis[options.id_jenis_seminar] ?? 0) === 100
+          is_complete: idJenisSeminar
+            ? (totalByJenis[idJenisSeminar] ?? 0) === 100
             : Object.values(totalByJenis).every((total) => total === 100),
         },
       };

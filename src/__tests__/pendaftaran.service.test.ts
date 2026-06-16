@@ -12,7 +12,9 @@ let mockMahasiswa: any = null;
 let mockPengajuanFst: any = null;
 let mockExistingPendaftaran: any = null;
 let mockPendaftaranById: any = null;
+let mockJadwalKelulusan: any = null;
 let mockCreatedData: any = null;
+let mockUpdatedData: any = null;
 let mockDeletedId: string | null = null;
 let mockValidatedId: string | null = null;
 let mockValidatedPayload: any = null;
@@ -44,10 +46,16 @@ mock.module('../modules/pendaftaran/pendaftaran.repository', () => ({
     },
     findByNimJenisSeminarTahunAjaran: () =>
       Promise.resolve(mockExistingPendaftaran),
+    findJadwalKelulusanByNimJenisSeminarTahunAjaran: () =>
+      Promise.resolve(mockJadwalKelulusan),
     findById: () => Promise.resolve(mockPendaftaranById),
     createWithDataDokumen: (data: any) => {
       mockCreatedData = data;
       return Promise.resolve(data);
+    },
+    update: (id: string, data: any) => {
+      mockUpdatedData = { ...mockPendaftaranById, ...data, id };
+      return Promise.resolve(mockUpdatedData);
     },
     updateStatusBerkas: (id: string, data: any) => {
       mockValidatedId = id;
@@ -124,7 +132,9 @@ function resetState() {
   mockPengajuanFst = null;
   mockExistingPendaftaran = null;
   mockPendaftaranById = null;
+  mockJadwalKelulusan = null;
   mockCreatedData = null;
+  mockUpdatedData = null;
   mockDeletedId = null;
   mockValidatedId = null;
   mockValidatedPayload = null;
@@ -219,11 +229,15 @@ describe('PendaftaranService.createByMahasiswa', () => {
     ).rejects.toThrow('Anda sudah mendaftar seminar ini');
   });
 
-  test('BOLEH daftar lagi jika status APPROVED + SUDAH_JADWAL', async () => {
+  test('BOLEH daftar lagi jika status APPROVED + SUDAH_JADWAL dan belum LULUS', async () => {
     mockMahasiswa = DEFAULT_MAHASISWA;
     mockExistingPendaftaran = {
       status_berkas: 'APPROVED',
       status_jadwal: 'SUDAH_JADWAL',
+    };
+    mockJadwalKelulusan = {
+      id: 'JADWAL-001',
+      status_kelulusan: 'TIDAK_LULUS',
     };
 
     const result = await PendaftaranService.createByMahasiswa('budi@mail.com', {
@@ -233,6 +247,25 @@ describe('PendaftaranService.createByMahasiswa', () => {
 
     expect(result.response).toBe(true);
     expect(result.message).toContain('berhasil ditambahkan');
+  });
+
+  test('throw 409 jika jadwal seminar yang sama sudah LULUS', async () => {
+    mockMahasiswa = DEFAULT_MAHASISWA;
+    mockExistingPendaftaran = {
+      status_berkas: 'APPROVED',
+      status_jadwal: 'SUDAH_JADWAL',
+    };
+    mockJadwalKelulusan = {
+      id: 'JADWAL-001',
+      status_kelulusan: 'LULUS',
+    };
+
+    await expect(
+      PendaftaranService.createByMahasiswa('budi@mail.com', {
+        ...CREATE_PAYLOAD,
+        id_pengajuan_fst: 'PJ-NEW',
+      })
+    ).rejects.toThrow('Anda sudah lulus seminar ini');
   });
 
   test('berhasil daftar baru (belum pernah mendaftar)', async () => {
@@ -251,6 +284,61 @@ describe('PendaftaranService.createByMahasiswa', () => {
     expect(logsCreated.length).toBe(1);
     expect(cacheInvalidated).toBe(true);
     expect(emailsSent.some((e) => e.type === 'created')).toBe(true);
+  });
+});
+
+// =============================================================================
+// updateByMahasiswa
+// =============================================================================
+describe('PendaftaranService.updateByMahasiswa', () => {
+  beforeEach(() => resetState());
+
+  test('throw 409 jika mengganti ke seminar yang sudah LULUS', async () => {
+    mockMahasiswa = DEFAULT_MAHASISWA;
+    mockPendaftaranById = {
+      ...DEFAULT_PENDAFTARAN,
+      id_pengajuan_fst: 'PJ-OLD',
+      id_jenis_seminar: 'jenis-lama',
+      kode_tahun_ajaran: '20261',
+      status_berkas: 'PENDING',
+    };
+    mockJadwalKelulusan = {
+      id: 'JADWAL-LULUS-001',
+      status_kelulusan: 'LULUS',
+    };
+
+    await expect(
+      PendaftaranService.updateByMahasiswa('budi@mail.com', 'PEND-TEST-001', {
+        id_jenis_seminar: 'jenis-baru',
+      })
+    ).rejects.toThrow('Anda sudah lulus seminar ini');
+  });
+
+  test('berhasil mengganti seminar jika target belum LULUS dan belum ada pendaftaran lain', async () => {
+    mockMahasiswa = DEFAULT_MAHASISWA;
+    mockPendaftaranById = {
+      ...DEFAULT_PENDAFTARAN,
+      id_pengajuan_fst: 'PJ-OLD',
+      id_jenis_seminar: 'jenis-lama',
+      kode_tahun_ajaran: '20261',
+      status_berkas: 'PENDING',
+    };
+    mockJadwalKelulusan = {
+      id: 'JADWAL-BELUM-LULUS-001',
+      status_kelulusan: 'BELUM_DITENTUKAN',
+    };
+    mockExistingPendaftaran = null;
+
+    const result = await PendaftaranService.updateByMahasiswa(
+      'budi@mail.com',
+      'PEND-TEST-001',
+      {
+        id_jenis_seminar: 'jenis-baru',
+      }
+    );
+
+    expect(result.response).toBe(true);
+    expect(mockUpdatedData.id_jenis_seminar).toBe('jenis-baru');
   });
 });
 

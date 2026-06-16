@@ -6,7 +6,7 @@ export default class KomponenPenilaianHandler {
   public static async getAll(c: Context) {
     const query = (c.req as any).valid('query') as {
       role?: PenilaiRole;
-      id_jenis_seminar?: string;
+      jenis_seminar?: string;
       is_aktif?: boolean;
     };
     return c.json(await KomponenPenilaianService.getAll(query));
@@ -15,7 +15,7 @@ export default class KomponenPenilaianHandler {
   public static async getByRole(c: Context) {
     const role = c.req.param('role') as PenilaiRole;
     const query = ((c.req as any).valid?.('query') ?? {}) as {
-      id_jenis_seminar?: string;
+      jenis_seminar?: string;
       is_aktif?: boolean;
     };
     return c.json(await KomponenPenilaianService.getByRole(role, query));

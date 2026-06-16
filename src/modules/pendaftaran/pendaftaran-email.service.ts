@@ -215,7 +215,7 @@ export default class PendaftaranEmailService {
         subject: 'Pendaftaran Seminar Berhasil Dikirim',
         title: 'Pendaftaran Berhasil Dikirim',
         intro: `Pendaftaran ${jenisSeminar} Anda telah kami terima dan masuk ke antrean validasi berkas.`,
-        highlight: 'Tim koordinator akan memeriksa kelengkapan berkas Anda.',
+        highlight: 'Koordinator akan memeriksa kelengkapan berkas Anda.',
         nextSteps: [
           'Pantau status pendaftaran secara berkala melalui sistem.',
           'Pastikan dokumen yang diunggah dapat diakses dan terbaca dengan jelas.',

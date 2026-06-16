@@ -4,6 +4,7 @@ import { createLogger } from './utils/logger.util';
 import ConstraintDosenService from './modules/constraint-dosen/constraint-dosen.service';
 import JadwalDraftService from './modules/jadwal-draft/jadwal-draft.service';
 import JadwalService from './modules/jadwal/jadwal.service';
+import JadwalEmailService from './modules/jadwal/jadwal-email.service';
 import { LogService } from './modules/log';
 import PendaftaranEmailService from './modules/pendaftaran/pendaftaran-email.service';
 import WorkerJobService from './modules/worker-job/worker-job.service';
@@ -12,6 +13,7 @@ import {
   type WorkerConstraintDosenChatUpdatePayload,
   type WorkerJadwalDraftGeneratePayload,
   type WorkerJadwalEmailPayload,
+  type WorkerJadwalNotificationEmailPayload,
   type WorkerJob,
   WorkerJobType,
   type WorkerLogCreatePayload,
@@ -76,6 +78,16 @@ async function processJob(job: WorkerJob) {
       const result = await JadwalService.sendGoogleCalendarInvitationById(
         payload.jadwalId,
         payload.action
+      );
+      await WorkerJobService.markCompleted(job.id, result);
+      return;
+    }
+
+    case WorkerJobType.JADWAL_NOTIFICATION_EMAIL_SEND: {
+      const payload = job.payload as WorkerJadwalNotificationEmailPayload;
+      const result = await JadwalEmailService.sendById(
+        payload.jadwalId,
+        payload.event
       );
       await WorkerJobService.markCompleted(job.id, result);
       return;

@@ -12,6 +12,7 @@ export enum WorkerJobType {
   LOG_CREATE = 'log.create',
   PENDAFTARAN_EMAIL_SEND = 'pendaftaran.email.send',
   JADWAL_EMAIL_SEND = 'jadwal.email.send',
+  JADWAL_NOTIFICATION_EMAIL_SEND = 'jadwal.notification-email.send',
   JADWAL_DRAFT_GENERATE = 'jadwal-draft.generate',
   CONSTRAINT_DOSEN_CHAT = 'constraint-dosen.chat',
   CONSTRAINT_DOSEN_CHAT_UPDATE = 'constraint-dosen.chat-update',
@@ -54,6 +55,15 @@ export type WorkerJadwalEmailPayload = {
   action: WorkerJadwalEmailAction;
 };
 
+export type WorkerJadwalNotificationEmailEvent =
+  | 'scheduled'
+  | 'status_kelulusan_updated';
+
+export type WorkerJadwalNotificationEmailPayload = {
+  jadwalId: string;
+  event: WorkerJadwalNotificationEmailEvent;
+};
+
 export type WorkerJadwalDraftGeneratePayload = {
   data: {
     tanggal_mulai: string | Date;
@@ -86,6 +96,7 @@ export type WorkerJobPayloadMap = {
   [WorkerJobType.LOG_CREATE]: WorkerLogCreatePayload;
   [WorkerJobType.PENDAFTARAN_EMAIL_SEND]: WorkerPendaftaranEmailPayload;
   [WorkerJobType.JADWAL_EMAIL_SEND]: WorkerJadwalEmailPayload;
+  [WorkerJobType.JADWAL_NOTIFICATION_EMAIL_SEND]: WorkerJadwalNotificationEmailPayload;
   [WorkerJobType.JADWAL_DRAFT_GENERATE]: WorkerJadwalDraftGeneratePayload;
   [WorkerJobType.CONSTRAINT_DOSEN_CHAT]: WorkerConstraintDosenChatPayload;
   [WorkerJobType.CONSTRAINT_DOSEN_CHAT_UPDATE]: WorkerConstraintDosenChatUpdatePayload;
