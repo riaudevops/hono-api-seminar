@@ -5,6 +5,7 @@ import {
   LogActionType,
   LogActorType,
   LogEntityType,
+  PenilaiRole,
   StatusJadwal,
   StatusJadwalDraft,
 } from '@prisma/client';
@@ -56,6 +57,19 @@ type GenerateProgressEmitter = (
   payload: Record<string, unknown>
 ) => Promise<void> | void;
 
+type JenisSeminarDraftConfig = {
+  id: string;
+  kode: string;
+  wajib_pembimbing: number;
+  wajib_penguji: number;
+  ada_ketua_sidang: boolean;
+};
+
+type DraftDosenAssignment = {
+  nip: string;
+  role: PenilaiRole;
+};
+
 const PERSONA_PROMPT = readFileSync(
   join(process.cwd(), 'src/prompts/base/scheduler-persona.md'),
   'utf-8'
@@ -74,6 +88,133 @@ function generateBatchId(): string {
 }
 
 export default class JadwalDraftService {
+  private static async getJenisConfigByKode(kodeList: string[]) {
+    const uniqueKode = [...new Set(kodeList)];
+    const rows = await prisma.jenis_seminar.findMany({
+      where: { kode: { in: uniqueKode } },
+      select: {
+        id: true,
+        kode: true,
+        wajib_pembimbing: true,
+        wajib_penguji: true,
+        ada_ketua_sidang: true,
+      },
+    });
+    const byKode = new Map<string, JenisSeminarDraftConfig>();
+    for (const row of rows) byKode.set(row.kode, row);
+
+    const missing = uniqueKode.filter((kode) => !byKode.has(kode));
+    if (missing.length > 0) {
+      throw new APIError(
+        `Jenis seminar dengan kode "${missing.join(', ')}" tidak ditemukan`,
+        404
+      );
+    }
+
+    return byKode;
+  }
+
+  private static validateDraftDosenComposition(params: {
+    nim: string;
+    jenis?: JenisSeminarDraftConfig;
+    listDosen: Array<{ nip: string; role: PenilaiRole | string }>;
+    draftId?: string;
+  }) {
+    const { nim, jenis, listDosen, draftId } = params;
+    if (!jenis) {
+      throw new APIError(
+        `Jenis seminar untuk mahasiswa ${nim} tidak ditemukan`,
+        404
+      );
+    }
+
+    const prefix = draftId
+      ? `Draft ${draftId} untuk mahasiswa ${nim}`
+      : `Mahasiswa ${nim}`;
+    const nips = listDosen.map((item) => item.nip);
+    if (new Set(nips).size !== nips.length) {
+      throw new APIError(`${prefix} memiliki dosen penilai duplikat`, 400);
+    }
+
+    const pembimbingRoles = new Set<PenilaiRole>([
+      PenilaiRole.KP_PEMBIMBING,
+      PenilaiRole.TA_PEMBIMBING_1,
+      PenilaiRole.TA_PEMBIMBING_2,
+    ]);
+    const pengujiRoles = new Set<PenilaiRole>([
+      PenilaiRole.KP_PENGUJI,
+      PenilaiRole.TA_PENGUJI_1,
+      PenilaiRole.TA_PENGUJI_2,
+    ]);
+    const allowedRoles = new Set<PenilaiRole>([
+      ...pembimbingRoles,
+      ...pengujiRoles,
+      PenilaiRole.TA_KETUA_SIDANG,
+    ]);
+
+    const invalidRole = listDosen.find(
+      (item) => !allowedRoles.has(item.role as PenilaiRole)
+    );
+    if (invalidRole) {
+      throw new APIError(
+        `${prefix} jenis ${jenis.kode} memiliki role ${invalidRole.role} yang tidak valid untuk jadwal seminar`,
+        400
+      );
+    }
+
+    const pembimbingCount = listDosen.filter((item) =>
+      pembimbingRoles.has(item.role as PenilaiRole)
+    ).length;
+    const pengujiCount = listDosen.filter((item) =>
+      pengujiRoles.has(item.role as PenilaiRole)
+    ).length;
+    const ketuaCount = listDosen.filter(
+      (item) => item.role === PenilaiRole.TA_KETUA_SIDANG
+    ).length;
+
+    if (pembimbingCount !== jenis.wajib_pembimbing) {
+      throw new APIError(
+        `${prefix} untuk ${jenis.kode} membutuhkan ${jenis.wajib_pembimbing} pembimbing`,
+        400
+      );
+    }
+
+    if (pengujiCount !== jenis.wajib_penguji) {
+      throw new APIError(
+        `${prefix} untuk ${jenis.kode} membutuhkan ${jenis.wajib_penguji} penguji`,
+        400
+      );
+    }
+
+    if (jenis.ada_ketua_sidang && ketuaCount > 1) {
+      throw new APIError(
+        `${prefix} untuk ${jenis.kode} maksimal memiliki 1 ketua sidang`,
+        400
+      );
+    }
+
+    if (!jenis.ada_ketua_sidang && ketuaCount > 0) {
+      throw new APIError(
+        `${prefix} untuk ${jenis.kode} tidak membutuhkan ketua sidang`,
+        400
+      );
+    }
+  }
+
+  private static validateDraftDosenCompositionFromJenisRelation(params: {
+    draftId: string;
+    nim: string;
+    jenis: JenisSeminarDraftConfig;
+    listDosen: Array<{ nip: string; role: PenilaiRole | string }>;
+  }) {
+    JadwalDraftService.validateDraftDosenComposition({
+      draftId: params.draftId,
+      nim: params.nim,
+      jenis: params.jenis,
+      listDosen: params.listDosen,
+    });
+  }
+
   public static async generate(
     data: {
       tanggal_mulai: Date;
@@ -142,6 +283,17 @@ export default class JadwalDraftService {
         `Tidak ada mahasiswa yang sesuai dengan mode "${mode}".`,
         400
       );
+    }
+
+    const jenisConfigByKode = await JadwalDraftService.getJenisConfigByKode(
+      data.list_mahasiswa.map((mhs) => mhs.kode_jenis)
+    );
+    for (const mhs of data.list_mahasiswa) {
+      JadwalDraftService.validateDraftDosenComposition({
+        nim: mhs.nim,
+        jenis: jenisConfigByKode.get(mhs.kode_jenis),
+        listDosen: mhs.list_dosen,
+      });
     }
 
     const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
@@ -794,6 +946,14 @@ export default class JadwalDraftService {
             continue;
           }
 
+          const listDosen = draft.list_dosen as DraftDosenAssignment[];
+          JadwalDraftService.validateDraftDosenCompositionFromJenisRelation({
+            draftId: draft.id,
+            nim: draft.nim,
+            jenis: (draft as any).jenis_seminar as JenisSeminarDraftConfig,
+            listDosen,
+          });
+
           await JadwalService.validateRuangan(draft.kode_ruangan);
 
           await RuanganHelper.cekKonflik(
@@ -802,7 +962,6 @@ export default class JadwalDraftService {
             draft.waktu_selesai
           );
 
-          const listDosen = draft.list_dosen as { nip: string }[];
           if (listDosen && listDosen.length > 0) {
             await DosenHelper.cekKonflik(
               listDosen.map((d) => d.nip),

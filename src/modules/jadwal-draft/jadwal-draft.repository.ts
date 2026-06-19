@@ -1,6 +1,9 @@
 import prisma from '../../infrastructures/db.infrastructure';
 import { StatusJadwalDraft } from '@prisma/client';
-import { CreateJadwalDraftInput, UpdateJadwalDraftInput } from './jadwal-draft.type';
+import type {
+  CreateJadwalDraftInput,
+  UpdateJadwalDraftInput,
+} from './jadwal-draft.type';
 
 export default class JadwalDraftRepository {
   public static async findAll(filters?: {

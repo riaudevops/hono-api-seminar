@@ -48,15 +48,23 @@ export default class KoordinatorService {
       activeStudents,
       totalRooms,
       totalLecturers,
-      penilaianWithoutDetails,
+      pendingAssessments,
       upcomingSeminarsToday,
     ] = await Promise.all([
       prisma.mahasiswa.count({ where: { aktif: true } }),
       prisma.ruangan.count(),
       prisma.dosen.count(),
-      prisma.penilaian.findMany({
-        where: { detail_penilaian: { none: {} } },
-        select: { id: true },
+      prisma.penilaian.count({
+        where: {
+          detail_penilaian: { none: {} },
+          jadwal: {
+            jenis_seminar: {
+              kode: {
+                in: ['SEMKP', 'SIDANG_LAPORAN', 'SIDANG_PAPERBASED'],
+              },
+            },
+          },
+        },
       }),
       prisma.penilaian.findMany({
         where: {
@@ -75,7 +83,7 @@ export default class KoordinatorService {
         activeStudents,
         upcomingSeminarsToday: upcomingSeminarsToday.length,
         totalRooms,
-        pendingAssessments: penilaianWithoutDetails.length,
+        pendingAssessments,
         totalLecturers,
       },
     };
