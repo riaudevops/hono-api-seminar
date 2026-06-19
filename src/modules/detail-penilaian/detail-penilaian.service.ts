@@ -258,31 +258,36 @@ export default class DetailPenilaianService {
       existingDetails.map((detail) => [detail.id_komponen, detail])
     );
 
-    const savedDetails = await prisma.$transaction(async (tx) => {
-      await DetailPenilaianRepository.upsertDetailsTx(
-        tx,
-        id_penilaian,
-        data.details
-      );
+    const savedDetails = await prisma.$transaction(
+      async (tx) => {
+        await DetailPenilaianRepository.upsertDetailsTx(
+          tx,
+          id_penilaian,
+          data.details
+        );
 
-      for (const detail of data.details) {
-        const existingDetail = existingDetailMap.get(detail.id_komponen);
-        await LogService.createPenilaianLogTx(tx, {
-          action: existingDetail ? LogActionType.UPDATE : LogActionType.CREATE,
-          actor_type: context.actor_type,
-          actor_id: context.actor_id,
-          id_jadwal: penilaian.id_jadwal,
-          id_komponen_penilaian: detail.id_komponen,
-          old_nilai: existingDetail ? existingDetail.nilai : null,
-          new_nilai: detail.nilai,
-        });
-      }
+        for (const detail of data.details) {
+          const existingDetail = existingDetailMap.get(detail.id_komponen);
+          await LogService.createPenilaianLogTx(tx, {
+            action: existingDetail
+              ? LogActionType.UPDATE
+              : LogActionType.CREATE,
+            actor_type: context.actor_type,
+            actor_id: context.actor_id,
+            id_jadwal: penilaian.id_jadwal,
+            id_komponen_penilaian: detail.id_komponen,
+            old_nilai: existingDetail ? existingDetail.nilai : null,
+            new_nilai: detail.nilai,
+          });
+        }
 
-      return DetailPenilaianRepository.findDetailsByPenilaianIdTx(
-        tx,
-        id_penilaian
-      );
-    });
+        return DetailPenilaianRepository.findDetailsByPenilaianIdTx(
+          tx,
+          id_penilaian
+        );
+      },
+      { timeout: 15000 }
+    );
 
     return {
       response: true,

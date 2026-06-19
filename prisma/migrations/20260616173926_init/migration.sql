@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "PenilaiRole" AS ENUM ('KP_INSTANSI', 'KP_PEMBIMBING', 'KP_PENGUJI', 'TA_PEMBIMBING_1', 'TA_PEMBIMBING_2', 'TA_PENGUJI_1', 'TA_PENGUJI_2', 'TA_KETUA_SIDANG');
+CREATE TYPE "PenilaiRole" AS ENUM ('KP_INSTANSI', 'KP_PEMBIMBING', 'KP_PENGUJI', 'TA_PEMBIMBING_1', 'TA_PEMBIMBING_2', 'TA_PENGUJI_1', 'TA_PENGUJI_2', 'TA_KETUA_SIDANG', 'ARTIKEL_TA');
 
 -- CreateEnum
 CREATE TYPE "LogActionType" AS ENUM ('CREATE', 'UPDATE', 'DELETE', 'GANTI_JADWAL', 'GANTI_DOSEN');
@@ -126,7 +126,7 @@ CREATE TABLE "komponen_penilaian" (
 CREATE TABLE "penilaian" (
     "id" TEXT NOT NULL,
     "id_jadwal" TEXT NOT NULL,
-    "nip" TEXT NOT NULL,
+    "nip" TEXT,
     "role" "PenilaiRole" NOT NULL,
 
     CONSTRAINT "penilaian_pkey" PRIMARY KEY ("id")
@@ -334,7 +334,7 @@ CREATE INDEX "penilaian_id_jadwal_idx" ON "penilaian"("id_jadwal");
 CREATE INDEX "penilaian_nip_idx" ON "penilaian"("nip");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "penilaian_id_jadwal_nip_key" ON "penilaian"("id_jadwal", "nip");
+CREATE UNIQUE INDEX "penilaian_id_jadwal_nip_role_key" ON "penilaian"("id_jadwal", "nip", "role");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "penilaian_id_jadwal_role_key" ON "penilaian"("id_jadwal", "role");
@@ -430,7 +430,7 @@ ALTER TABLE "komponen_penilaian" ADD CONSTRAINT "komponen_penilaian_id_jenis_sem
 ALTER TABLE "penilaian" ADD CONSTRAINT "penilaian_id_jadwal_fkey" FOREIGN KEY ("id_jadwal") REFERENCES "jadwal"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "penilaian" ADD CONSTRAINT "penilaian_nip_fkey" FOREIGN KEY ("nip") REFERENCES "dosen"("nip") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "penilaian" ADD CONSTRAINT "penilaian_nip_fkey" FOREIGN KEY ("nip") REFERENCES "dosen"("nip") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "detail_penilaian" ADD CONSTRAINT "detail_penilaian_id_penilaian_fkey" FOREIGN KEY ("id_penilaian") REFERENCES "penilaian"("id") ON DELETE CASCADE ON UPDATE CASCADE;
