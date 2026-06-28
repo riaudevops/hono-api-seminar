@@ -17,6 +17,12 @@ jenisSeminarRoute.get(
 );
 
 jenisSeminarRoute.get(
+  '/mahasiswa/jenis-seminar-saya',
+  AuthMiddleware.JWTBearerTokenExtraction,
+  JenisSeminarHandler.getJenisSeminarSaya
+);
+
+jenisSeminarRoute.get(
   '/data-master/jenis-seminar/:kode',
   AuthMiddleware.JWTBearerTokenExtraction,
   JenisSeminarHandler.getByKode

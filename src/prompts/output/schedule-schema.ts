@@ -148,6 +148,12 @@ const BatchScheduleSuggestionSchema = TimeSlotSchema.extend({
   jenis: z.string().describe('Jenis seminar (misal: SEMPRO, SIDANG_LAPORAN)'),
   confidence: z.number().min(0).max(1).describe('Skor keyakinan AI (0.0-1.0)'),
   reasoning: z.string().describe('Alasan pemilihan slot ini'),
+  penguji_dipilih: z
+    .string()
+    .nullable()
+    .describe(
+      'NIP dosen penguji yang dipilih untuk SEMKP (jika butuh_penguji=true). Null jika tidak ada yang cocok.'
+    ),
 });
 
 export const GenerateBatchOutputSchema = z.object({

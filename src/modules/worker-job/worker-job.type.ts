@@ -56,7 +56,8 @@ export type WorkerJadwalEmailPayload = {
 };
 
 export type WorkerJadwalNotificationEmailEvent =
-  | 'scheduled'
+  | 'scheduled_created'
+  | 'scheduled_updated'
   | 'status_kelulusan_updated';
 
 export type WorkerJadwalNotificationEmailPayload = {

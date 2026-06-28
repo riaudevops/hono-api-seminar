@@ -212,7 +212,7 @@ export default class PendaftaranEmailService {
 
     if (event === 'created') {
       return {
-        subject: 'Pendaftaran Seminar Berhasil Dikirim',
+        subject: `Pendaftaran ${jenisSeminar} Anda Berhasil Dikirim`,
         title: 'Pendaftaran Berhasil Dikirim',
         intro: `Pendaftaran ${jenisSeminar} Anda telah kami terima dan masuk ke antrean validasi berkas.`,
         highlight: 'Koordinator akan memeriksa kelengkapan berkas Anda.',
@@ -226,7 +226,7 @@ export default class PendaftaranEmailService {
 
     if (event === 'updated') {
       return {
-        subject: 'Pendaftaran Seminar Berhasil Diperbarui',
+        subject: `Pendaftaran ${jenisSeminar} Anda Berhasil Diperbarui`,
         title: 'Pendaftaran Berhasil Diperbarui',
         intro: `Perubahan data pendaftaran ${jenisSeminar} Anda berhasil disimpan.`,
         highlight:
@@ -242,7 +242,7 @@ export default class PendaftaranEmailService {
     }
 
     return {
-      subject: `Status Pendaftaran Seminar Diperbarui: ${statusMeta.label}`,
+      subject: `Status Pendaftaran ${jenisSeminar} Diperbarui: ${statusMeta.label}`,
       title: 'Status Pendaftaran Diperbarui',
       intro: `Status berkas pendaftaran ${jenisSeminar} Anda telah diperbarui.`,
       highlight: statusMeta.description,
@@ -304,117 +304,25 @@ export default class PendaftaranEmailService {
     );
     const rows = PendaftaranEmailService.getDetailRows(pendaftaran)
       .map(
-        ([label, value]) => `
-          <tr>
-            <td style="padding:12px 16px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;width:38%;">${PendaftaranEmailService.escapeHtml(label)}</td>
-            <td style="padding:12px 16px;border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:14px;font-weight:600;">${PendaftaranEmailService.escapeHtml(value)}</td>
-          </tr>`
+        ([label, value]) =>
+          `<tr><td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#64748b;font-weight:700;">${PendaftaranEmailService.escapeHtml(label)}</td><td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#0f172a;">${PendaftaranEmailService.escapeHtml(value)}</td></tr>`
       )
       .join('');
     const steps = content.nextSteps
-      .map(
-        (step) => `
-          <li style="margin:0 0 10px 0;color:#334155;font-size:14px;line-height:1.6;">${PendaftaranEmailService.escapeHtml(step)}</li>`
-      )
+      .map((step) => `<li>${PendaftaranEmailService.escapeHtml(step)}</li>`)
       .join('');
 
     const revisiSection =
       revisiData && revisiData.dokumen_revisi.length > 0
-        ? `
-            <tr>
-              <td style="padding:0 32px 24px 32px;">
-                <div style="border:1px solid #fca5a5;background:#fff5f5;border-radius:14px;padding:18px 20px;">
-                  <div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#dc2626;margin-bottom:12px;">📋 Dokumen yang Perlu Direvisi</div>
-                  ${revisiData.catatan_umum ? `<p style="margin:0 0 14px 0;color:#334155;font-size:14px;line-height:1.7;"><strong>Catatan umum:</strong> ${PendaftaranEmailService.escapeHtml(revisiData.catatan_umum)}</p>` : ''}
-                  <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:1px solid #fca5a5;border-radius:8px;overflow:hidden;">
-                    <thead>
-                      <tr style="background:#fee2e2;">
-                        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.04em;width:40%;">Dokumen</th>
-                        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.04em;">Catatan Revisi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${revisiData.dokumen_revisi
-                        .map(
-                          (item, i) => `
-                      <tr style="background:${i % 2 === 0 ? '#ffffff' : '#fff5f5'};">
-                        <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#0f172a;border-top:1px solid #fca5a5;">${PendaftaranEmailService.escapeHtml(item.nama_dokumen)}</td>
-                        <td style="padding:10px 14px;font-size:13px;color:#334155;border-top:1px solid #fca5a5;">${PendaftaranEmailService.escapeHtml(item.catatan)}</td>
-                      </tr>`
-                        )
-                        .join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </td>
-            </tr>`
+        ? `<div style="margin:18px 0;"><h2 style="font-size:16px;">Dokumen yang Perlu Direvisi</h2>${revisiData.catatan_umum ? `<p><strong>Catatan umum:</strong> ${PendaftaranEmailService.escapeHtml(revisiData.catatan_umum)}</p>` : ''}<table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;"><thead><tr><th style="padding:10px 14px;text-align:left;border-bottom:1px solid #e5e7eb;color:#64748b;">Dokumen</th><th style="padding:10px 14px;text-align:left;border-bottom:1px solid #e5e7eb;color:#64748b;">Catatan Revisi</th></tr></thead><tbody>${revisiData.dokumen_revisi
+            .map(
+              (item) =>
+                `<tr><td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#0f172a;">${PendaftaranEmailService.escapeHtml(item.nama_dokumen)}</td><td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#0f172a;">${PendaftaranEmailService.escapeHtml(item.catatan)}</td></tr>`
+            )
+            .join('')}</tbody></table></div>`
         : '';
 
-    return `<!doctype html>
-<html lang="id">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${escapedTitle}</title>
-  </head>
-  <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapedIntro}</div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f1f5f9;margin:0;padding:24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 18px 45px rgba(15,23,42,.08);">
-            <tr>
-              <td style="background:linear-gradient(135deg,#0f766e,#2563eb);padding:28px 32px;color:#ffffff;">
-                <div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85;">UIN Suska Riau</div>
-                <div style="font-size:24px;font-weight:800;line-height:1.25;margin-top:6px;">Sistem Informasi Seminar TIF</div>
-                <div style="font-size:14px;line-height:1.6;margin-top:8px;opacity:.92;">Notifikasi pendaftaran seminar mahasiswa</div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px 32px 24px 32px;">
-                <h1 style="margin:0 0 16px 0;color:#0f172a;font-size:24px;line-height:1.3;">${escapedTitle}</h1>
-                <p style="margin:0 0 16px 0;color:#334155;font-size:15px;line-height:1.7;">Halo <strong>${recipientName}</strong>,</p>
-                <p style="margin:0;color:#334155;font-size:15px;line-height:1.7;">${escapedIntro}</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 32px 24px 32px;">
-                <div style="border:1px solid ${statusMeta.border};background:${statusMeta.background};border-radius:14px;padding:18px 20px;">
-                  <div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${statusMeta.color};margin-bottom:8px;">Status Berkas</div>
-                  <span style="display:inline-block;background:#ffffff;color:${statusMeta.color};border:1px solid ${statusMeta.border};border-radius:999px;padding:7px 12px;font-size:13px;font-weight:800;line-height:1;">${PendaftaranEmailService.escapeHtml(statusMeta.label)}</span>
-                  <p style="margin:12px 0 0 0;color:#334155;font-size:14px;line-height:1.7;">${escapedHighlight}</p>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 32px 24px 32px;">
-                <h2 style="margin:0 0 12px 0;color:#0f172a;font-size:16px;line-height:1.4;">Ringkasan Pendaftaran</h2>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#ffffff;">
-                  <tbody>${rows}</tbody>
-                </table>
-              </td>
-            </tr>
-            ${revisiSection}
-            <tr>
-              <td style="padding:0 32px 32px 32px;">
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;">
-                  <h2 style="margin:0 0 12px 0;color:#0f172a;font-size:16px;line-height:1.4;">Langkah Selanjutnya</h2>
-                  <ol style="margin:0;padding-left:20px;">${steps}</ol>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 32px;text-align:center;">
-                <p style="margin:0;color:#64748b;font-size:12px;line-height:1.6;">Email ini dikirim otomatis oleh Sistem Informasi Seminar TIF UIN Suska Riau.</p>
-                <p style="margin:6px 0 0 0;color:#94a3b8;font-size:12px;line-height:1.6;">Mohon tidak membalas email ini.</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+    return `<div style="background:#f8fafc;padding:24px;font-family:Arial,sans-serif;color:#0f172a;"><div style="max-width:640px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;"><div style="background:#0f766e;color:#fff;padding:22px;"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Sistem Informasi Seminar TIF</div><h1 style="margin:8px 0 0;font-size:24px;">${escapedTitle}</h1></div><div style="padding:24px;"><p>Halo <strong>${recipientName}</strong>,</p><p>${escapedIntro}</p><div style="border:1px solid ${statusMeta.border};background:${statusMeta.background};color:${statusMeta.color};border-radius:10px;padding:12px 14px;margin:18px 0;font-weight:700;">Status Berkas: ${PendaftaranEmailService.escapeHtml(statusMeta.label)}</div><p>${escapedHighlight}</p><h2 style="font-size:16px;">Ringkasan Pendaftaran</h2><table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;margin-bottom:18px;">${rows}</table>${revisiSection}<h2 style="font-size:16px;">Langkah Selanjutnya</h2><ol>${steps}</ol><p style="font-size:12px;color:#64748b;margin-top:24px;">Email ini dikirim otomatis oleh Sistem Informasi Seminar TIF UIN Suska Riau. Mohon tidak membalas email ini.</p></div></div></div>`;
   }
 
   private static getDetailRows(

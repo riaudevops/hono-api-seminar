@@ -97,7 +97,27 @@ class GoogleCalendarService {
     const eventId = this.buildEventId(jadwal.id);
     const requestBody = this.buildEvent(jadwal, action);
     const calendarId = config.google.calendarId;
-    const sendUpdates = config.app.isProduction ? 'all' : 'none';
+
+    return await this.upsertEvent({
+      calendar,
+      calendarId,
+      eventId,
+      requestBody,
+      sendUpdates: 'none',
+      jadwalId: jadwal.id,
+    });
+  }
+
+  private async upsertEvent(params: {
+    calendar: calendar_v3.Calendar;
+    calendarId: string;
+    eventId: string;
+    requestBody: calendar_v3.Schema$Event;
+    sendUpdates: 'all' | 'none';
+    jadwalId: string;
+  }): Promise<GoogleCalendarSyncResult> {
+    const { calendar, calendarId, eventId, requestBody, sendUpdates, jadwalId } =
+      params;
 
     try {
       const response = await calendar.events.patch({
@@ -108,7 +128,7 @@ class GoogleCalendarService {
       });
 
       logger.info('Google Calendar event updated', {
-        jadwalId: jadwal.id,
+        jadwalId,
         eventId: response.data.id,
         sendUpdates,
       });
@@ -117,15 +137,12 @@ class GoogleCalendarService {
         success: true,
         eventId: response.data.id,
         htmlLink: response.data.htmlLink,
-        message:
-          sendUpdates === 'all'
-            ? 'Event Google Calendar berhasil diperbarui tanpa attendee/undangan email'
-            : 'Event Google Calendar berhasil diperbarui tanpa mengirim email (non-production)',
+        message: 'Event Google Calendar berhasil diperbarui tanpa attendees',
       };
     } catch (error: any) {
       if (error?.code !== 404 && error?.response?.status !== 404) {
         logger.error('Failed to update Google Calendar event', {
-          jadwalId: jadwal.id,
+          jadwalId,
           eventId,
           error: error?.message,
         });
@@ -143,7 +160,7 @@ class GoogleCalendarService {
     });
 
     logger.info('Google Calendar event created', {
-      jadwalId: jadwal.id,
+      jadwalId,
       eventId: response.data.id,
       sendUpdates,
     });
@@ -152,10 +169,7 @@ class GoogleCalendarService {
       success: true,
       eventId: response.data.id,
       htmlLink: response.data.htmlLink,
-      message:
-        sendUpdates === 'all'
-          ? 'Event Google Calendar berhasil dibuat tanpa attendee/undangan email'
-          : 'Event Google Calendar berhasil dibuat tanpa mengirim email (non-production)',
+      message: 'Event Google Calendar berhasil dibuat tanpa attendees',
     };
   }
 
@@ -198,6 +212,26 @@ class GoogleCalendarService {
         },
       },
     };
+  }
+
+  public async getEventLinkByJadwalId(jadwalId: string) {
+    const calendar = this.getCalendarClient();
+    if (!calendar) return null;
+
+    try {
+      const response = await calendar.events.get({
+        calendarId: config.google.calendarId,
+        eventId: this.buildEventId(jadwalId),
+      });
+      return response.data.htmlLink ?? null;
+    } catch (error: any) {
+      if (error?.code === 404 || error?.response?.status === 404) return null;
+      logger.warn('Failed to fetch Google Calendar event link', {
+        jadwalId,
+        error: error?.message,
+      });
+      return null;
+    }
   }
 
   private buildDescription(

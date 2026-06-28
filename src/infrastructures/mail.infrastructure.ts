@@ -15,6 +15,7 @@ type SendMailOptions = {
   bcc?: MailRecipient;
   replyTo?: string;
   headers?: Record<string, string>;
+  attachments?: Array<Record<string, any>>;
 };
 
 type MailOptions = SendMailOptions & Record<string, any>;

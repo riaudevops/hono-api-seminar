@@ -179,9 +179,9 @@ export default class JadwalDraftService {
       );
     }
 
-    if (pengujiCount !== jenis.wajib_penguji) {
+    if (pengujiCount > jenis.wajib_penguji) {
       throw new APIError(
-        `${prefix} untuk ${jenis.kode} membutuhkan ${jenis.wajib_penguji} penguji`,
+        `${prefix} untuk ${jenis.kode} maksimal ${jenis.wajib_penguji} penguji`,
         400
       );
     }
@@ -213,6 +213,38 @@ export default class JadwalDraftService {
       jenis: params.jenis,
       listDosen: params.listDosen,
     });
+  }
+
+  private static async getJudulKpByNim(nim: string): Promise<string | null> {
+    const row = await prisma.data_pendaftaran.findFirst({
+      where: {
+        pendaftaran: { nim },
+        dokumen_template: { kode: 'JUDUL_KP' },
+      },
+      select: { nilai_text: true },
+    });
+    return row?.nilai_text ?? null;
+  }
+
+  private static async getDosenKandidatPenguji(): Promise<
+    Array<{ nip: string; nama: string; keahlian: string[] }>
+  > {
+    const dosenList = await prisma.dosen.findMany({
+      select: {
+        nip: true,
+        nama: true,
+        keahlian_dosen: {
+          select: {
+            bidang_keahlian: { select: { nama: true } },
+          },
+        },
+      },
+    });
+    return dosenList.map((d) => ({
+      nip: d.nip,
+      nama: d.nama,
+      keahlian: d.keahlian_dosen.map((k) => k.bidang_keahlian.nama),
+    }));
   }
 
   public static async generate(
@@ -297,6 +329,23 @@ export default class JadwalDraftService {
     }
 
     const kode_tahun_ajaran = TahunAjaranHelper.findSekarang();
+
+    const kandidatPenguji = await JadwalDraftService.getDosenKandidatPenguji();
+    const judulKpByNim = new Map<string, string | null>();
+    await Promise.all(
+      data.list_mahasiswa
+        .filter(
+          (mhs) =>
+            mhs.kode_jenis === 'SEMKP' &&
+            !mhs.list_dosen.some(
+              (d) => d.role === PenilaiRole.KP_PENGUJI
+            )
+        )
+        .map(async (mhs) => {
+          const judul = await JadwalDraftService.getJudulKpByNim(mhs.nim);
+          judulKpByNim.set(mhs.nim, judul);
+        })
+    );
 
     // Validate mahasiswa + dosen + cek existing jadwal secara paralel.
     // Sebelumnya: serial await per mahasiswa = N round-trip DB sebelum AI dimulai.
@@ -403,7 +452,18 @@ export default class JadwalDraftService {
       const blockingForAlgo = [...baseBlockingSchedules];
       const activeRoomCodes = ruanganList.map((r: any) => r.kode);
 
-      for (const mhs of data.list_mahasiswa) {
+      const taListNoConstraint = data.list_mahasiswa.filter(
+        (m) => m.kode_jenis !== 'SEMKP'
+      );
+      const kpListNoConstraint = data.list_mahasiswa.filter(
+        (m) => m.kode_jenis === 'SEMKP'
+      );
+      const sortedMahasiswaNoConstraint = [
+        ...JadwalDraftService.sortMahasiswaForScheduling(taListNoConstraint),
+        ...JadwalDraftService.sortMahasiswaForScheduling(kpListNoConstraint),
+      ];
+
+      for (const mhs of sortedMahasiswaNoConstraint) {
         const idJenis = kodeToId.get(mhs.kode_jenis)!;
         const jenis = mhs.kode_jenis;
         const durationMinutes = SEMINAR_DURATION_MINUTES[jenis] ?? 60;
@@ -517,9 +577,14 @@ export default class JadwalDraftService {
       return responseData;
     }
 
-    const sortedMahasiswa = JadwalDraftService.sortMahasiswaForScheduling(
-      data.list_mahasiswa
+    const taList = data.list_mahasiswa.filter(
+      (m) => m.kode_jenis !== 'SEMKP'
     );
+    const kpList = data.list_mahasiswa.filter((m) => m.kode_jenis === 'SEMKP');
+    const sortedMahasiswa = [
+      ...JadwalDraftService.sortMahasiswaForScheduling(taList),
+      ...JadwalDraftService.sortMahasiswaForScheduling(kpList),
+    ];
     const mahasiswaChunks = JadwalDraftService.chunkMahasiswa(
       sortedMahasiswa,
       GENERATE_CHUNK_SIZE
@@ -582,6 +647,8 @@ export default class JadwalDraftService {
         constraintList,
         tanggalDikecualikan: data.tanggal_dikecualikan,
         catatanTambahan: data.catatan_tambahan,
+        judulKpByNim,
+        kandidatPenguji,
       });
 
       logger.info('Chunk context built', {
@@ -1188,14 +1255,32 @@ export default class JadwalDraftService {
     constraintList: any[];
     tanggalDikecualikan?: string[];
     catatanTambahan?: string;
+    judulKpByNim?: Map<string, string | null>;
+    kandidatPenguji?: Array<{ nip: string; nama: string; keahlian: string[] }>;
   }) {
+    const { judulKpByNim, kandidatPenguji } = params;
+
     return {
       tanggal_mulai: JadwalHelper.formatDateInJakarta(params.tanggalMulai),
-      list_mahasiswa: params.mahasiswaChunk.map((m) => ({
-        nim: m.nim,
-        jenis: m.kode_jenis,
-        list_dosen: m.list_dosen,
-      })),
+      list_mahasiswa: params.mahasiswaChunk.map((m) => {
+        const isSemkpTanpaPenguji =
+          m.kode_jenis === 'SEMKP' &&
+          !m.list_dosen.some((d) => d.role === PenilaiRole.KP_PENGUJI);
+
+        const baseEntry: Record<string, unknown> = {
+          nim: m.nim,
+          jenis: m.kode_jenis,
+          list_dosen: m.list_dosen,
+        };
+
+        if (isSemkpTanpaPenguji) {
+          baseEntry.butuh_penguji = true;
+          baseEntry.judul_kp = judulKpByNim?.get(m.nim) ?? null;
+          baseEntry.kandidat_penguji = kandidatPenguji ?? [];
+        }
+
+        return baseEntry;
+      }),
       ruangan_tersedia: params.ruanganList.map((r) => r.kode),
       jadwal_ada: [
         ...params.baseBlockingSchedules,
@@ -1478,6 +1563,7 @@ export default class JadwalDraftService {
       jenis: string;
       confidence: number;
       reasoning: string;
+      penguji_dipilih?: string | null;
     }>;
     mahasiswaChunk: Array<{
       nim: string;
@@ -1497,6 +1583,18 @@ export default class JadwalDraftService {
         params.kodeToId.get(s.jenis) ||
         (await JenisSeminarHelper.resolveIdByKode(s.jenis));
 
+      const listDosen = [...(mhsInput?.list_dosen || [])];
+
+      if (
+        s.penguji_dipilih &&
+        !listDosen.some((d) => d.nip === s.penguji_dipilih)
+      ) {
+        listDosen.push({
+          nip: s.penguji_dipilih,
+          role: PenilaiRole.KP_PENGUJI,
+        });
+      }
+
       drafts.push({
         batch_id: params.batchId,
         nim: s.nim,
@@ -1511,10 +1609,13 @@ export default class JadwalDraftService {
           s.waktu_selesai
         ),
         kode_ruangan: s.kode_ruangan,
-        list_dosen: mhsInput?.list_dosen || [],
+        list_dosen: listDosen,
         llm_reasoning: {
           reasoning: s.reasoning,
           jenis: s.jenis,
+          ...(s.penguji_dipilih
+            ? { penguji_dipilih: s.penguji_dipilih }
+            : {}),
         },
         confidence: s.confidence,
       });

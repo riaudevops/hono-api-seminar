@@ -6,7 +6,7 @@ import {
   PenilaiRole,
   StatusJadwal,
   type StatusBerkas,
-  type StatusKelulusan,
+  StatusKelulusan,
 } from '@prisma/client';
 import JadwalRepository, { type JadwalFilter } from './jadwal.repository';
 import JadwalEmailService from './jadwal-email.service';
@@ -764,7 +764,7 @@ export default class JadwalService {
       await JadwalService.enqueueGoogleCalendarInvitation(createdId, 'created');
     const notificationEmailJob = await JadwalEmailService.enqueueById(
       createdId,
-      'scheduled'
+      'scheduled_created'
     );
 
     return {
@@ -784,6 +784,24 @@ export default class JadwalService {
     const existingJadwal = await JadwalRepository.findById(id);
     if (!existingJadwal) {
       throw new APIError('Jadwal tidak ditemukan', 404);
+    }
+
+    if (existingJadwal.status_kelulusan === StatusKelulusan.LULUS) {
+      throw new APIError(
+        'Jadwal tidak dapat diubah karena mahasiswa sudah dinyatakan LULUS',
+        409
+      );
+    }
+
+    const hasNilai = (existingJadwal.penilaian ?? []).some(
+      (p: any) =>
+        Array.isArray(p.detail_penilaian) && p.detail_penilaian.length > 0
+    );
+    if (hasNilai) {
+      throw new APIError(
+        'Jadwal tidak dapat diubah karena nilai sudah diinput',
+        409
+      );
     }
 
     if (data.nim) await JadwalService.validateMahasiswa(data.nim);
@@ -882,11 +900,17 @@ export default class JadwalService {
     const googleCalendarJob =
       await JadwalService.enqueueGoogleCalendarInvitation(id, 'updated');
 
+    const notificationEmailJob = await JadwalEmailService.enqueueById(
+      id,
+      'scheduled_updated'
+    );
+
     return {
       response: true,
       message: 'Jadwal berhasil diperbarui',
       data: jadwalWithTimezone,
       google_calendar: googleCalendarJob,
+      notification_email: notificationEmailJob,
     };
   }
 
@@ -1322,9 +1346,9 @@ export default class JadwalService {
       );
     }
 
-    if (pengujiCount !== jenis.wajib_penguji) {
+    if (pengujiCount > jenis.wajib_penguji) {
       throw new APIError(
-        `Jenis seminar ${jenis.kode} membutuhkan ${jenis.wajib_penguji} penguji`,
+        `Jenis seminar ${jenis.kode} maksimal ${jenis.wajib_penguji} penguji`,
         400
       );
     }

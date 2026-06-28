@@ -116,6 +116,17 @@ Untuk setiap mahasiswa, berikan tepat **1 suggestion**:
 
 ## Catatan Penting
 
+### Kasus Khusus: SEMKP Tanpa Penguji
+
+Jika mahasiswa SEMKP memiliki `butuh_penguji: true`:
+1. Baca `judul_kp` mahasiswa tersebut.
+2. Cari dosen dari `kandidat_penguji` yang `keahlian`-nya paling relevan dengan judul KP.
+3. Pastikan dosen kandidat **AVAILABLE** pada slot yang dipilih (cek `constraint_dosen`).
+4. Pilih 1 dosen penguji yang paling cocok, isi field `penguji_dipilih` dengan NIP dosen tersebut.
+5. Pastikan dosen terpilih **TIDAK SAMA** dengan pembimbing (`list_dosen` existing) mahasiswa tersebut.
+6. **Jika tidak ada dosen dengan keahlian yang cocok, atau semua dosen yang cocok sudah terjadwal di seminar lain pada slot tersebut, PILIH dosen lain yang keahliannya paling mendekati ATAU dosen mana pun yang AVAILABLE** pada slot tersebut. Isi field `penguji_dipilih` dengan NIP dosen tersebut. Jangan biarkan kosong selama masih ada dosen yang available.
+7. Hanya isi `penguji_dipilih` dengan `null` jika **benar-benar tidak ada dosen lain yang available** pada slot manapun.
+
 - Output **harus** berisi tepat 1 suggestion per mahasiswa dalam input
 - Jika tidak memungkinkan menemukan slot untuk seorang mahasiswa, tetap sertakan dengan `confidence: 0.0` dan jelaskan di `reasoning`
 - Jangan gunakan tanggal yang ada di **tanggal_dikecualikan**

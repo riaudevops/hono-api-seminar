@@ -4,6 +4,7 @@ import { APIError } from '../../utils/api-error.util';
 import redisService from '../../infrastructures/redis.infrastructure';
 import CacheInvalidation from '../../utils/cache-invalidation.util';
 import { normalizeCachePart } from '../../utils/cache-key.util';
+import prisma from '../../infrastructures/db.infrastructure';
 import JenisSeminarRepository from './jenis-seminar.repository';
 import type { UpsertJenisSeminarType } from './jenis-seminar.type';
 
@@ -34,6 +35,39 @@ export default class JenisSeminarService {
         data,
       };
     });
+  }
+
+  public static async getJenisSeminarSaya(email: string) {
+    const mahasiswa = await prisma.mahasiswa.findUnique({
+      where: { email },
+      select: { nim: true },
+    });
+
+    if (!mahasiswa) {
+      throw new APIError('Data mahasiswa tidak ditemukan.', 404);
+    }
+
+    const jenisList = await JenisSeminarRepository.findAll(true);
+    const lulusRecords = await prisma.jadwal.findMany({
+      where: {
+        nim: mahasiswa.nim,
+        status_kelulusan: 'LULUS',
+      },
+      select: { id_jenis_seminar: true },
+    });
+
+    const lulusSet = new Set(lulusRecords.map((j) => j.id_jenis_seminar));
+
+    const data = jenisList.map((jenis) => ({
+      ...jenis,
+      is_lulus: lulusSet.has(jenis.id),
+    }));
+
+    return {
+      response: true,
+      message: 'Data jenis seminar saya berhasil diambil.',
+      data,
+    };
   }
 
   public static async upsert(payload: UpsertJenisSeminarType) {

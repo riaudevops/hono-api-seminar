@@ -7,6 +7,7 @@ import {
   type WorkerJadwalNotificationEmailEvent,
 } from '../worker-job/worker-job.type';
 import JadwalRepository from './jadwal.repository';
+import TahunAjaranHelper from '../../helpers/tahun-ajaran.helper';
 
 const logger = createLogger('JadwalEmail');
 
@@ -70,9 +71,11 @@ export default class JadwalEmailService {
     }
 
     const result =
-      event === 'scheduled'
-        ? await JadwalEmailService.sendScheduled(jadwal)
-        : await JadwalEmailService.sendStatusKelulusanUpdated(jadwal);
+      event === 'scheduled_created'
+        ? await JadwalEmailService.sendScheduledCreated(jadwal)
+        : event === 'scheduled_updated'
+          ? await JadwalEmailService.sendScheduledUpdated(jadwal)
+          : await JadwalEmailService.sendStatusKelulusanUpdated(jadwal);
 
     return {
       response: true,
@@ -82,25 +85,52 @@ export default class JadwalEmailService {
     };
   }
 
-  private static async sendScheduled(jadwal: any) {
+  private static async sendScheduledCreated(jadwal: any) {
+    return JadwalEmailService.sendScheduledByVariant(jadwal, 'created');
+  }
+
+  private static async sendScheduledUpdated(jadwal: any) {
+    return JadwalEmailService.sendScheduledByVariant(jadwal, 'updated');
+  }
+
+  private static async sendScheduledByVariant(
+    jadwal: any,
+    variant: 'created' | 'updated'
+  ) {
     const recipients = JadwalEmailService.getScheduledRecipients(jadwal);
     const detailRows = JadwalEmailService.getDetailRows(jadwal);
+    const icsAttachment = JadwalEmailService.buildIcsAttachment(jadwal);
+    const isUpdated = variant === 'updated';
     const results = await Promise.all(
       recipients.map((recipient) =>
         JadwalEmailService.sendSafely({
           jadwal,
           recipient,
-          subject: `Jadwal ${jadwal.jenis_seminar?.nama ?? 'Seminar'} Telah Ditetapkan`,
-          title: 'Jadwal Seminar Telah Ditetapkan',
-          intro: `Jadwal ${jadwal.jenis_seminar?.nama ?? 'seminar'} untuk mahasiswa ${jadwal.mahasiswa?.nama ?? jadwal.nim} telah ditetapkan.`,
-          highlight:
-            'Mohon hadir sesuai jadwal dan mempersiapkan kebutuhan seminar.',
+          subject: isUpdated
+            ? `Perubahan Jadwal ${jadwal.jenis_seminar?.nama ?? 'Seminar'}`
+            : `Jadwal ${jadwal.jenis_seminar?.nama ?? 'Seminar'} Telah Ditetapkan`,
+          title: isUpdated
+            ? 'Perubahan Jadwal Seminar'
+            : 'Jadwal Seminar Telah Ditetapkan',
+          intro: isUpdated
+            ? `Terdapat perubahan pada jadwal ${jadwal.jenis_seminar?.nama ?? 'seminar'} untuk mahasiswa ${jadwal.mahasiswa?.nama ?? jadwal.nim}.`
+            : `Jadwal ${jadwal.jenis_seminar?.nama ?? 'seminar'} untuk mahasiswa ${jadwal.mahasiswa?.nama ?? jadwal.nim} telah ditetapkan.`,
+          highlight: isUpdated
+            ? 'Mohon periksa kembali detail jadwal terbaru di bawah ini.'
+            : 'Mohon hadir sesuai jadwal dan mempersiapkan kebutuhan seminar.',
           detailRows,
-          nextSteps: [
-            'Periksa tanggal, waktu, dan ruangan seminar.',
-            'Pastikan seluruh dokumen dan perlengkapan seminar telah siap.',
-            'Hubungi koordinator jika terdapat kendala pada jadwal.',
-          ],
+          nextSteps: isUpdated
+            ? [
+                'Periksa ulang tanggal, waktu, dan ruangan terbaru.',
+                'Sesuaikan agenda Anda dengan perubahan jadwal ini.',
+                'Hubungi koordinator jika terdapat kendala pada perubahan jadwal.',
+              ]
+            : [
+                'Periksa tanggal, waktu, dan ruangan seminar.',
+                'Pastikan seluruh dokumen dan perlengkapan seminar telah siap.',
+                'Hubungi koordinator jika terdapat kendala pada jadwal.',
+              ],
+          icsAttachment,
         })
       )
     );
@@ -121,6 +151,7 @@ export default class JadwalEmailService {
       return { total_recipient: 0, sent: 0 };
     }
 
+    const icsAttachment = JadwalEmailService.buildIcsAttachment(jadwal);
     const statusLabel = JadwalEmailService.getStatusKelulusanLabel(
       jadwal.status_kelulusan
     );
@@ -138,6 +169,7 @@ export default class JadwalEmailService {
       nextSteps: JadwalEmailService.getStatusKelulusanNextSteps(
         jadwal.status_kelulusan
       ),
+      icsAttachment,
     });
 
     return { total_recipient: 1, sent: sent ? 1 : 0 };
@@ -152,6 +184,7 @@ export default class JadwalEmailService {
     highlight: string;
     detailRows: DetailRow[];
     nextSteps: string[];
+    icsAttachment?: { filename: string; content: string; contentType: string };
   }) {
     try {
       await mailService.sendMail({
@@ -159,6 +192,7 @@ export default class JadwalEmailService {
         subject: params.subject,
         text: JadwalEmailService.buildText(params),
         html: JadwalEmailService.buildHtml(params),
+        attachments: params.icsAttachment ? [params.icsAttachment] : undefined,
       });
       return true;
     } catch (error) {
@@ -211,7 +245,7 @@ export default class JadwalEmailService {
           ? `${jadwal.ruangan.nama ?? jadwal.ruangan.kode} (${jadwal.ruangan.kode})`
           : (jadwal.kode_ruangan ?? '-'),
       ],
-      ['Tahun Ajaran', jadwal.kode_tahun_ajaran ?? '-'],
+      ['Tahun Ajaran', TahunAjaranHelper.parseStringNameByCode(jadwal.kode_tahun_ajaran) ?? '-'],
     ];
   }
 
@@ -222,6 +256,7 @@ export default class JadwalEmailService {
     detailRows: DetailRow[];
     nextSteps: string[];
     recipient: JadwalRecipient;
+    icsAttachment?: { filename: string; content: string; contentType: string };
   }) {
     return [
       'Sistem Informasi Seminar TIF - UIN Suska Riau',
@@ -239,6 +274,9 @@ export default class JadwalEmailService {
       '',
       'Langkah Selanjutnya:',
       ...params.nextSteps.map((step, index) => `${index + 1}. ${step}`),
+      ...(params.icsAttachment
+        ? ['', `Lampiran kalender: ${params.icsAttachment.filename}`]
+        : []),
       '',
       'Email ini dikirim otomatis oleh Sistem Informasi Seminar TIF UIN Suska Riau. Mohon tidak membalas email ini.',
     ].join('\n');
@@ -251,6 +289,7 @@ export default class JadwalEmailService {
     detailRows: DetailRow[];
     nextSteps: string[];
     recipient: JadwalRecipient;
+    icsAttachment?: { filename: string; content: string; contentType: string };
   }) {
     const rows = params.detailRows
       .map(
@@ -262,7 +301,11 @@ export default class JadwalEmailService {
       .map((step) => `<li>${JadwalEmailService.escapeHtml(step)}</li>`)
       .join('');
 
-    return `<div style="background:#f8fafc;padding:24px;font-family:Arial,sans-serif;color:#0f172a;"><div style="max-width:640px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;"><div style="background:#0f766e;color:#fff;padding:22px;"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Sistem Informasi Seminar TIF</div><h1 style="margin:8px 0 0;font-size:24px;">${JadwalEmailService.escapeHtml(params.title)}</h1></div><div style="padding:24px;"><p>Halo <strong>${JadwalEmailService.escapeHtml(params.recipient.nama)}</strong>,</p><p>${JadwalEmailService.escapeHtml(params.intro)}</p><div style="border:1px solid #99f6e4;background:#f0fdfa;color:#115e59;border-radius:10px;padding:12px 14px;margin:18px 0;font-weight:700;">${JadwalEmailService.escapeHtml(params.highlight)}</div><h2 style="font-size:16px;">Ringkasan Jadwal</h2><table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;margin-bottom:18px;">${rows}</table><h2 style="font-size:16px;">Langkah Selanjutnya</h2><ol>${steps}</ol><p style="font-size:12px;color:#64748b;margin-top:24px;">Email ini dikirim otomatis oleh Sistem Informasi Seminar TIF UIN Suska Riau. Mohon tidak membalas email ini.</p></div></div></div>`;
+    const icsBlock = params.icsAttachment
+      ? `<p style="margin:18px 0;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#334155;">File kalender terlampir: <strong>${JadwalEmailService.escapeHtml(params.icsAttachment.filename)}</strong>. Silakan klik lampiran tersebut untuk menambahkan jadwal ke Google Calendar, Outlook, atau aplikasi kalender lain.</p>`
+      : '';
+
+    return `<div style="background:#f8fafc;padding:24px;font-family:Arial,sans-serif;color:#0f172a;"><div style="max-width:640px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;"><div style="background:#0f766e;color:#fff;padding:22px;"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Sistem Informasi Seminar TIF</div><h1 style="margin:8px 0 0;font-size:24px;">${JadwalEmailService.escapeHtml(params.title)}</h1></div><div style="padding:24px;"><p>Halo <strong>${JadwalEmailService.escapeHtml(params.recipient.nama)}</strong>,</p><p>${JadwalEmailService.escapeHtml(params.intro)}</p><div style="border:1px solid #99f6e4;background:#f0fdfa;color:#115e59;border-radius:10px;padding:12px 14px;margin:18px 0;font-weight:700;">${JadwalEmailService.escapeHtml(params.highlight)}</div><h2 style="font-size:16px;">Ringkasan Jadwal</h2><table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;margin-bottom:18px;">${rows}</table>${icsBlock}<h2 style="font-size:16px;">Langkah Selanjutnya</h2><ol>${steps}</ol><p style="font-size:12px;color:#64748b;margin-top:24px;">Email ini dikirim otomatis oleh Sistem Informasi Seminar TIF UIN Suska Riau. Mohon tidak membalas email ini.</p></div></div></div>`;
   }
 
   private static getStatusKelulusanLabel(status: StatusKelulusan) {
@@ -310,6 +353,59 @@ export default class JadwalEmailService {
       minute: '2-digit',
       hour12: false,
     }).format(new Date(value));
+  }
+
+  private static buildIcsAttachment(jadwal: any) {
+    const start = new Date(jadwal.waktu_mulai);
+    const end = new Date(jadwal.waktu_selesai);
+    const summary = `${jadwal.jenis_seminar?.nama ?? 'Seminar'} - ${jadwal.mahasiswa?.nama ?? jadwal.nim ?? '-'}`;
+    const location = jadwal.ruangan
+      ? `${jadwal.ruangan.nama ?? jadwal.ruangan.kode} (${jadwal.ruangan.kode})`
+      : (jadwal.kode_ruangan ?? '-');
+    const descriptionLines = [
+      `Jenis Seminar: ${jadwal.jenis_seminar?.nama ?? '-'}`,
+      `Mahasiswa: ${jadwal.mahasiswa?.nama ?? '-'} (${jadwal.nim ?? '-'})`,
+      `Tanggal: ${JadwalEmailService.formatDate(jadwal.tanggal)}`,
+      `Waktu: ${JadwalEmailService.formatTime(jadwal.waktu_mulai)} - ${JadwalEmailService.formatTime(jadwal.waktu_selesai)} WIB`,
+      `Ruangan: ${location}`,
+      `Tahun Ajaran: ${TahunAjaranHelper.parseStringNameByCode(jadwal.kode_tahun_ajaran) ?? '-'}`,
+    ];
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Sistem Informasi Seminar TIF UIN Suska//Jadwal Seminar//ID',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:jadwal-${jadwal.id}@seminar-tif.local`,
+      `DTSTAMP:${JadwalEmailService.toIcsUtc(new Date())}`,
+      `DTSTART:${JadwalEmailService.toIcsUtc(start)}`,
+      `DTEND:${JadwalEmailService.toIcsUtc(end)}`,
+      `SUMMARY:${JadwalEmailService.escapeIcsText(summary)}`,
+      `LOCATION:${JadwalEmailService.escapeIcsText(location)}`,
+      `DESCRIPTION:${JadwalEmailService.escapeIcsText(descriptionLines.join('\n'))}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+      '',
+    ].join('\r\n');
+
+    return {
+      filename: `jadwal-${jadwal.id}.ics`,
+      content: ics,
+      contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
+    };
+  }
+
+  private static toIcsUtc(value: Date) {
+    return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  }
+
+  private static escapeIcsText(value: string) {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/\r?\n/g, '\\n')
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;');
   }
 
   private static escapeHtml(value: string) {

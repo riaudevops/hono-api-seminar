@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { APIError } from '../../utils/api-error.util';
 import JenisSeminarService from './jenis-seminar.service';
 import type { UpsertJenisSeminarType } from './jenis-seminar.type';
 
@@ -6,6 +7,15 @@ export default class JenisSeminarHandler {
   public static async getAll(c: Context) {
     const onlyAktif = c.req.query('aktif') === 'true';
     return c.json(await JenisSeminarService.getAll(onlyAktif));
+  }
+
+  public static async getJenisSeminarSaya(c: Context) {
+    const user = c.get('user') as { email?: string } | undefined;
+    const email = user?.email;
+    if (!email) {
+      throw new APIError('Email tidak ditemukan pada token.', 401);
+    }
+    return c.json(await JenisSeminarService.getJenisSeminarSaya(email));
   }
 
   public static async getByKode(c: Context) {

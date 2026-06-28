@@ -4,8 +4,6 @@ import JadwalHelper from '../../helpers/jadwal.helper';
 import { APIError } from '../../utils/api-error.util';
 import { PenilaiRole, LogEntityType } from '@prisma/client';
 
-// ─── Mapping ───────────────────────────────────────────────────────
-
 const JENIS_LABEL: Record<string, { name: string; color: string }> = {
   SEMKP: { name: 'Seminar KP', color: '#8b5cf6' },
   SEMPRO: { name: 'Seminar Proposal', color: '#3b82f6' },
@@ -33,8 +31,6 @@ const JENIS_FRONTEND: Record<string, string> = {
 function jenisKode(jadwal: any): string {
   return jadwal.jenis_seminar?.kode || '';
 }
-
-// ─── Service ───────────────────────────────────────────────────────
 
 export default class KoordinatorService {
   public static async getDashboardStats() {
